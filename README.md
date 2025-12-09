@@ -1,0 +1,2 @@
+# claude_code_exterminal_memory
+claude codeさんが作業内容を記録するためのメモリ
