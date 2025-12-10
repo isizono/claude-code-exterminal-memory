@@ -50,6 +50,8 @@ def execute_query(query: str, params: tuple = ()) -> list[sqlite3.Row]:
     try:
         cursor = conn.execute(query, params)
         return cursor.fetchall()
+    except sqlite3.Error as e:
+        raise sqlite3.Error(f"クエリ実行エラー: {e}") from e
     finally:
         conn.close()
 
@@ -61,6 +63,9 @@ def execute_insert(query: str, params: tuple = ()) -> int:
         cursor = conn.execute(query, params)
         conn.commit()
         return cursor.lastrowid
+    except sqlite3.Error as e:
+        conn.rollback()
+        raise sqlite3.Error(f"INSERT実行エラー: {e}") from e
     finally:
         conn.close()
 
