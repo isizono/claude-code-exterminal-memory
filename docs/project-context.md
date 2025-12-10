@@ -132,6 +132,19 @@ mcp__knowledge__search
 
 **詳細設計**: 実装時に詰める（後回し）
 
+### プロジェクト管理の追加（合意済み - 2025-12-10）
+
+複数プロジェクトの議論・タスクを分離管理するため、projectsテーブルを追加。
+
+- **projectsテーブル**: プロジェクト情報を管理
+- **task_statusesテーブル**: タスクステータスを正規化
+- **TEXT→VARCHAR**: パフォーマンス改善のため、固定長フィールドはVARCHAR(255)に変更
+- **プロジェクトスコープ**: すべてのテーブルにproject_id追加（tasksとdiscussion_topics）
+- **API変更**:
+  - すべてのAPIにproject_id追加（引数の最初）
+  - get-topicsを3つに分割（get-topics, get-decided-topics, get-undecided-topics）
+  - 検索APIのproject_id必須化
+
 ### スコープ外（後回し）
 - 複数エージェント間の会話機能（Issue上でも代替可能 - 合意済み）
 - ベクトル化機能（将来の拡張として別リポジトリで実装予定 - 合意済み）
@@ -165,18 +178,51 @@ mcp__knowledge__search
 9. MCP: RDBに保存
 ```
 
-### テーブル設計（確定 - 2025-12-10）
+### テーブル設計（更新 - 2025-12-10）
+
+#### projectsテーブル（追加 - 2025-12-10）
+```sql
+CREATE TABLE projects (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  asana_url TEXT,  -- AsanaプロジェクトタスクのURL
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**目的**: プロジェクトを管理。複数プロジェクトの議論・タスクを分離する。
+
+**使用例:**
+```
+name: "claude-code-exterminal-memory"
+description: "MCPサーバーを作るよ〜"
+asana_url: "https://app.asana.com/0/..."
+```
+
+#### task_statusesテーブル（追加 - 2025-12-10）
+```sql
+CREATE TABLE task_statuses (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE
+);
+
+-- 初期データ
+INSERT INTO task_statuses (name) VALUES ('active'), ('completed'), ('cancelled');
+```
+
+**目的**: タスクのステータスを正規化。
 
 #### tasksテーブル
 ```sql
 CREATE TABLE tasks (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active', -- 'active', 'completed', 'cancelled'
-  asana_url TEXT,                        -- Asana専用カラム
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  status_id INTEGER NOT NULL DEFAULT 1 REFERENCES task_statuses(id),  -- 1='active'
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMP
 );
 ```
@@ -242,23 +288,67 @@ CREATE TABLE task_logs (
 
 **原則**: RDBには事実のみ。改善提案（事実じゃない）、学んだこと（→ knowledgeへ）は記録しない。
 
-#### decisionsテーブル
+#### discussion_topicsテーブル（更新 - 2025-12-10）
 ```sql
-CREATE TABLE decisions (
-  id SERIAL PRIMARY KEY,
-  matter TEXT NOT NULL,        -- 何を決めたか
-  decision TEXT NOT NULL,      -- 決定内容
-  reason TEXT NOT NULL,        -- 理由
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+CREATE TABLE discussion_topics (
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  parent_topic_id INTEGER REFERENCES discussion_topics(id),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
+**目的**: 議論すべきトピックを管理。親子関係を持つことで、議論の文脈を保持。プロジェクトごとに分離。
+
 **使用例:**
 ```
-matter: "Redisのagent_status機能をスコープに含めるか"
-decision: "スコープ外として後回しにする"
-reason: "複数エージェント協調機能自体が後回しなので、agent_statusも現時点では不要"
+project_id: 1
+title: "開発フローの詳細"
+description: "プランモードの使い方、タスク分解の粒度、作業手順を決定する"
+parent_topic_id: NULL  -- 最上位トピック
 ```
+
+#### discussion_logsテーブル（追加 - 2025-12-10）
+```sql
+CREATE TABLE discussion_logs (
+  id INTEGER PRIMARY KEY,
+  topic_id INTEGER NOT NULL REFERENCES discussion_topics(id),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**目的**: 議論のやりとりを記録（1レコード = 1やりとり）。
+
+**使用例:**
+```
+topic_id: 1
+content: "プランモードは設計議論フェーズでは不要。実装フェーズでTODO分解時に使用する。"
+```
+
+#### decisionsテーブル（更新 - 2025-12-10）
+```sql
+CREATE TABLE decisions (
+  id INTEGER PRIMARY KEY,
+  topic_id INTEGER REFERENCES discussion_topics(id),
+  decision TEXT NOT NULL,      -- 決定内容
+  reason TEXT NOT NULL,        -- 理由
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**目的**: 決定事項を記録。topicと紐付けることで、どの議論から生まれた決定かを追跡可能。
+
+**使用例:**
+```
+topic_id: 2  -- "プランモードの使い方"
+decision: "設計議論フェーズではプランモード不要。実装フェーズでtaskを実行する前にプランモードで具体的TODO分解を行う。"
+reason: "設計議論では自由に発散→収束させたい。実装時は認識合わせが必要。"
+```
+
+**導入背景（dogfooding）**: このプロジェクトで設計中のシステムを、プロジェクト自体の議論記録に使用する。docs/での記録をDBに移行し、MCPツールで操作可能にする。
 
 ### 技術スタック（更新中 - 2025-12-10）
 
