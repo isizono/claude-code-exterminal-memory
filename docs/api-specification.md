@@ -2,10 +2,11 @@
 
 ## 概要
 
-Claude Code用の外部メモリシステムのMCPツール仕様。議論トピック、議論ログ、決定事項を管理する。
+Claude Code用の外部メモリシステムのMCPツール仕様。プロジェクト、議論トピック、議論ログ、決定事項、タスクを管理する。
 
 ### 設計原則
 
+- **プロジェクト分離**: 複数プロジェクトの議論・タスクを分離管理
 - **イミュータブル**: 一度記録したデータは更新・削除しない
 - **議論の終了**: 削除の代わりに、決定事項（decision）に理由を記録して議論を終了させる
 - **親子関係**: トピック間で親子関係を持ち、議論の文脈を保持する
@@ -15,27 +16,104 @@ Claude Code用の外部メモリシステムのMCPツール仕様。議論トピ
 
 ## ツール一覧
 
-### 書き込み系
+### プロジェクト管理系
 
-1. [add-topic](#add-topic) - トピックを追加
-2. [add-log](#add-log) - 議論ログを追加
-3. [add-decision](#add-decision) - 決定事項を追加
+1. [add-project](#add-project) - プロジェクトを追加
+2. [get-projects](#get-projects) - プロジェクト一覧を取得
 
-### 読み取り系
+### トピック管理系（書き込み）
 
-4. [get-topics](#get-topics) - トピック一覧を取得（1階層）
-5. [get-topic-tree](#get-topic-tree) - トピックツリーを取得（再帰的）
-6. [get-logs](#get-logs) - 議論ログを取得
-7. [get-decisions](#get-decisions) - 決定事項を取得
+3. [add-topic](#add-topic) - トピックを追加
+4. [add-log](#add-log) - 議論ログを追加
+5. [add-decision](#add-decision) - 決定事項を追加
+
+### トピック管理系（読み取り）
+
+6. [get-topics](#get-topics) - トピック一覧を取得（1階層・全件）
+7. [get-decided-topics](#get-decided-topics) - 決定済みトピック一覧を取得（1階層）
+8. [get-undecided-topics](#get-undecided-topics) - 未決定トピック一覧を取得（1階層）
+9. [get-topic-tree](#get-topic-tree) - トピックツリーを取得（再帰的）
+10. [get-logs](#get-logs) - 議論ログを取得
+11. [get-decisions](#get-decisions) - 決定事項を取得
 
 ### 検索系
 
-8. [search-topics](#search-topics) - トピックをキーワード検索
-9. [search-decisions](#search-decisions) - 決定事項をキーワード検索
+12. [search-topics](#search-topics) - トピックをキーワード検索
+13. [search-decisions](#search-decisions) - 決定事項をキーワード検索
 
 ---
 
 ## ツール詳細
+
+### add-project
+
+新しいプロジェクトを追加する。
+
+**Parameters:**
+
+| 名前 | 型 | 必須 | 説明 |
+|------|------|------|------|
+| `name` | string | ✓ | プロジェクト名（ユニーク） |
+| `description` | string | | プロジェクトの説明 |
+| `asana_url` | string | | AsanaプロジェクトタスクのURL |
+
+**Returns:**
+
+```json
+{
+  "project_id": 1,
+  "name": "claude-code-exterminal-memory",
+  "description": "MCPサーバーを作るよ〜",
+  "asana_url": "https://app.asana.com/0/...",
+  "created_at": "2025-12-10T10:00:00Z"
+}
+```
+
+**Example:**
+
+```python
+result = mcp.add_project(
+    name="claude-code-exterminal-memory",
+    description="MCPサーバーを作るよ〜",
+    asana_url="https://app.asana.com/0/..."
+)
+```
+
+---
+
+### get-projects
+
+プロジェクト一覧を取得する。
+
+**Parameters:**
+
+| 名前 | 型 | 必須 | デフォルト | 説明 |
+|------|------|------|------|------|
+| `limit` | integer | | 30 | 取得件数上限（最大30件） |
+
+**Returns:**
+
+```json
+{
+  "projects": [
+    {
+      "id": 1,
+      "name": "claude-code-exterminal-memory",
+      "description": "MCPサーバーを作るよ〜",
+      "asana_url": "https://app.asana.com/0/...",
+      "created_at": "2025-12-10T10:00:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```python
+result = mcp.get_projects()
+```
+
+---
 
 ### add-topic
 
@@ -45,7 +123,8 @@ Claude Code用の外部メモリシステムのMCPツール仕様。議論トピ
 
 | 名前 | 型 | 必須 | 説明 |
 |------|------|------|------|
-| `title` | string | ✓ | トピックのタイトル（例：「開発フローの詳細」） |
+| `project_id` | integer | ✓ | プロジェクトID |
+| `title` | string | ✓ | トピックのタイトル |
 | `description` | string | | トピックの説明 |
 | `parent_topic_id` | integer | | 親トピックのID（未指定なら最上位トピック） |
 
@@ -54,6 +133,7 @@ Claude Code用の外部メモリシステムのMCPツール仕様。議論トピ
 ```json
 {
   "topic_id": 1,
+  "project_id": 1,
   "title": "開発フローの詳細",
   "description": "プランモードの使い方、タスク分解の粒度を決定する",
   "parent_topic_id": null,
@@ -65,6 +145,7 @@ Claude Code用の外部メモリシステムのMCPツール仕様。議論トピ
 
 ```python
 result = mcp.add_topic(
+    project_id=1,
     title="開発フローの詳細",
     description="プランモードの使い方、タスク分解の粒度を決定する"
 )
@@ -150,12 +231,13 @@ result = mcp.add_decision(
 
 ### get-topics
 
-指定した親トピックの直下の子トピックを取得する（1階層のみ）。
+指定した親トピックの直下の子トピックを取得する（1階層・全件）。
 
 **Parameters:**
 
 | 名前 | 型 | 必須 | デフォルト | 説明 |
 |------|------|------|------|------|
+| `project_id` | integer | ✓ | | プロジェクトID |
 | `parent_topic_id` | integer | | null | 親トピックのID（未指定なら最上位トピックのみ取得） |
 | `limit` | integer | | 10 | 取得件数上限（最大10件） |
 
@@ -166,17 +248,11 @@ result = mcp.add_decision(
   "topics": [
     {
       "id": 1,
+      "project_id": 1,
       "title": "開発フローの詳細",
       "description": "...",
       "parent_topic_id": null,
       "created_at": "2025-12-10T10:00:00Z"
-    },
-    {
-      "id": 2,
-      "title": "MCPツールの設計",
-      "description": "...",
-      "parent_topic_id": null,
-      "created_at": "2025-12-10T10:01:00Z"
     }
   ]
 }
@@ -186,10 +262,92 @@ result = mcp.add_decision(
 
 ```python
 # 最上位トピックを取得
-result = mcp.get_topics()
+result = mcp.get_topics(project_id=1)
 
 # 特定トピックの子トピックを取得
-result = mcp.get_topics(parent_topic_id=1)
+result = mcp.get_topics(project_id=1, parent_topic_id=1)
+```
+
+---
+
+### get-decided-topics
+
+指定した親トピックの直下の子トピックのうち、決定済み（decisionが存在する）トピックのみを取得する（1階層）。
+
+**Parameters:**
+
+| 名前 | 型 | 必須 | デフォルト | 説明 |
+|------|------|------|------|------|
+| `project_id` | integer | ✓ | | プロジェクトID |
+| `parent_topic_id` | integer | | null | 親トピックのID（未指定なら最上位トピックのみ取得） |
+| `limit` | integer | | 10 | 取得件数上限（最大10件） |
+
+**Returns:**
+
+```json
+{
+  "topics": [
+    {
+      "id": 2,
+      "project_id": 1,
+      "title": "プランモードの使い方",
+      "description": "...",
+      "parent_topic_id": 1,
+      "created_at": "2025-12-10T10:01:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```python
+# 最上位の決定済みトピックを取得
+result = mcp.get_decided_topics(project_id=1)
+
+# 特定トピック配下の決定済みトピックを取得
+result = mcp.get_decided_topics(project_id=1, parent_topic_id=1)
+```
+
+---
+
+### get-undecided-topics
+
+指定した親トピックの直下の子トピックのうち、未決定（decisionが存在しない）トピックのみを取得する（1階層）。
+
+**Parameters:**
+
+| 名前 | 型 | 必須 | デフォルト | 説明 |
+|------|------|------|------|------|
+| `project_id` | integer | ✓ | | プロジェクトID |
+| `parent_topic_id` | integer | | null | 親トピックのID（未指定なら最上位トピックのみ取得） |
+| `limit` | integer | | 10 | 取得件数上限（最大10件） |
+
+**Returns:**
+
+```json
+{
+  "topics": [
+    {
+      "id": 3,
+      "project_id": 1,
+      "title": "MCPツールの詳細設計",
+      "description": "...",
+      "parent_topic_id": 1,
+      "created_at": "2025-12-10T10:02:00Z"
+    }
+  ]
+}
+```
+
+**Example:**
+
+```python
+# 最上位の未決定トピックを取得
+result = mcp.get_undecided_topics(project_id=1)
+
+# 特定トピック配下の未決定トピックを取得
+result = mcp.get_undecided_topics(project_id=1, parent_topic_id=1)
 ```
 
 ---
@@ -202,51 +360,41 @@ result = mcp.get_topics(parent_topic_id=1)
 
 | 名前 | 型 | 必須 | デフォルト | 説明 |
 |------|------|------|------|------|
-| `topic_id` | integer | | null | 起点となるトピックのID（未指定なら最上位から全ツリー） |
+| `project_id` | integer | ✓ | | プロジェクトID |
+| `topic_id` | integer | ✓ | | 起点となるトピックのID |
 | `limit` | integer | | 100 | 取得件数上限（最大100件） |
 
 **Returns:**
 
 ```json
 {
-  "topics": [
-    {
-      "id": 1,
-      "title": "開発フローの詳細",
-      "description": "...",
-      "parent_topic_id": null,
-      "created_at": "2025-12-10T10:00:00Z",
-      "children": [
-        {
-          "id": 2,
-          "title": "プランモードの使い方",
-          "description": "...",
-          "parent_topic_id": 1,
-          "created_at": "2025-12-10T10:01:00Z",
-          "children": []
-        },
-        {
-          "id": 3,
-          "title": "タスク分解の粒度",
-          "description": "...",
-          "parent_topic_id": 1,
-          "created_at": "2025-12-10T10:02:00Z",
-          "children": []
-        }
-      ]
-    }
-  ]
+  "tree": {
+    "id": 1,
+    "project_id": 1,
+    "title": "開発フローの詳細",
+    "description": "...",
+    "parent_topic_id": null,
+    "created_at": "2025-12-10T10:00:00Z",
+    "children": [
+      {
+        "id": 2,
+        "project_id": 1,
+        "title": "プランモードの使い方",
+        "description": "...",
+        "parent_topic_id": 1,
+        "created_at": "2025-12-10T10:01:00Z",
+        "children": []
+      }
+    ]
+  }
 }
 ```
 
 **Example:**
 
 ```python
-# 全ツリーを取得
-result = mcp.get_topic_tree()
-
 # 特定トピックを起点にツリーを取得
-result = mcp.get_topic_tree(topic_id=1)
+result = mcp.get_topic_tree(project_id=1, topic_id=1)
 ```
 
 **Note:**
@@ -341,10 +489,6 @@ result = mcp.get_decisions(topic_id=1)
 result = mcp.get_decisions(topic_id=1, start_id=31)
 ```
 
-**Note:**
-
-全決定事項を取得したい場合は、トピックツリーを探索するか、`search-decisions`を使用する。
-
 ---
 
 ### search-topics
@@ -355,6 +499,7 @@ result = mcp.get_decisions(topic_id=1, start_id=31)
 
 | 名前 | 型 | 必須 | 説明 |
 |------|------|------|------|
+| `project_id` | integer | ✓ | プロジェクトID |
 | `keyword` | string | ✓ | 検索キーワード（title, descriptionから部分一致） |
 | `limit` | integer | | 30 | 取得件数上限（最大30件） |
 
@@ -365,6 +510,7 @@ result = mcp.get_decisions(topic_id=1, start_id=31)
   "topics": [
     {
       "id": 1,
+      "project_id": 1,
       "title": "開発フローの詳細",
       "description": "プランモードの使い方、タスク分解の粒度を決定する",
       "parent_topic_id": null,
@@ -377,7 +523,7 @@ result = mcp.get_decisions(topic_id=1, start_id=31)
 **Example:**
 
 ```python
-result = mcp.search_topics(keyword="プランモード")
+result = mcp.search_topics(project_id=1, keyword="プランモード")
 ```
 
 ---
@@ -390,6 +536,7 @@ result = mcp.search_topics(keyword="プランモード")
 
 | 名前 | 型 | 必須 | 説明 |
 |------|------|------|------|
+| `project_id` | integer | ✓ | プロジェクトID |
 | `keyword` | string | ✓ | 検索キーワード（decision, reasonから部分一致） |
 | `limit` | integer | | 30 | 取得件数上限（最大30件） |
 
@@ -412,7 +559,7 @@ result = mcp.search_topics(keyword="プランモード")
 **Example:**
 
 ```python
-result = mcp.search_decisions(keyword="プランモード")
+result = mcp.search_decisions(project_id=1, keyword="プランモード")
 ```
 
 ---
@@ -425,7 +572,7 @@ result = mcp.search_decisions(keyword="プランモード")
 {
   "error": {
     "code": "INVALID_PARAMETER",
-    "message": "topic_id is required"
+    "message": "project_id is required"
   }
 }
 ```

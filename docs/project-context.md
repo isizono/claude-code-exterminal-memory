@@ -132,6 +132,19 @@ mcp__knowledge__search
 
 **詳細設計**: 実装時に詰める（後回し）
 
+### プロジェクト管理の追加（合意済み - 2025-12-10）
+
+複数プロジェクトの議論・タスクを分離管理するため、projectsテーブルを追加。
+
+- **projectsテーブル**: プロジェクト情報を管理
+- **task_statusesテーブル**: タスクステータスを正規化
+- **TEXT→VARCHAR**: パフォーマンス改善のため、固定長フィールドはVARCHAR(255)に変更
+- **プロジェクトスコープ**: すべてのテーブルにproject_id追加（tasksとdiscussion_topics）
+- **API変更**:
+  - すべてのAPIにproject_id追加（引数の最初）
+  - get-topicsを3つに分割（get-topics, get-decided-topics, get-undecided-topics）
+  - 検索APIのproject_id必須化
+
 ### スコープ外（後回し）
 - 複数エージェント間の会話機能（Issue上でも代替可能 - 合意済み）
 - ベクトル化機能（将来の拡張として別リポジトリで実装予定 - 合意済み）
@@ -165,18 +178,51 @@ mcp__knowledge__search
 9. MCP: RDBに保存
 ```
 
-### テーブル設計（確定 - 2025-12-10）
+### テーブル設計（更新 - 2025-12-10）
+
+#### projectsテーブル（追加 - 2025-12-10）
+```sql
+CREATE TABLE projects (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  asana_url TEXT,  -- AsanaプロジェクトタスクのURL
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**目的**: プロジェクトを管理。複数プロジェクトの議論・タスクを分離する。
+
+**使用例:**
+```
+name: "claude-code-exterminal-memory"
+description: "MCPサーバーを作るよ〜"
+asana_url: "https://app.asana.com/0/..."
+```
+
+#### task_statusesテーブル（追加 - 2025-12-10）
+```sql
+CREATE TABLE task_statuses (
+  id INTEGER PRIMARY KEY,
+  name VARCHAR(255) NOT NULL UNIQUE
+);
+
+-- 初期データ
+INSERT INTO task_statuses (name) VALUES ('active'), ('completed'), ('cancelled');
+```
+
+**目的**: タスクのステータスを正規化。
 
 #### tasksテーブル
 ```sql
 CREATE TABLE tasks (
-  id SERIAL PRIMARY KEY,
-  title TEXT NOT NULL,
+  id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
+  title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'active', -- 'active', 'completed', 'cancelled'
-  asana_url TEXT,                        -- Asana専用カラム
-  created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  status_id INTEGER NOT NULL DEFAULT 1 REFERENCES task_statuses(id),  -- 1='active'
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   completed_at TIMESTAMP
 );
 ```
@@ -242,21 +288,23 @@ CREATE TABLE task_logs (
 
 **原則**: RDBには事実のみ。改善提案（事実じゃない）、学んだこと（→ knowledgeへ）は記録しない。
 
-#### discussion_topicsテーブル（追加 - 2025-12-10）
+#### discussion_topicsテーブル（更新 - 2025-12-10）
 ```sql
 CREATE TABLE discussion_topics (
   id INTEGER PRIMARY KEY,
+  project_id INTEGER NOT NULL REFERENCES projects(id),
   parent_topic_id INTEGER REFERENCES discussion_topics(id),
-  title TEXT NOT NULL,
+  title VARCHAR(255) NOT NULL,
   description TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-**目的**: 議論すべきトピックを管理。親子関係を持つことで、議論の文脈を保持。
+**目的**: 議論すべきトピックを管理。親子関係を持つことで、議論の文脈を保持。プロジェクトごとに分離。
 
 **使用例:**
 ```
+project_id: 1
 title: "開発フローの詳細"
 description: "プランモードの使い方、タスク分解の粒度、作業手順を決定する"
 parent_topic_id: NULL  -- 最上位トピック
