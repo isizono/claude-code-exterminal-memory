@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.main import add_project_impl as add_project, get_projects_impl as get_projects
+from src.services.project_service import add_project, get_projects
 
 
 @pytest.fixture

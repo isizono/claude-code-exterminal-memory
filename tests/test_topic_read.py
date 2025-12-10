@@ -3,18 +3,16 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.main import (
-    add_project_impl as add_project,
-    add_topic_impl as add_topic,
-    add_log_impl as add_log,
-    add_decision_impl as add_decision,
-    get_topics_impl as get_topics,
-    get_decided_topics_impl as get_decided_topics,
-    get_undecided_topics_impl as get_undecided_topics,
-    get_logs_impl as get_logs,
-    get_decisions_impl as get_decisions,
-    get_topic_tree_impl as get_topic_tree,
+from src.services.project_service import add_project
+from src.services.topic_service import (
+    add_topic,
+    get_topics,
+    get_decided_topics,
+    get_undecided_topics,
+    get_topic_tree,
 )
+from src.services.discussion_log_service import add_log, get_logs
+from src.services.decision_service import add_decision, get_decisions
 
 
 @pytest.fixture

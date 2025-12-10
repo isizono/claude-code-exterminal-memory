@@ -54,7 +54,7 @@ Claude Code用の外部メモリシステムのMCPツール仕様。プロジェ
 | 名前 | 型 | 必須 | 説明 |
 |------|------|------|------|
 | `name` | string | ✓ | プロジェクト名（ユニーク） |
-| `description` | string | | プロジェクトの説明 |
+| `description` | string | ✓ | プロジェクトの説明 |
 | `asana_url` | string | | AsanaプロジェクトタスクのURL |
 
 **Returns:**
@@ -125,7 +125,7 @@ result = mcp.get_projects()
 |------|------|------|------|
 | `project_id` | integer | ✓ | プロジェクトID |
 | `title` | string | ✓ | トピックのタイトル |
-| `description` | string | | トピックの説明 |
+| `description` | string | ✓ | トピックの説明 |
 | `parent_topic_id` | integer | | 親トピックのID（未指定なら最上位トピック） |
 
 **Returns:**

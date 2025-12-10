@@ -3,13 +3,10 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.main import (
-    add_project_impl as add_project,
-    add_topic_impl as add_topic,
-    add_decision_impl as add_decision,
-    search_topics_impl as search_topics,
-    search_decisions_impl as search_decisions,
-)
+from src.services.project_service import add_project
+from src.services.topic_service import add_topic
+from src.services.decision_service import add_decision
+from src.services.search_service import search_topics, search_decisions
 
 
 @pytest.fixture
