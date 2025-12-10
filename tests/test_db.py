@@ -35,7 +35,7 @@ def test_get_db_path_default():
         del os.environ["DISCUSSION_DB_PATH"]
 
     path = get_db_path()
-    assert path.endswith(".claude-code-memory/discussion.db")
+    assert path.endswith(".claude/.claude-code-memory/discussion.db")
 
 
 def test_init_database(temp_db):
