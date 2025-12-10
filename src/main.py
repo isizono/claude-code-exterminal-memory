@@ -96,6 +96,144 @@ def get_projects_impl(limit: int = 30) -> dict:
         }
 
 
+def add_topic_impl(
+    project_id: int,
+    title: str,
+    description: Optional[str] = None,
+    parent_topic_id: Optional[int] = None,
+) -> dict:
+    """
+    新しい議論トピックを追加する。
+
+    Args:
+        project_id: プロジェクトID
+        title: トピックのタイトル
+        description: トピックの説明
+        parent_topic_id: 親トピックのID（未指定なら最上位トピック）
+
+    Returns:
+        作成されたトピック情報
+    """
+    try:
+        topic_id = execute_insert(
+            "INSERT INTO discussion_topics (project_id, title, description, parent_topic_id) VALUES (?, ?, ?, ?)",
+            (project_id, title, description, parent_topic_id),
+        )
+
+        # 作成したトピックを取得
+        rows = execute_query(
+            "SELECT * FROM discussion_topics WHERE id = ?", (topic_id,)
+        )
+        if rows:
+            topic = row_to_dict(rows[0])
+            return {
+                "topic_id": topic["id"],
+                "project_id": topic["project_id"],
+                "title": topic["title"],
+                "description": topic["description"],
+                "parent_topic_id": topic["parent_topic_id"],
+                "created_at": topic["created_at"],
+            }
+        else:
+            raise Exception("Failed to retrieve created topic")
+
+    except Exception as e:
+        return {
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": str(e),
+            }
+        }
+
+
+def add_log_impl(topic_id: int, content: str) -> dict:
+    """
+    トピックに議論ログ（1やりとり）を追加する。
+
+    Args:
+        topic_id: 対象トピックのID
+        content: 議論内容（マークダウン可）
+
+    Returns:
+        作成されたログ情報
+    """
+    try:
+        log_id = execute_insert(
+            "INSERT INTO discussion_logs (topic_id, content) VALUES (?, ?)",
+            (topic_id, content),
+        )
+
+        # 作成したログを取得
+        rows = execute_query(
+            "SELECT * FROM discussion_logs WHERE id = ?", (log_id,)
+        )
+        if rows:
+            log = row_to_dict(rows[0])
+            return {
+                "log_id": log["id"],
+                "topic_id": log["topic_id"],
+                "content": log["content"],
+                "created_at": log["created_at"],
+            }
+        else:
+            raise Exception("Failed to retrieve created log")
+
+    except Exception as e:
+        return {
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": str(e),
+            }
+        }
+
+
+def add_decision_impl(
+    decision: str,
+    reason: str,
+    topic_id: Optional[int] = None,
+) -> dict:
+    """
+    決定事項を記録する。
+
+    Args:
+        decision: 決定内容
+        reason: 決定の理由
+        topic_id: 関連するトピックのID（未指定も可）
+
+    Returns:
+        作成された決定事項情報
+    """
+    try:
+        decision_id = execute_insert(
+            "INSERT INTO decisions (topic_id, decision, reason) VALUES (?, ?, ?)",
+            (topic_id, decision, reason),
+        )
+
+        # 作成した決定事項を取得
+        rows = execute_query(
+            "SELECT * FROM decisions WHERE id = ?", (decision_id,)
+        )
+        if rows:
+            dec = row_to_dict(rows[0])
+            return {
+                "decision_id": dec["id"],
+                "topic_id": dec["topic_id"],
+                "decision": dec["decision"],
+                "reason": dec["reason"],
+                "created_at": dec["created_at"],
+            }
+        else:
+            raise Exception("Failed to retrieve created decision")
+
+    except Exception as e:
+        return {
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": str(e),
+            }
+        }
+
+
 # MCPツール定義
 @mcp.tool()
 def add_project(
@@ -129,3 +267,60 @@ def get_projects(limit: int = 30) -> dict:
         プロジェクト一覧
     """
     return get_projects_impl(limit)
+
+
+@mcp.tool()
+def add_topic(
+    project_id: int,
+    title: str,
+    description: Optional[str] = None,
+    parent_topic_id: Optional[int] = None,
+) -> dict:
+    """
+    新しい議論トピックを追加する。
+
+    Args:
+        project_id: プロジェクトID
+        title: トピックのタイトル
+        description: トピックの説明
+        parent_topic_id: 親トピックのID（未指定なら最上位トピック）
+
+    Returns:
+        作成されたトピック情報
+    """
+    return add_topic_impl(project_id, title, description, parent_topic_id)
+
+
+@mcp.tool()
+def add_log(topic_id: int, content: str) -> dict:
+    """
+    トピックに議論ログ（1やりとり）を追加する。
+
+    Args:
+        topic_id: 対象トピックのID
+        content: 議論内容（マークダウン可）
+
+    Returns:
+        作成されたログ情報
+    """
+    return add_log_impl(topic_id, content)
+
+
+@mcp.tool()
+def add_decision(
+    decision: str,
+    reason: str,
+    topic_id: Optional[int] = None,
+) -> dict:
+    """
+    決定事項を記録する。
+
+    Args:
+        decision: 決定内容
+        reason: 決定の理由
+        topic_id: 関連するトピックのID（未指定も可）
+
+    Returns:
+        作成された決定事項情報
+    """
+    return add_decision_impl(decision, reason, topic_id)
