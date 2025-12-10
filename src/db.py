@@ -14,7 +14,7 @@ def get_db_path() -> str:
     # デフォルトは ~/.claude/.claude-code-memory/discussion.db
     home = Path.home()
     db_dir = home / ".claude" / ".claude-code-memory"
-    db_dir.mkdir(parents=True, exist_ok=True)
+    db_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     return str(db_dir / "discussion.db")
 
 

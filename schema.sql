@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS projects (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name VARCHAR(255) NOT NULL UNIQUE,
-  description TEXT,
+  description TEXT NOT NULL DEFAULT '',
   asana_url TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS discussion_topics (
   project_id INTEGER NOT NULL REFERENCES projects(id),
   parent_topic_id INTEGER REFERENCES discussion_topics(id),
   title VARCHAR(255) NOT NULL,
-  description TEXT,
+  description TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
