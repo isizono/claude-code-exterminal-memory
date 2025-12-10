@@ -56,7 +56,6 @@ def add_topic(
 def get_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
-    limit: int = 10,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックを取得する（1階層・全件）。
@@ -64,25 +63,19 @@ def get_topics(
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-        limit: 取得件数上限（最大10件）
 
     Returns:
         トピック一覧
     """
     try:
-        # limitを10件に制限
-        limit = min(limit, 10)
-
-        # parent_topic_id が None の場合は IS NULL を使う
         if parent_topic_id is None:
             rows = execute_query(
                 """
                 SELECT * FROM discussion_topics
                 WHERE project_id = ? AND parent_topic_id IS NULL
                 ORDER BY created_at ASC, id ASC
-                LIMIT ?
                 """,
-                (project_id, limit),
+                (project_id,),
             )
         else:
             rows = execute_query(
@@ -90,9 +83,8 @@ def get_topics(
                 SELECT * FROM discussion_topics
                 WHERE project_id = ? AND parent_topic_id = ?
                 ORDER BY created_at ASC, id ASC
-                LIMIT ?
                 """,
-                (project_id, parent_topic_id, limit),
+                (project_id, parent_topic_id),
             )
 
         topics = []
@@ -121,7 +113,6 @@ def get_topics(
 def get_decided_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
-    limit: int = 10,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックのうち、決定済み（decisionが存在する）トピックのみを取得する（1階層）。
@@ -129,16 +120,11 @@ def get_decided_topics(
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-        limit: 取得件数上限（最大10件）
 
     Returns:
         決定済みトピック一覧
     """
     try:
-        # limitを10件に制限
-        limit = min(limit, 10)
-
-        # parent_topic_id が None の場合は IS NULL を使う
         if parent_topic_id is None:
             rows = execute_query(
                 """
@@ -146,9 +132,8 @@ def get_decided_topics(
                 WHERE dt.project_id = ? AND dt.parent_topic_id IS NULL
                   AND EXISTS (SELECT 1 FROM decisions d WHERE d.topic_id = dt.id)
                 ORDER BY dt.created_at ASC, dt.id ASC
-                LIMIT ?
                 """,
-                (project_id, limit),
+                (project_id,),
             )
         else:
             rows = execute_query(
@@ -157,9 +142,8 @@ def get_decided_topics(
                 WHERE dt.project_id = ? AND dt.parent_topic_id = ?
                   AND EXISTS (SELECT 1 FROM decisions d WHERE d.topic_id = dt.id)
                 ORDER BY dt.created_at ASC, dt.id ASC
-                LIMIT ?
                 """,
-                (project_id, parent_topic_id, limit),
+                (project_id, parent_topic_id),
             )
 
         topics = []
@@ -188,7 +172,6 @@ def get_decided_topics(
 def get_undecided_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
-    limit: int = 10,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックのうち、未決定（decisionが存在しない）トピックのみを取得する（1階層）。
@@ -196,16 +179,11 @@ def get_undecided_topics(
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-        limit: 取得件数上限（最大10件）
 
     Returns:
         未決定トピック一覧
     """
     try:
-        # limitを10件に制限
-        limit = min(limit, 10)
-
-        # parent_topic_id が None の場合は IS NULL を使う
         if parent_topic_id is None:
             rows = execute_query(
                 """
@@ -213,9 +191,8 @@ def get_undecided_topics(
                 WHERE dt.project_id = ? AND dt.parent_topic_id IS NULL
                   AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.topic_id = dt.id)
                 ORDER BY dt.created_at ASC, dt.id ASC
-                LIMIT ?
                 """,
-                (project_id, limit),
+                (project_id,),
             )
         else:
             rows = execute_query(
@@ -224,9 +201,8 @@ def get_undecided_topics(
                 WHERE dt.project_id = ? AND dt.parent_topic_id = ?
                   AND NOT EXISTS (SELECT 1 FROM decisions d WHERE d.topic_id = dt.id)
                 ORDER BY dt.created_at ASC, dt.id ASC
-                LIMIT ?
                 """,
-                (project_id, parent_topic_id, limit),
+                (project_id, parent_topic_id),
             )
 
         topics = []

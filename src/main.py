@@ -109,7 +109,6 @@ def add_decision(
 def get_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
-    limit: int = 10,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックを取得する（1階層・全件）。
@@ -117,19 +116,17 @@ def get_topics(
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-        limit: 取得件数上限（最大10件）
 
     Returns:
         トピック一覧
     """
-    return topic_service.get_topics(project_id, parent_topic_id, limit)
+    return topic_service.get_topics(project_id, parent_topic_id)
 
 
 @mcp.tool()
 def get_decided_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
-    limit: int = 10,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックのうち、決定済み（decisionが存在する）トピックのみを取得する（1階層）。
@@ -137,19 +134,17 @@ def get_decided_topics(
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-        limit: 取得件数上限（最大10件）
 
     Returns:
         決定済みトピック一覧
     """
-    return topic_service.get_decided_topics(project_id, parent_topic_id, limit)
+    return topic_service.get_decided_topics(project_id, parent_topic_id)
 
 
 @mcp.tool()
 def get_undecided_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
-    limit: int = 10,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックのうち、未決定（decisionが存在しない）トピックのみを取得する（1階層）。
@@ -157,12 +152,11 @@ def get_undecided_topics(
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-        limit: 取得件数上限（最大10件）
 
     Returns:
         未決定トピック一覧
     """
-    return topic_service.get_undecided_topics(project_id, parent_topic_id, limit)
+    return topic_service.get_undecided_topics(project_id, parent_topic_id)
 
 
 @mcp.tool()

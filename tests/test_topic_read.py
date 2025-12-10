@@ -90,31 +90,6 @@ def test_get_topics_child_level(test_project):
     assert result["topics"][0]["parent_topic_id"] == parent["topic_id"]
 
 
-def test_get_topics_with_limit(test_project):
-    """limit指定で取得件数を制限できる"""
-    # 5つトピックを作成
-    for i in range(5):
-        add_topic(project_id=test_project, title=f"Topic {i}")
-
-    result = get_topics(project_id=test_project, limit=3)
-
-    assert "error" not in result
-    assert len(result["topics"]) == 3
-
-
-def test_get_topics_limit_max_10(test_project):
-    """limitは最大10件に制限される"""
-    # 15個トピックを作成
-    for i in range(15):
-        add_topic(project_id=test_project, title=f"Topic {i}")
-
-    # 20件要求しても10件まで
-    result = get_topics(project_id=test_project, limit=20)
-
-    assert "error" not in result
-    assert len(result["topics"]) == 10
-
-
 # ========================================
 # get-decided-topics のテスト
 # ========================================
