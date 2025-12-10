@@ -242,23 +242,65 @@ CREATE TABLE task_logs (
 
 **原則**: RDBには事実のみ。改善提案（事実じゃない）、学んだこと（→ knowledgeへ）は記録しない。
 
-#### decisionsテーブル
+#### discussion_topicsテーブル（追加 - 2025-12-10）
 ```sql
-CREATE TABLE decisions (
-  id SERIAL PRIMARY KEY,
-  matter TEXT NOT NULL,        -- 何を決めたか
-  decision TEXT NOT NULL,      -- 決定内容
-  reason TEXT NOT NULL,        -- 理由
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+CREATE TABLE discussion_topics (
+  id INTEGER PRIMARY KEY,
+  parent_topic_id INTEGER REFERENCES discussion_topics(id),
+  title TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
+**目的**: 議論すべきトピックを管理。親子関係を持つことで、議論の文脈を保持。
+
 **使用例:**
 ```
-matter: "Redisのagent_status機能をスコープに含めるか"
-decision: "スコープ外として後回しにする"
-reason: "複数エージェント協調機能自体が後回しなので、agent_statusも現時点では不要"
+title: "開発フローの詳細"
+description: "プランモードの使い方、タスク分解の粒度、作業手順を決定する"
+parent_topic_id: NULL  -- 最上位トピック
 ```
+
+#### discussion_logsテーブル（追加 - 2025-12-10）
+```sql
+CREATE TABLE discussion_logs (
+  id INTEGER PRIMARY KEY,
+  topic_id INTEGER NOT NULL REFERENCES discussion_topics(id),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**目的**: 議論のやりとりを記録（1レコード = 1やりとり）。
+
+**使用例:**
+```
+topic_id: 1
+content: "プランモードは設計議論フェーズでは不要。実装フェーズでTODO分解時に使用する。"
+```
+
+#### decisionsテーブル（更新 - 2025-12-10）
+```sql
+CREATE TABLE decisions (
+  id INTEGER PRIMARY KEY,
+  topic_id INTEGER REFERENCES discussion_topics(id),
+  decision TEXT NOT NULL,      -- 決定内容
+  reason TEXT NOT NULL,        -- 理由
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+**目的**: 決定事項を記録。topicと紐付けることで、どの議論から生まれた決定かを追跡可能。
+
+**使用例:**
+```
+topic_id: 2  -- "プランモードの使い方"
+decision: "設計議論フェーズではプランモード不要。実装フェーズでtaskを実行する前にプランモードで具体的TODO分解を行う。"
+reason: "設計議論では自由に発散→収束させたい。実装時は認識合わせが必要。"
+```
+
+**導入背景（dogfooding）**: このプロジェクトで設計中のシステムを、プロジェクト自体の議論記録に使用する。docs/での記録をDBに移行し、MCPツールで操作可能にする。
 
 ### 技術スタック（更新中 - 2025-12-10）
 
