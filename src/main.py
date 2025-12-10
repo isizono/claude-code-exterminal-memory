@@ -17,7 +17,7 @@ mcp = FastMCP("Discussion Recording System")
 @mcp.tool()
 def add_project(
     name: str,
-    description: Optional[str] = None,
+    description: str,
     asana_url: Optional[str] = None,
 ) -> dict:
     """
@@ -52,7 +52,7 @@ def get_projects(limit: int = 30) -> dict:
 def add_topic(
     project_id: int,
     title: str,
-    description: Optional[str] = None,
+    description: str,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
     """

@@ -25,7 +25,7 @@ def temp_db():
 @pytest.fixture
 def test_project(temp_db):
     """テスト用プロジェクトを作成する"""
-    result = add_project(name="test-project")
+    result = add_project(name="test-project", description="Test project description")
     return result["project_id"]
 
 
@@ -37,7 +37,7 @@ def test_project(temp_db):
 def test_search_topics_no_results(test_project):
     """検索結果がない場合、空の配列が返る"""
     # トピックを追加（キーワードにマッチしないもの）
-    add_topic(project_id=test_project, title="Database Design")
+    add_topic(project_id=test_project, title="Database Design", description="Database schema")
 
     result = search_topics(project_id=test_project, keyword="プランモード")
 

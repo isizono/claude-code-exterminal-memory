@@ -1,4 +1,5 @@
 """議論トピック管理サービス"""
+import sqlite3
 from typing import Optional
 from src.db import execute_insert, execute_query, row_to_dict
 
@@ -44,6 +45,13 @@ def add_topic(
         else:
             raise Exception("Failed to retrieve created topic")
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
@@ -101,6 +109,13 @@ def get_topics(
 
         return {"topics": topics}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
@@ -160,6 +175,13 @@ def get_decided_topics(
 
         return {"topics": topics}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
@@ -219,6 +241,13 @@ def get_undecided_topics(
 
         return {"topics": topics}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
@@ -342,6 +371,13 @@ def get_topic_tree(
 
         return {"tree": tree}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {

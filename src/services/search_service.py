@@ -1,5 +1,19 @@
 """検索サービス"""
+import sqlite3
 from src.db import execute_query, row_to_dict
+
+
+def _escape_like_pattern(s: str) -> str:
+    """
+    LIKE検索用のエスケープ処理。
+
+    Args:
+        s: エスケープする文字列
+
+    Returns:
+        エスケープされた文字列
+    """
+    return s.replace('%', r'\%').replace('_', r'\_')
 
 
 def search_topics(
@@ -23,13 +37,13 @@ def search_topics(
         limit = min(limit, 30)
 
         # LIKE検索用のパターン（大文字小文字を区別しない）
-        search_pattern = f"%{keyword}%"
+        search_pattern = f"%{_escape_like_pattern(keyword)}%"
 
         rows = execute_query(
             """
             SELECT * FROM discussion_topics
             WHERE project_id = ?
-              AND (title LIKE ? OR description LIKE ?)
+              AND (title LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')
             ORDER BY created_at DESC, id DESC
             LIMIT ?
             """,
@@ -50,6 +64,13 @@ def search_topics(
 
         return {"topics": topics}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
@@ -80,14 +101,14 @@ def search_decisions(
         limit = min(limit, 30)
 
         # LIKE検索用のパターン（大文字小文字を区別しない）
-        search_pattern = f"%{keyword}%"
+        search_pattern = f"%{_escape_like_pattern(keyword)}%"
 
         rows = execute_query(
             """
             SELECT d.* FROM decisions d
             JOIN discussion_topics dt ON d.topic_id = dt.id
             WHERE dt.project_id = ?
-              AND (d.decision LIKE ? OR d.reason LIKE ?)
+              AND (d.decision LIKE ? ESCAPE '\\' OR d.reason LIKE ? ESCAPE '\\')
             ORDER BY d.created_at DESC, d.id DESC
             LIMIT ?
             """,
@@ -107,6 +128,13 @@ def search_decisions(
 
         return {"decisions": decisions}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {

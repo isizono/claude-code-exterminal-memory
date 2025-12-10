@@ -1,4 +1,5 @@
 """議論ログ管理サービス"""
+import sqlite3
 from typing import Optional
 from src.db import execute_insert, execute_query, row_to_dict
 
@@ -35,6 +36,13 @@ def add_log(topic_id: int, content: str) -> dict:
         else:
             raise Exception("Failed to retrieve created log")
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
@@ -97,6 +105,13 @@ def get_logs(
 
         return {"logs": logs}
 
+    except sqlite3.IntegrityError as e:
+        return {
+            "error": {
+                "code": "CONSTRAINT_VIOLATION",
+                "message": str(e),
+            }
+        }
     except Exception as e:
         return {
             "error": {
