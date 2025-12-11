@@ -173,7 +173,7 @@ def test_search_decisions_with_wildcard_underscore(test_project):
 # ========================================
 
 
-def test_add_project_with_required_description_at_api_level():
+def test_add_project_with_required_description_at_api_level(temp_db):
     """main.pyのAPIレベルではdescriptionが必須（サービス層では任意）"""
     # このテストはmain.pyのツール定義を確認する
     # サービス層自体はOptionalを受け入れる

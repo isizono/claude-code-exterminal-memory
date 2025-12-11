@@ -111,7 +111,7 @@ def test_add_log_invalid_topic(test_project):
     result = add_log(topic_id=99999, content="test")
 
     assert "error" in result
-    assert result["error"]["code"] == "DATABASE_ERROR"
+    assert result["error"]["code"] == "CONSTRAINT_VIOLATION"
 
 
 def test_add_decision_success(test_project):

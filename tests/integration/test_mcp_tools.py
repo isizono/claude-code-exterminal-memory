@@ -55,7 +55,7 @@ def test_add_project_duplicate_name(temp_db):
     # 2つ目はエラー
     result2 = add_project(name="duplicate-test")
     assert "error" in result2
-    assert result2["error"]["code"] == "DATABASE_ERROR"
+    assert result2["error"]["code"] == "CONSTRAINT_VIOLATION"
 
 
 def test_get_projects_empty(temp_db):
@@ -84,26 +84,13 @@ def test_get_projects_multiple(temp_db):
     assert result["projects"][2]["name"] == "project-1"
 
 
-def test_get_projects_with_limit(temp_db):
-    """limit指定で取得件数を制限できる"""
-    # 5つプロジェクトを作成
-    for i in range(5):
-        add_project(name=f"project-{i}")
-
-    result = get_projects(limit=3)
-
-    assert "error" not in result
-    assert len(result["projects"]) == 3
-
-
-def test_get_projects_limit_max_30(temp_db):
-    """limitは最大30件に制限される"""
+def test_get_projects_returns_all(temp_db):
+    """全件取得されることを確認"""
     # 35個プロジェクトを作成
     for i in range(35):
         add_project(name=f"project-{i}")
 
-    # 50件要求しても30件まで
-    result = get_projects(limit=50)
+    result = get_projects()
 
     assert "error" not in result
-    assert len(result["projects"]) == 30
+    assert len(result["projects"]) == 35
