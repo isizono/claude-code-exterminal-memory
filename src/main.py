@@ -10,7 +10,7 @@ from src.services import (
 )
 
 # MCPサーバーを作成
-mcp = FastMCP("Discussion Recording System")
+mcp = FastMCP("claude-code-exterminal-memory")
 
 
 # MCPツール定義
@@ -22,6 +22,11 @@ def add_project(
 ) -> dict:
     """
     新しいプロジェクトを追加する。
+
+    典型的な使い方:
+    - 新プロジェクト開始時: add_project("プロジェクト名", "説明", asana_url="...")
+
+    ワークフロー位置: プロジェクト管理の最初のステップ
 
     Args:
         name: プロジェクト名（ユニーク）
@@ -39,6 +44,11 @@ def get_projects() -> dict:
     """
     プロジェクト一覧を取得する（全件）。
 
+    典型的な使い方:
+    - セッション開始時にプロジェクト特定: get_projects() → project_id を確認
+
+    ワークフロー位置: 全ての議論管理の起点（最初のステップ）
+
     Returns:
         プロジェクト一覧
     """
@@ -54,6 +64,12 @@ def add_topic(
 ) -> dict:
     """
     新しい議論トピックを追加する。
+
+    典型的な使い方:
+    - 新しい設計議論を始める: add_topic(project_id, "○○機能の設計", "...")
+    - 既存トピックの詳細論点: add_topic(project_id, "詳細設計", "...", parent_topic_id=親ID)
+
+    ワークフロー位置: 議論開始時（最初のステップ）
 
     Args:
         project_id: プロジェクトID
@@ -71,6 +87,15 @@ def add_topic(
 def add_log(topic_id: int, content: str) -> dict:
     """
     トピックに議論ログ（1やりとり）を追加する。
+
+    典型的な使い方:
+    - AIとユーザーのやりとりを記録: add_log(topic_id, "AI: 提案\nユーザー: フィードバック")
+
+    ワークフロー位置: 議論中（重要な節目で記録）
+
+    記録タイミング:
+    - 重要な議論の節目（提案→フィードバック）
+    - 決定事項の前提となる議論
 
     Args:
         topic_id: 対象トピックのID
@@ -91,6 +116,13 @@ def add_decision(
     """
     決定事項を記録する。
 
+    典型的な使い方:
+    - 認識合わせ後の即座の記録: add_decision(decision="...", reason="...", topic_id=...)
+
+    ワークフロー位置: 認識合わせ→ユーザーOK直後（即座に記録）
+
+    重要: 後回しにせず、決定が確定した時点で記録すること
+
     Args:
         decision: 決定内容
         reason: 決定の理由
@@ -110,6 +142,12 @@ def get_topics(
     """
     指定した親トピックの直下の子トピックを取得する（1階層・全件）。
 
+    典型的な使い方:
+    - 最上位トピック確認: get_topics(project_id)
+    - 特定トピック配下の確認: get_topics(project_id, parent_topic_id=親ID)
+
+    ワークフロー位置: セッション開始時、トピック構造の確認時
+
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
@@ -127,6 +165,12 @@ def get_decided_topics(
 ) -> dict:
     """
     指定した親トピックの直下の子トピックのうち、決定済み（decisionが存在する）トピックのみを取得する（1階層）。
+
+    典型的な使い方:
+    - 最上位の決定済み事項確認: get_decided_topics(project_id)
+    - 特定トピック配下の決定済み論点確認: get_decided_topics(project_id, parent_topic_id=親ID)
+
+    ワークフロー位置: 決定済み事項の確認時
 
     Args:
         project_id: プロジェクトID
@@ -146,6 +190,12 @@ def get_undecided_topics(
     """
     指定した親トピックの直下の子トピックのうち、未決定（decisionが存在しない）トピックのみを取得する（1階層）。
 
+    典型的な使い方:
+    - セッション開始時に未決定事項を確認: get_undecided_topics(project_id)
+    - 特定トピック配下の未解決論点を確認: get_undecided_topics(project_id, parent_topic_id=親ID)
+
+    ワークフロー位置: セッション開始時、次に議論すべきトピックの確認時
+
     Args:
         project_id: プロジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
@@ -164,6 +214,12 @@ def get_logs(
 ) -> dict:
     """
     指定トピックの議論ログを取得する。
+
+    典型的な使い方:
+    - トピックの議論履歴を確認: get_logs(topic_id)
+    - ページング: get_logs(topic_id, start_id=最後のID)
+
+    ワークフロー位置: 議論再開時、過去の議論確認時
 
     Args:
         topic_id: 対象トピックのID
@@ -185,6 +241,12 @@ def get_decisions(
     """
     指定トピックに関連する決定事項を取得する。
 
+    典型的な使い方:
+    - トピックの決定事項を確認: get_decisions(topic_id)
+    - ページング: get_decisions(topic_id, start_id=最後のID)
+
+    ワークフロー位置: 決定済み事項の確認時
+
     Args:
         topic_id: 対象トピックのID
         start_id: 取得開始位置の決定事項ID（ページネーション用）
@@ -204,6 +266,11 @@ def get_topic_tree(
 ) -> dict:
     """
     指定したトピックを起点に、再帰的に全ツリーを取得する。
+
+    典型的な使い方:
+    - トピック全体の構造を把握: get_topic_tree(project_id, topic_id)
+
+    ワークフロー位置: 議論全体の俯瞰時、構造確認時
 
     Args:
         project_id: プロジェクトID
@@ -225,6 +292,11 @@ def search_topics(
     """
     トピックをキーワード検索する。
 
+    典型的な使い方:
+    - 過去の議論を検索: search_topics(project_id, keyword="認証")
+
+    ワークフロー位置: 関連する過去の議論を探す時
+
     Args:
         project_id: プロジェクトID
         keyword: 検索キーワード（title, descriptionから部分一致）
@@ -245,6 +317,11 @@ def search_decisions(
     """
     決定事項をキーワード検索する。
 
+    典型的な使い方:
+    - 過去の決定を検索: search_decisions(project_id, keyword="API設計")
+
+    ワークフロー位置: 関連する過去の決定事項を探す時
+
     Args:
         project_id: プロジェクトID
         keyword: 検索キーワード（decision, reasonから部分一致）
@@ -254,3 +331,103 @@ def search_decisions(
         検索結果の決定事項一覧
     """
     return search_service.search_decisions(project_id, keyword, limit)
+
+
+# リソース機能
+@mcp.resource("docs://workflow")
+def workflow_docs() -> str:
+    """MCPツールを使った議論管理の典型的なフロー"""
+    return """# 議論管理ワークフロー
+
+## 1. プロジェクトの特定
+まず作業対象のプロジェクトを特定する。
+
+```
+get_projects() → project_id を確認
+```
+
+## 2. 設計議論の開始
+新しい議論トピックを作成する。
+
+```
+add_topic(project_id, title="○○機能の設計", description="...")
+→ topic_id が返される
+```
+
+## 3. 議論のやりとり記録
+AIとユーザーのやりとりを記録。
+
+```
+add_log(topic_id, content="AI: 提案\\nユーザー: フィードバック")
+```
+
+記録タイミング:
+- 重要な議論の節目
+- 決定事項の前提となる議論
+
+## 4. 決定事項の記録
+認識合わせ → ユーザーOK → 即座に記録。
+
+```
+add_decision(
+    decision="決定内容",
+    reason="理由",
+    topic_id=関連トピックID
+)
+```
+
+**重要**: 後回しにせず即座に記録すること。
+
+## 5. 議論状況の確認
+
+未決定事項:
+```
+get_undecided_topics(project_id)
+get_undecided_topics(project_id, parent_topic_id=親ID)
+```
+
+決定済み:
+```
+get_decided_topics(project_id)
+get_decisions(topic_id)
+```
+
+トピック構造:
+```
+get_topics(project_id)  # 最上位
+get_topic_tree(project_id, topic_id)  # ツリー全体
+```
+
+検索:
+```
+search_topics(project_id, keyword="...")
+search_decisions(project_id, keyword="...")
+```
+
+## 6. セッション開始時
+
+新しいセッション開始時の推奨フロー:
+1. get_projects() でプロジェクト特定
+2. get_topics(project_id) で最上位トピック確認
+3. get_undecided_topics(project_id) で未決定事項確認
+4. 必要に応じて get_topic_tree, get_logs, get_decisions
+
+## データベース構造
+
+```
+projects (プロジェクト)
+  ├── discussion_topics (議論トピック)
+  │     ├── discussion_logs (議論ログ)
+  │     └── decisions (決定事項)
+  └── tasks (タスク) ※未実装
+```
+
+主要な関係:
+- discussion_topics.parent_topic_id → discussion_topics.id (親子関係)
+- discussion_topics.project_id → projects.id
+- decisions.topic_id → discussion_topics.id
+"""
+
+
+if __name__ == "__main__":
+    mcp.run()
