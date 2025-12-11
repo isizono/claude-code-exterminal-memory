@@ -44,7 +44,7 @@ def test_add_project_unique_constraint_violation(temp_db):
     # 同じ名前で2つ目のプロジェクトを追加（UNIQUE制約違反）
     result2 = add_project(name="unique-project", description="Second")
     assert "error" in result2
-    assert result2["error"]["code"] == "CONSTRAINT_VIOLATION"
+    assert result2["error"]["code"] == "DATABASE_ERROR"
     assert "UNIQUE" in result2["error"]["message"] or "unique" in result2["error"]["message"].lower()
 
 
@@ -171,32 +171,3 @@ def test_search_decisions_with_wildcard_underscore(test_project):
 # ========================================
 # パラメータバリデーションのテスト
 # ========================================
-
-
-def test_add_project_with_required_description_at_api_level(temp_db):
-    """main.pyのAPIレベルではdescriptionが必須（サービス層では任意）"""
-    # このテストはmain.pyのツール定義を確認する
-    # サービス層自体はOptionalを受け入れる
-    result = add_project(name="test", description=None)
-    # サービス層ではNoneを受け入れる（main.pyで検証される）
-    assert "error" not in result
-
-
-def test_add_topic_with_required_description_at_api_level():
-    """main.pyのAPIレベルではdescriptionが必須（サービス層では任意）"""
-    # このテストはmain.pyのツール定義を確認する
-    # サービス層自体はOptionalを受け入れる
-    temp_db_instance = tempfile.TemporaryDirectory()
-    db_path = os.path.join(temp_db_instance.name, "test.db")
-    os.environ["DISCUSSION_DB_PATH"] = db_path
-    init_database()
-
-    project = add_project(name="test", description="test")
-    result = add_topic(project_id=project["project_id"], title="test", description=None)
-
-    # サービス層ではNoneを受け入れる（main.pyで検証される）
-    assert "error" not in result
-
-    temp_db_instance.cleanup()
-    if "DISCUSSION_DB_PATH" in os.environ:
-        del os.environ["DISCUSSION_DB_PATH"]

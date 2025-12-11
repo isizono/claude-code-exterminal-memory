@@ -78,7 +78,7 @@ def test_get_connection_returns_row_factory(temp_db):
     try:
         # プロジェクトを追加
         conn.execute(
-            "INSERT INTO projects (name) VALUES (?)", ("test-project",)
+            "INSERT INTO projects (name, description) VALUES (?, ?)", ("test-project", "Test description")
         )
         conn.commit()
 

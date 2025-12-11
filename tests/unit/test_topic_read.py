@@ -31,7 +31,7 @@ def temp_db():
 @pytest.fixture
 def test_project(temp_db):
     """テスト用プロジェクトを作成する"""
-    result = add_project(name="test-project")
+    result = add_project(name="test-project", description="Test project")
     return result["project_id"]
 
 
@@ -51,9 +51,9 @@ def test_get_topics_empty(test_project):
 def test_get_topics_root_level(test_project):
     """最上位トピックを取得できる"""
     # 最上位トピックを3つ作成
-    topic1 = add_topic(project_id=test_project, title="Topic 1")
-    topic2 = add_topic(project_id=test_project, title="Topic 2")
-    topic3 = add_topic(project_id=test_project, title="Topic 3")
+    topic1 = add_topic(project_id=test_project, title="Topic 1", description="Test description")
+    topic2 = add_topic(project_id=test_project, title="Topic 2", description="Test description")
+    topic3 = add_topic(project_id=test_project, title="Topic 3", description="Test description")
 
     result = get_topics(project_id=test_project)
 
@@ -67,17 +67,19 @@ def test_get_topics_root_level(test_project):
 def test_get_topics_child_level(test_project):
     """子トピックを取得できる"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="Parent")
+    parent = add_topic(project_id=test_project, title="Parent", description="Test description")
 
     # 子トピックを2つ作成
     child1 = add_topic(
         project_id=test_project,
         title="Child 1",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
     child2 = add_topic(
         project_id=test_project,
         title="Child 2",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
 
@@ -106,9 +108,9 @@ def test_get_decided_topics_empty(test_project):
 def test_get_decided_topics_filters_correctly(test_project):
     """決定済みトピックのみを返す"""
     # トピックを3つ作成
-    topic1 = add_topic(project_id=test_project, title="Decided Topic 1")
-    topic2 = add_topic(project_id=test_project, title="Undecided Topic")
-    topic3 = add_topic(project_id=test_project, title="Decided Topic 2")
+    topic1 = add_topic(project_id=test_project, title="Decided Topic 1", description="Test description")
+    topic2 = add_topic(project_id=test_project, title="Undecided Topic", description="Test description")
+    topic3 = add_topic(project_id=test_project, title="Decided Topic 2", description="Test description")
 
     # topic1とtopic3に決定事項を追加
     add_decision(
@@ -133,22 +135,25 @@ def test_get_decided_topics_filters_correctly(test_project):
 def test_get_decided_topics_with_parent(test_project):
     """親トピック配下の決定済みトピックを取得できる"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="Parent")
+    parent = add_topic(project_id=test_project, title="Parent", description="Test description")
 
     # 子トピックを3つ作成
     child1 = add_topic(
         project_id=test_project,
         title="Decided Child 1",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
     child2 = add_topic(
         project_id=test_project,
         title="Undecided Child",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
     child3 = add_topic(
         project_id=test_project,
         title="Decided Child 2",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
 
@@ -182,7 +187,7 @@ def test_get_decided_topics_with_parent(test_project):
 def test_get_undecided_topics_empty(test_project):
     """未決定トピックが存在しない場合、空の配列が返る"""
     # トピックを作成して決定事項を追加
-    topic = add_topic(project_id=test_project, title="Decided Topic")
+    topic = add_topic(project_id=test_project, title="Decided Topic", description="Test description")
     add_decision(
         topic_id=topic["topic_id"],
         decision="Decision",
@@ -198,9 +203,9 @@ def test_get_undecided_topics_empty(test_project):
 def test_get_undecided_topics_filters_correctly(test_project):
     """未決定トピックのみを返す"""
     # トピックを3つ作成
-    topic1 = add_topic(project_id=test_project, title="Decided Topic")
-    topic2 = add_topic(project_id=test_project, title="Undecided Topic 1")
-    topic3 = add_topic(project_id=test_project, title="Undecided Topic 2")
+    topic1 = add_topic(project_id=test_project, title="Decided Topic", description="Test description")
+    topic2 = add_topic(project_id=test_project, title="Undecided Topic 1", description="Test description")
+    topic3 = add_topic(project_id=test_project, title="Undecided Topic 2", description="Test description")
 
     # topic1に決定事項を追加
     add_decision(
@@ -224,7 +229,7 @@ def test_get_undecided_topics_filters_correctly(test_project):
 
 def test_get_logs_empty(test_project):
     """ログが存在しない場合、空の配列が返る"""
-    topic = add_topic(project_id=test_project, title="Topic")
+    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
     result = get_logs(topic_id=topic["topic_id"])
 
     assert "error" not in result
@@ -233,7 +238,7 @@ def test_get_logs_empty(test_project):
 
 def test_get_logs_multiple(test_project):
     """複数のログを取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic")
+    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
 
     # 3つのログを追加
     log1 = add_log(topic_id=topic["topic_id"], content="Log 1")
@@ -252,7 +257,7 @@ def test_get_logs_multiple(test_project):
 
 def test_get_logs_with_pagination(test_project):
     """ページネーションで取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic")
+    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
 
     # 5つのログを追加
     logs = []
@@ -281,7 +286,7 @@ def test_get_logs_with_pagination(test_project):
 
 def test_get_decisions_empty(test_project):
     """決定事項が存在しない場合、空の配列が返る"""
-    topic = add_topic(project_id=test_project, title="Topic")
+    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
     result = get_decisions(topic_id=topic["topic_id"])
 
     assert "error" not in result
@@ -290,7 +295,7 @@ def test_get_decisions_empty(test_project):
 
 def test_get_decisions_multiple(test_project):
     """複数の決定事項を取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic")
+    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
 
     # 3つの決定事項を追加
     dec1 = add_decision(
@@ -321,7 +326,7 @@ def test_get_decisions_multiple(test_project):
 
 def test_get_decisions_with_pagination(test_project):
     """ページネーションで取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic")
+    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
 
     # 5つの決定事項を追加
     decisions = []
@@ -354,7 +359,7 @@ def test_get_decisions_with_pagination(test_project):
 
 def test_get_topic_tree_single_topic(test_project):
     """単一トピックのツリーを取得できる"""
-    topic = add_topic(project_id=test_project, title="Root Topic")
+    topic = add_topic(project_id=test_project, title="Root Topic", description="Test description")
 
     result = get_topic_tree(project_id=test_project, topic_id=topic["topic_id"])
 
@@ -367,17 +372,19 @@ def test_get_topic_tree_single_topic(test_project):
 def test_get_topic_tree_with_children(test_project):
     """子トピックを含むツリーを取得できる"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="Parent")
+    parent = add_topic(project_id=test_project, title="Parent", description="Test description")
 
     # 子トピックを2つ作成
     child1 = add_topic(
         project_id=test_project,
         title="Child 1",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
     child2 = add_topic(
         project_id=test_project,
         title="Child 2",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
 
@@ -394,12 +401,13 @@ def test_get_topic_tree_with_children(test_project):
 def test_get_topic_tree_nested(test_project):
     """ネストされたツリーを取得できる"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="Parent")
+    parent = add_topic(project_id=test_project, title="Parent", description="Test description")
 
     # 子トピックを作成
     child = add_topic(
         project_id=test_project,
         title="Child",
+        description="Test description",
         parent_topic_id=parent["topic_id"],
     )
 
@@ -407,6 +415,7 @@ def test_get_topic_tree_nested(test_project):
     grandchild = add_topic(
         project_id=test_project,
         title="Grandchild",
+        description="Test description",
         parent_topic_id=child["topic_id"],
     )
 
@@ -423,13 +432,14 @@ def test_get_topic_tree_nested(test_project):
 def test_get_topic_tree_with_limit(test_project):
     """limitを超える場合は制限される"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="Parent")
+    parent = add_topic(project_id=test_project, title="Parent", description="Test description")
 
     # 子トピックを5つ作成
     for i in range(5):
         add_topic(
             project_id=test_project,
             title=f"Child {i}",
+            description="Test description",
             parent_topic_id=parent["topic_id"],
         )
 

@@ -135,6 +135,7 @@ def test_search_topics_with_limit(test_project):
         add_topic(
             project_id=test_project,
             title=f"プランモード Topic {i}",
+            description="Test description",
         )
 
     result = search_topics(project_id=test_project, keyword="プランモード", limit=3)
@@ -150,6 +151,7 @@ def test_search_topics_limit_max_30(test_project):
         add_topic(
             project_id=test_project,
             title=f"プランモード Topic {i}",
+            description="Test description",
         )
 
     # 50件要求しても30件まで
@@ -162,18 +164,20 @@ def test_search_topics_limit_max_30(test_project):
 def test_search_topics_project_isolation(test_project):
     """プロジェクト間で検索結果が分離される"""
     # 別のプロジェクトを作成
-    project2 = add_project(name="test-project-2")["project_id"]
+    project2 = add_project(name="test-project-2", description="Test project 2")["project_id"]
 
     # test_projectにトピックを追加
     topic1 = add_topic(
         project_id=test_project,
         title="プランモードの使い方",
+        description="Test description",
     )
 
     # project2にトピックを追加
     topic2 = add_topic(
         project_id=project2,
         title="プランモードの粒度",
+        description="Test description",
     )
 
     # test_projectで検索
@@ -192,7 +196,7 @@ def test_search_topics_project_isolation(test_project):
 def test_search_decisions_no_results(test_project):
     """検索結果がない場合、空の配列が返る"""
     # トピックと決定事項を追加（キーワードにマッチしないもの）
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
     add_decision(
         topic_id=topic["topic_id"],
         decision="Use PostgreSQL",
@@ -208,7 +212,7 @@ def test_search_decisions_no_results(test_project):
 def test_search_decisions_by_decision(test_project):
     """決定内容から検索できる"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
 
     # 決定事項を3つ追加
     dec1 = add_decision(
@@ -239,7 +243,7 @@ def test_search_decisions_by_decision(test_project):
 def test_search_decisions_by_reason(test_project):
     """決定理由から検索できる"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
 
     # 決定事項を2つ追加
     dec1 = add_decision(
@@ -263,7 +267,7 @@ def test_search_decisions_by_reason(test_project):
 def test_search_decisions_case_insensitive(test_project):
     """大文字小文字を区別しない検索ができる"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
 
     # 英語の決定事項を追加
     dec1 = add_decision(
@@ -283,7 +287,7 @@ def test_search_decisions_case_insensitive(test_project):
 def test_search_decisions_partial_match(test_project):
     """部分一致で検索できる"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
 
     # 決定事項を追加
     dec1 = add_decision(
@@ -303,7 +307,7 @@ def test_search_decisions_partial_match(test_project):
 def test_search_decisions_with_limit(test_project):
     """limit指定で取得件数を制限できる"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
 
     # 5つの決定事項を追加
     for i in range(5):
@@ -322,7 +326,7 @@ def test_search_decisions_with_limit(test_project):
 def test_search_decisions_limit_max_30(test_project):
     """limitは最大30件に制限される"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="Test Topic")
+    topic = add_topic(project_id=test_project, title="Test Topic", description="Test description")
 
     # 40個の決定事項を追加
     for i in range(40):
@@ -342,10 +346,10 @@ def test_search_decisions_limit_max_30(test_project):
 def test_search_decisions_project_isolation(test_project):
     """プロジェクト間で検索結果が分離される"""
     # 別のプロジェクトを作成
-    project2 = add_project(name="test-project-2")["project_id"]
+    project2 = add_project(name="test-project-2", description="Test project 2")["project_id"]
 
     # test_projectにトピックと決定事項を追加
-    topic1 = add_topic(project_id=test_project, title="Topic 1")
+    topic1 = add_topic(project_id=test_project, title="Topic 1", description="Test description")
     dec1 = add_decision(
         topic_id=topic1["topic_id"],
         decision="プランモード不要",
@@ -353,7 +357,7 @@ def test_search_decisions_project_isolation(test_project):
     )
 
     # project2にトピックと決定事項を追加
-    topic2 = add_topic(project_id=project2, title="Topic 2")
+    topic2 = add_topic(project_id=project2, title="Topic 2", description="Test description")
     dec2 = add_decision(
         topic_id=topic2["topic_id"],
         decision="プランモード使用",
@@ -371,8 +375,8 @@ def test_search_decisions_project_isolation(test_project):
 def test_search_decisions_across_multiple_topics(test_project):
     """複数トピックにまたがって検索できる"""
     # 2つのトピックを作成
-    topic1 = add_topic(project_id=test_project, title="Topic 1")
-    topic2 = add_topic(project_id=test_project, title="Topic 2")
+    topic1 = add_topic(project_id=test_project, title="Topic 1", description="Test description")
+    topic2 = add_topic(project_id=test_project, title="Topic 2", description="Test description")
 
     # それぞれに決定事項を追加
     dec1 = add_decision(

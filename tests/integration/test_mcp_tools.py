@@ -35,27 +35,16 @@ def test_add_project_success(temp_db):
     assert "created_at" in result
 
 
-def test_add_project_minimal(temp_db):
-    """必須項目のみでプロジェクトを追加できる"""
-    result = add_project(name="minimal-project")
-
-    assert "error" not in result
-    assert result["project_id"] > 0
-    assert result["name"] == "minimal-project"
-    assert result["description"] is None
-    assert result["asana_url"] is None
-
-
 def test_add_project_duplicate_name(temp_db):
     """同じ名前のプロジェクトを追加するとエラーになる"""
     # 1つ目は成功
-    result1 = add_project(name="duplicate-test")
+    result1 = add_project(name="duplicate-test", description="Test description")
     assert "error" not in result1
 
     # 2つ目はエラー
-    result2 = add_project(name="duplicate-test")
+    result2 = add_project(name="duplicate-test", description="Test description")
     assert "error" in result2
-    assert result2["error"]["code"] == "CONSTRAINT_VIOLATION"
+    assert result2["error"]["code"] == "DATABASE_ERROR"
 
 
 def test_get_projects_empty(temp_db):
@@ -88,7 +77,7 @@ def test_get_projects_returns_all(temp_db):
     """全件取得されることを確認"""
     # 35個プロジェクトを作成
     for i in range(35):
-        add_project(name=f"project-{i}")
+        add_project(name=f"project-{i}", description=f"Description {i}")
 
     result = get_projects()
 
