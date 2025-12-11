@@ -35,17 +35,14 @@ def add_project(
 
 
 @mcp.tool()
-def get_projects(limit: int = 30) -> dict:
+def get_projects() -> dict:
     """
-    プロジェクト一覧を取得する。
-
-    Args:
-        limit: 取得件数上限（最大30件）
+    プロジェクト一覧を取得する（全件）。
 
     Returns:
         プロジェクト一覧
     """
-    return project_service.get_projects(limit)
+    return project_service.get_projects()
 
 
 @mcp.tool()
