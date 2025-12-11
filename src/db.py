@@ -23,6 +23,7 @@ def get_connection() -> sqlite3.Connection:
     db_path = get_db_path()
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row  # 辞書ライクなアクセスを可能にする
+    conn.execute("PRAGMA foreign_keys = ON")  # 外部キー制約を有効化
     return conn
 
 
