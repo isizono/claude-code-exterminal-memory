@@ -6,7 +6,7 @@ from src.db import execute_insert, execute_query, row_to_dict
 
 def add_project(
     name: str,
-    description: Optional[str] = None,
+    description: str,
     asana_url: Optional[str] = None,
 ) -> dict:
     """
@@ -14,7 +14,7 @@ def add_project(
 
     Args:
         name: プロジェクト名（ユニーク）
-        description: プロジェクトの説明
+        description: プロジェクトの説明（必須）
         asana_url: AsanaプロジェクトタスクのURL
 
     Returns:

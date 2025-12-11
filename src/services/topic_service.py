@@ -7,7 +7,7 @@ from src.db import execute_insert, execute_query, row_to_dict
 def add_topic(
     project_id: int,
     title: str,
-    description: Optional[str] = None,
+    description: str,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
     """
@@ -16,7 +16,7 @@ def add_topic(
     Args:
         project_id: プロジェクトID
         title: トピックのタイトル
-        description: トピックの説明
+        description: トピックの説明（必須）
         parent_topic_id: 親トピックのID（未指定なら最上位トピック）
 
     Returns:

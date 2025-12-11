@@ -25,7 +25,7 @@ def add_project(
 
     Args:
         name: プロジェクト名（ユニーク）
-        description: プロジェクトの説明
+        description: プロジェクトの説明（必須）
         asana_url: AsanaプロジェクトタスクのURL
 
     Returns:
@@ -58,7 +58,7 @@ def add_topic(
     Args:
         project_id: プロジェクトID
         title: トピックのタイトル
-        description: トピックの説明
+        description: トピックの説明（必須）
         parent_topic_id: 親トピックのID（未指定なら最上位トピック）
 
     Returns:
