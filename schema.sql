@@ -46,14 +46,6 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- UPDATE時にupdated_atを自動更新するトリガー
-CREATE TRIGGER IF NOT EXISTS update_tasks_timestamp
-BEFORE UPDATE ON tasks
-FOR EACH ROW
-BEGIN
-  UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
-END;
-
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_topics_project_id ON discussion_topics(project_id);
 CREATE INDEX IF NOT EXISTS idx_topics_parent_id ON discussion_topics(parent_topic_id);
