@@ -7,6 +7,7 @@ from src.services import (
     discussion_log_service,
     decision_service,
     search_service,
+    task_service,
 )
 
 # MCPサーバーを作成
@@ -132,6 +133,84 @@ def search_decisions(
 ) -> dict:
     """決定事項をキーワード検索する。"""
     return search_service.search_decisions(project_id, keyword, limit)
+
+
+@mcp.tool()
+def add_task(
+    project_id: int,
+    title: str,
+    description: str,
+) -> dict:
+    """
+    新しいタスクを追加する。
+
+    典型的な使い方:
+    - 実装タスクを作成: add_task(project_id, "○○機能を実装", "詳細説明...")
+
+    ワークフロー位置: 実装タスクの整理・管理開始時
+
+    Args:
+        project_id: プロジェクトID
+        title: タスクのタイトル
+        description: タスクの詳細説明（必須）
+
+    Returns:
+        作成されたタスク情報
+    """
+    return task_service.add_task(project_id, title, description)
+
+
+@mcp.tool()
+def get_tasks(
+    project_id: int,
+    status: Optional[str] = None,
+) -> dict:
+    """
+    タスク一覧を取得する（statusでフィルタリング可能）。
+
+    典型的な使い方:
+    - 全タスク確認: get_tasks(project_id)
+    - 進行中のタスク確認: get_tasks(project_id, status="in_progress")
+    - ブロック中のタスク確認: get_tasks(project_id, status="blocked")
+
+    ワークフロー位置: タスク状況の確認時
+
+    Args:
+        project_id: プロジェクトID
+        status: フィルタするステータス（pending/in_progress/blocked/completed、未指定なら全件取得）
+
+    Returns:
+        タスク一覧
+    """
+    return task_service.get_tasks(project_id, status)
+
+
+@mcp.tool()
+def update_task_status(
+    task_id: int,
+    new_status: str,
+) -> dict:
+    """
+    タスクのステータスを更新する。
+
+    典型的な使い方:
+    - タスク開始: update_task_status(task_id, "in_progress")
+    - タスク完了: update_task_status(task_id, "completed")
+    - ブロック状態: update_task_status(task_id, "blocked")
+
+    ワークフロー位置: タスク進行状況の更新時
+
+    重要: blocked状態にした場合、自動的にトピックが作成され、topic_idが設定される。
+    これにより、ブロック理由や解決方法を議論トピックとして記録できる。
+
+    Args:
+        task_id: タスクID
+        new_status: 新しいステータス（pending/in_progress/blocked/completed）
+
+    Returns:
+        更新されたタスク情報（blocked時はtopic_idも含む）
+    """
+    return task_service.update_task_status(task_id, new_status)
 
 
 # リソース機能
