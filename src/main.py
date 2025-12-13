@@ -20,38 +20,13 @@ def add_project(
     description: str,
     asana_url: Optional[str] = None,
 ) -> dict:
-    """
-    新しいプロジェクトを追加する。
-
-    典型的な使い方:
-    - 新プロジェクト開始時: add_project("プロジェクト名", "説明", asana_url="...")
-
-    ワークフロー位置: プロジェクト管理の最初のステップ
-
-    Args:
-        name: プロジェクト名（ユニーク）
-        description: プロジェクトの説明（必須）
-        asana_url: AsanaプロジェクトタスクのURL
-
-    Returns:
-        作成されたプロジェクト情報
-    """
+    """新しいプロジェクトを追加する。"""
     return project_service.add_project(name, description, asana_url)
 
 
 @mcp.tool()
 def get_projects() -> dict:
-    """
-    プロジェクト一覧を取得する（全件）。
-
-    典型的な使い方:
-    - セッション開始時にプロジェクト特定: get_projects() → project_id を確認
-
-    ワークフロー位置: 全ての議論管理の起点（最初のステップ）
-
-    Returns:
-        プロジェクト一覧
-    """
+    """プロジェクト一覧を取得する。"""
     return project_service.get_projects()
 
 
@@ -62,48 +37,13 @@ def add_topic(
     description: str,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
-    """
-    新しい議論トピックを追加する。
-
-    典型的な使い方:
-    - 新しい設計議論を始める: add_topic(project_id, "○○機能の設計", "...")
-    - 既存トピックの詳細論点: add_topic(project_id, "詳細設計", "...", parent_topic_id=親ID)
-
-    ワークフロー位置: 議論開始時（最初のステップ）
-
-    Args:
-        project_id: プロジェクトID
-        title: トピックのタイトル
-        description: トピックの説明（必須）
-        parent_topic_id: 親トピックのID（未指定なら最上位トピック）
-
-    Returns:
-        作成されたトピック情報
-    """
+    """新しい議論トピックを追加する。"""
     return topic_service.add_topic(project_id, title, description, parent_topic_id)
 
 
 @mcp.tool()
 def add_log(topic_id: int, content: str) -> dict:
-    """
-    トピックに議論ログ（1やりとり）を追加する。
-
-    典型的な使い方:
-    - AIとユーザーのやりとりを記録: add_log(topic_id, "AI: 提案\nユーザー: フィードバック")
-
-    ワークフロー位置: 議論中（重要な節目で記録）
-
-    記録タイミング:
-    - 重要な議論の節目（提案→フィードバック）
-    - 決定事項の前提となる議論
-
-    Args:
-        topic_id: 対象トピックのID
-        content: 議論内容（マークダウン可）
-
-    Returns:
-        作成されたログ情報
-    """
+    """トピックに議論ログを追加する。"""
     return discussion_log_service.add_log(topic_id, content)
 
 
@@ -113,24 +53,7 @@ def add_decision(
     reason: str,
     topic_id: Optional[int] = None,
 ) -> dict:
-    """
-    決定事項を記録する。
-
-    典型的な使い方:
-    - 認識合わせ後の即座の記録: add_decision(decision="...", reason="...", topic_id=...)
-
-    ワークフロー位置: 認識合わせ→ユーザーOK直後（即座に記録）
-
-    重要: 後回しにせず、決定が確定した時点で記録すること
-
-    Args:
-        decision: 決定内容
-        reason: 決定の理由
-        topic_id: 関連するトピックのID（未指定も可）
-
-    Returns:
-        作成された決定事項情報
-    """
+    """決定事項を記録する。"""
     return decision_service.add_decision(decision, reason, topic_id)
 
 
@@ -139,22 +62,7 @@ def get_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
-    """
-    指定した親トピックの直下の子トピックを取得する（1階層・全件）。
-
-    典型的な使い方:
-    - 最上位トピック確認: get_topics(project_id)
-    - 特定トピック配下の確認: get_topics(project_id, parent_topic_id=親ID)
-
-    ワークフロー位置: セッション開始時、トピック構造の確認時
-
-    Args:
-        project_id: プロジェクトID
-        parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-
-    Returns:
-        トピック一覧
-    """
+    """指定した親トピックの直下の子トピックを取得する。"""
     return topic_service.get_topics(project_id, parent_topic_id)
 
 
@@ -163,22 +71,7 @@ def get_decided_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
-    """
-    指定した親トピックの直下の子トピックのうち、決定済み（decisionが存在する）トピックのみを取得する（1階層）。
-
-    典型的な使い方:
-    - 最上位の決定済み事項確認: get_decided_topics(project_id)
-    - 特定トピック配下の決定済み論点確認: get_decided_topics(project_id, parent_topic_id=親ID)
-
-    ワークフロー位置: 決定済み事項の確認時
-
-    Args:
-        project_id: プロジェクトID
-        parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-
-    Returns:
-        決定済みトピック一覧
-    """
+    """指定した親トピックの直下の決定済みトピックのみを取得する。"""
     return topic_service.get_decided_topics(project_id, parent_topic_id)
 
 
@@ -187,22 +80,7 @@ def get_undecided_topics(
     project_id: int,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
-    """
-    指定した親トピックの直下の子トピックのうち、未決定（decisionが存在しない）トピックのみを取得する（1階層）。
-
-    典型的な使い方:
-    - セッション開始時に未決定事項を確認: get_undecided_topics(project_id)
-    - 特定トピック配下の未解決論点を確認: get_undecided_topics(project_id, parent_topic_id=親ID)
-
-    ワークフロー位置: セッション開始時、次に議論すべきトピックの確認時
-
-    Args:
-        project_id: プロジェクトID
-        parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
-
-    Returns:
-        未決定トピック一覧
-    """
+    """指定した親トピックの直下の未決定トピックのみを取得する。"""
     return topic_service.get_undecided_topics(project_id, parent_topic_id)
 
 
@@ -212,23 +90,7 @@ def get_logs(
     start_id: Optional[int] = None,
     limit: int = 30,
 ) -> dict:
-    """
-    指定トピックの議論ログを取得する。
-
-    典型的な使い方:
-    - トピックの議論履歴を確認: get_logs(topic_id)
-    - ページング: get_logs(topic_id, start_id=最後のID)
-
-    ワークフロー位置: 議論再開時、過去の議論確認時
-
-    Args:
-        topic_id: 対象トピックのID
-        start_id: 取得開始位置のログID（ページネーション用）
-        limit: 取得件数上限（最大30件）
-
-    Returns:
-        議論ログ一覧
-    """
+    """指定トピックの議論ログを取得する。"""
     return discussion_log_service.get_logs(topic_id, start_id, limit)
 
 
@@ -238,23 +100,7 @@ def get_decisions(
     start_id: Optional[int] = None,
     limit: int = 30,
 ) -> dict:
-    """
-    指定トピックに関連する決定事項を取得する。
-
-    典型的な使い方:
-    - トピックの決定事項を確認: get_decisions(topic_id)
-    - ページング: get_decisions(topic_id, start_id=最後のID)
-
-    ワークフロー位置: 決定済み事項の確認時
-
-    Args:
-        topic_id: 対象トピックのID
-        start_id: 取得開始位置の決定事項ID（ページネーション用）
-        limit: 取得件数上限（最大30件）
-
-    Returns:
-        決定事項一覧
-    """
+    """指定トピックに関連する決定事項を取得する。"""
     return decision_service.get_decisions(topic_id, start_id, limit)
 
 
@@ -264,22 +110,7 @@ def get_topic_tree(
     topic_id: int,
     limit: int = 100,
 ) -> dict:
-    """
-    指定したトピックを起点に、再帰的に全ツリーを取得する。
-
-    典型的な使い方:
-    - トピック全体の構造を把握: get_topic_tree(project_id, topic_id)
-
-    ワークフロー位置: 議論全体の俯瞰時、構造確認時
-
-    Args:
-        project_id: プロジェクトID
-        topic_id: 起点となるトピックのID
-        limit: 取得件数上限（最大100件）
-
-    Returns:
-        トピックツリー
-    """
+    """指定したトピックを起点に、再帰的に全ツリーを取得する。"""
     return topic_service.get_topic_tree(project_id, topic_id, limit)
 
 
@@ -289,22 +120,7 @@ def search_topics(
     keyword: str,
     limit: int = 30,
 ) -> dict:
-    """
-    トピックをキーワード検索する。
-
-    典型的な使い方:
-    - 過去の議論を検索: search_topics(project_id, keyword="認証")
-
-    ワークフロー位置: 関連する過去の議論を探す時
-
-    Args:
-        project_id: プロジェクトID
-        keyword: 検索キーワード（title, descriptionから部分一致）
-        limit: 取得件数上限（最大30件）
-
-    Returns:
-        検索結果のトピック一覧
-    """
+    """トピックをキーワード検索する。"""
     return search_service.search_topics(project_id, keyword, limit)
 
 
@@ -314,22 +130,7 @@ def search_decisions(
     keyword: str,
     limit: int = 30,
 ) -> dict:
-    """
-    決定事項をキーワード検索する。
-
-    典型的な使い方:
-    - 過去の決定を検索: search_decisions(project_id, keyword="API設計")
-
-    ワークフロー位置: 関連する過去の決定事項を探す時
-
-    Args:
-        project_id: プロジェクトID
-        keyword: 検索キーワード（decision, reasonから部分一致）
-        limit: 取得件数上限（最大30件）
-
-    Returns:
-        検索結果の決定事項一覧
-    """
+    """決定事項をキーワード検索する。"""
     return search_service.search_decisions(project_id, keyword, limit)
 
 
