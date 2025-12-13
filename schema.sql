@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS projects (
 -- 議論トピックテーブル
 CREATE TABLE IF NOT EXISTS discussion_topics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id INTEGER NOT NULL REFERENCES projects(id),
-  parent_topic_id INTEGER REFERENCES discussion_topics(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  parent_topic_id INTEGER REFERENCES discussion_topics(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
