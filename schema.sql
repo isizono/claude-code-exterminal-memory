@@ -37,21 +37,21 @@ CREATE TABLE IF NOT EXISTS decisions (
 -- タスクテーブル
 CREATE TABLE IF NOT EXISTS tasks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id INTEGER NOT NULL REFERENCES projects(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'pending', -- pending/in_progress/blocked/completed
-  topic_id INTEGER REFERENCES discussion_topics(id), -- blockedの時に関連する議論トピック
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'blocked', 'completed')), -- pending/in_progress/blocked/completed
+  topic_id INTEGER REFERENCES discussion_topics(id) ON DELETE SET NULL, -- blockedの時に関連する議論トピック
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- UPDATE時にupdated_atを自動更新するトリガー
 CREATE TRIGGER IF NOT EXISTS update_tasks_timestamp
-AFTER UPDATE ON tasks
+BEFORE UPDATE ON tasks
 FOR EACH ROW
 BEGIN
-  UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+  UPDATE tasks SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
 
 -- インデックス
