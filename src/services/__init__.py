@@ -5,6 +5,7 @@ from . import (
     discussion_log_service,
     decision_service,
     search_service,
+    task_service,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "discussion_log_service",
     "decision_service",
     "search_service",
+    "task_service",
 ]
