@@ -1,7 +1,8 @@
 """タスク管理サービス"""
 import sqlite3
 from typing import Optional
-from src.db import execute_insert, execute_query, row_to_dict
+from src.db import execute_query, row_to_dict
+from src.db_base import BaseDBService
 from src.base import TaskStatusManager
 from src.services import topic_service
 
@@ -75,6 +76,16 @@ class TaskStatusManagerImpl(TaskStatusManager):
         return result["topic_id"]
 
 
+class TaskDBService(BaseDBService):
+    """タスクのDB操作を管理するサービス"""
+
+    table_name = "tasks"
+
+
+# グローバルインスタンス
+_task_db = TaskDBService()
+
+
 def add_task(project_id: int, title: str, description: str) -> dict:
     """
     タスクを作成してIDを返す
@@ -88,15 +99,16 @@ def add_task(project_id: int, title: str, description: str) -> dict:
         作成されたタスク情報
     """
     try:
-        task_id = execute_insert(
-            "INSERT INTO tasks (project_id, title, description) VALUES (?, ?, ?)",
-            (project_id, title, description),
-        )
+        task_id = _task_db._execute_insert({
+            'project_id': project_id,
+            'title': title,
+            'description': description,
+            'status': 'pending'
+        })
 
         # 作成したタスクを取得
-        rows = execute_query("SELECT * FROM tasks WHERE id = ?", (task_id,))
-        if rows:
-            task = row_to_dict(rows[0])
+        task = _task_db._get_by_id(task_id)
+        if task:
             return {
                 "task_id": task["id"],
                 "project_id": task["project_id"],
@@ -203,8 +215,8 @@ def update_task_status(task_id: int, new_status: str) -> dict:
     """
     try:
         # 現在のタスク情報を取得
-        rows = execute_query("SELECT * FROM tasks WHERE id = ?", (task_id,))
-        if not rows:
+        task = _task_db._get_by_id(task_id)
+        if not task:
             return {
                 "error": {
                     "code": "NOT_FOUND",
@@ -212,7 +224,6 @@ def update_task_status(task_id: int, new_status: str) -> dict:
                 }
             }
 
-        task = row_to_dict(rows[0])
         old_status = task["status"]
 
         # ステータスマネージャーのインスタンスを作成
@@ -222,37 +233,17 @@ def update_task_status(task_id: int, new_status: str) -> dict:
         manager.on_status_change(task_id, old_status, new_status)
 
         # blockedになった場合はトピックを作成
-        topic_id = None
+        update_fields = {'status': new_status}
         if new_status == "blocked":
             topic_id = manager.on_blocked(task_id)
+            update_fields['topic_id'] = topic_id
 
-        # ステータスを更新
-        conn = execute_query("SELECT 1", ())  # ダミークエリ（connを取得するため）
-        from src.db import get_connection
-
-        conn = get_connection()
-        try:
-            if topic_id is not None:
-                conn.execute(
-                    "UPDATE tasks SET status = ?, topic_id = ? WHERE id = ?",
-                    (new_status, topic_id, task_id),
-                )
-            else:
-                conn.execute(
-                    "UPDATE tasks SET status = ? WHERE id = ?",
-                    (new_status, task_id),
-                )
-            conn.commit()
-        except sqlite3.Error as e:
-            conn.rollback()
-            raise sqlite3.Error(f"UPDATE実行エラー: {e}") from e
-        finally:
-            conn.close()
+        # ステータスを更新（updated_atは自動で追加される）
+        _task_db._execute_update(task_id, update_fields)
 
         # 更新後のタスクを取得
-        rows = execute_query("SELECT * FROM tasks WHERE id = ?", (task_id,))
-        if rows:
-            task = row_to_dict(rows[0])
+        task = _task_db._get_by_id(task_id)
+        if task:
             return {
                 "task_id": task["id"],
                 "project_id": task["project_id"],
