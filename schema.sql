@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS projects (
 -- 議論トピックテーブル
 CREATE TABLE IF NOT EXISTS discussion_topics (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  project_id INTEGER NOT NULL REFERENCES projects(id),
-  parent_topic_id INTEGER REFERENCES discussion_topics(id),
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  parent_topic_id INTEGER REFERENCES discussion_topics(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -34,8 +34,22 @@ CREATE TABLE IF NOT EXISTS decisions (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- タスクテーブル
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'in_progress', 'blocked', 'completed')), -- pending/in_progress/blocked/completed
+  topic_id INTEGER REFERENCES discussion_topics(id) ON DELETE SET NULL, -- blockedの時に関連する議論トピック
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 -- インデックス
 CREATE INDEX IF NOT EXISTS idx_topics_project_id ON discussion_topics(project_id);
 CREATE INDEX IF NOT EXISTS idx_topics_parent_id ON discussion_topics(parent_topic_id);
 CREATE INDEX IF NOT EXISTS idx_logs_topic_id ON discussion_logs(topic_id);
 CREATE INDEX IF NOT EXISTS idx_decisions_topic_id ON decisions(topic_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
