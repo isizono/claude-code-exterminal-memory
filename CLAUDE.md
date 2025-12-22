@@ -197,9 +197,6 @@ git worktree remove .trees/feature-x
 
 # worktree一覧を確認
 git worktree list
-
-# 不要なworktreeの参照をクリーンアップ
-git worktree prune
 ```
 
 **配置ルール**: worktreeは必ず`.trees/`ディレクトリ配下に作成する（`.gitignore`に登録済み）
