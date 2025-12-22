@@ -37,17 +37,7 @@ class TaskStatusManagerImpl(TaskStatusListener):
             (title, description) のタプル
         """
         topic_title = f"[BLOCKED] {task['title']}"
-        topic_description = f"""タスクがブロックされました。
-
-## タスク情報
-- タイトル: {task['title']}
-- 説明: {task['description']}
-
-## ブロック理由
-このタスクは進行中にブロック状態になりました。
-議論を通じてブロック解消の方法を検討してください。"""
-
-        return topic_title, topic_description
+        return topic_title, task['description']
 
 
 class TaskDBService(BaseDBService):
