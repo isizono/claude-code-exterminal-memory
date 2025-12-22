@@ -3,10 +3,9 @@ import logging
 import sqlite3
 from typing import Optional
 
-from src.db import execute_query, row_to_dict
+from src.db import execute_query, get_connection, row_to_dict
 from src.db_base import BaseDBService
 from src.base import TaskStatusListener
-from src.services.topic_service import add_topic
 
 logger = logging.getLogger(__name__)
 
@@ -27,31 +26,18 @@ class TaskStatusManagerImpl(TaskStatusListener):
         """
         logger.info(f"Task {task_id}: status changed to '{new_status}'")
 
-    def on_blocked(self, task_id: int) -> int:
+    def get_blocked_topic_info(self, task: dict) -> tuple[str, str]:
         """
-        blocked状態になった時、自動でトピックを作成して返す
+        blocked状態になった時のトピック情報を生成する
 
         Args:
-            task_id: タスクID
+            task: タスク情報
 
         Returns:
-            作成されたトピックのID
+            (title, description) のタプル
         """
-        # タスク情報を取得
-        rows = execute_query(
-            "SELECT * FROM tasks WHERE id = ?",
-            (task_id,),
-        )
-
-        if not rows:
-            raise ValueError(f"Task with id {task_id} not found")
-
-        task = row_to_dict(rows[0])
-
-        # トピックを作成
         topic_title = f"[BLOCKED] {task['title']}"
-        topic_description = f"""
-タスクがブロックされました。
+        topic_description = f"""タスクがブロックされました。
 
 ## タスク情報
 - タイトル: {task['title']}
@@ -59,22 +45,9 @@ class TaskStatusManagerImpl(TaskStatusListener):
 
 ## ブロック理由
 このタスクは進行中にブロック状態になりました。
-議論を通じてブロック解消の方法を検討してください。
-"""
+議論を通じてブロック解消の方法を検討してください。"""
 
-        result = add_topic(
-            project_id=task["project_id"],
-            title=topic_title,
-            description=topic_description.strip(),
-            parent_topic_id=None,
-        )
-
-        if "error" in result:
-            raise Exception(
-                f"Failed to create topic: {result['error']['message']}"
-            )
-
-        return result["topic_id"]
+        return topic_title, topic_description
 
 
 class TaskDBService(BaseDBService):
@@ -217,6 +190,10 @@ def update_task_status(task_id: int, new_status: str) -> dict:
 
     Returns:
         更新されたタスク情報
+
+    Note:
+        blockedへの変更時はトピック作成とステータス更新を
+        単一トランザクションで実行し、整合性を保証する
     """
     # ステータスバリデーション
     if new_status not in VALID_STATUSES:
@@ -227,39 +204,61 @@ def update_task_status(task_id: int, new_status: str) -> dict:
             }
         }
 
+    conn = get_connection()
     try:
         # 現在のタスク情報を取得
-        task = _task_db._get_by_id(task_id)
-        if not task:
+        cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        row = cursor.fetchone()
+        if not row:
             return {
                 "error": {
                     "code": "NOT_FOUND",
                     "message": f"Task with id {task_id} not found",
                 }
             }
+        task = row_to_dict(row)
 
         # ステータスマネージャーのインスタンスを作成
         manager = TaskStatusManagerImpl()
 
-        # ステータス変更フックを呼び出し
+        # ステータス変更フックを呼び出し（ログ出力のみ）
         manager.on_status_change(task_id, new_status)
 
-        # blockedになった場合はトピックを作成
-        update_fields = {'status': new_status}
+        # blockedになった場合はトピック作成とステータス更新を同一トランザクションで実行
         if new_status == "blocked":
-            topic_id = manager.on_blocked(task_id)
-            update_fields['topic_id'] = topic_id
+            # トピック情報を生成
+            topic_title, topic_description = manager.get_blocked_topic_info(task)
 
-        # ステータスを更新（updated_atは自動で追加される）
-        _task_db._execute_update(task_id, update_fields)
+            # トピックを作成
+            cursor = conn.execute(
+                "INSERT INTO topics (project_id, title, description) VALUES (?, ?, ?)",
+                (task["project_id"], topic_title, topic_description),
+            )
+            topic_id = cursor.lastrowid
+
+            # タスクのステータスとtopic_idを更新
+            conn.execute(
+                "UPDATE tasks SET status = ?, topic_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (new_status, topic_id, task_id),
+            )
+        else:
+            # blocked以外は通常のステータス更新
+            conn.execute(
+                "UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (new_status, task_id),
+            )
+
+        conn.commit()
 
         # 更新後のタスクを取得
-        task = _task_db._get_by_id(task_id)
-        if not task:
+        cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        row = cursor.fetchone()
+        if not row:
             raise Exception("Failed to retrieve updated task")
-        return _task_to_response(task)
+        return _task_to_response(row_to_dict(row))
 
     except sqlite3.IntegrityError as e:
+        conn.rollback()
         return {
             "error": {
                 "code": "CONSTRAINT_VIOLATION",
@@ -267,9 +266,12 @@ def update_task_status(task_id: int, new_status: str) -> dict:
             }
         }
     except Exception as e:
+        conn.rollback()
         return {
             "error": {
                 "code": "DATABASE_ERROR",
                 "message": str(e),
             }
         }
+    finally:
+        conn.close()
