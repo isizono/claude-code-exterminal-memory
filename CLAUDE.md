@@ -189,12 +189,20 @@ fix: session_id生成時のUUID形式を修正
 **作業方法**: 原則としてgit worktreeを使用する
 
 ```bash
-# 新しい作業ツリーを作成
-git worktree add ../project-name-feature-x feature/feature-x
+# 新しい作業ツリーを作成（.trees/配下に格納）
+git worktree add .trees/feature-x feature/feature-x
 
 # 作業完了後
-git worktree remove ../project-name-feature-x
+git worktree remove .trees/feature-x
+
+# worktree一覧を確認
+git worktree list
+
+# 不要なworktreeの参照をクリーンアップ
+git worktree prune
 ```
+
+**配置ルール**: worktreeは必ず`.trees/`ディレクトリ配下に作成する（`.gitignore`に登録済み）
 
 **ブランチ命名規則**: `feature/<feature-name>`, `fix/<issue-name>` など
 
