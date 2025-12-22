@@ -3,28 +3,23 @@ import sqlite3
 from typing import Optional
 from src.db import execute_query, row_to_dict
 from src.db_base import BaseDBService
-from src.base import TaskStatusManager
+from src.base import TaskStatusListener
 from src.services import topic_service
 
 
-class TaskStatusManagerImpl(TaskStatusManager):
+class TaskStatusManagerImpl(TaskStatusListener):
     """タスクのステータス変更を管理する実装クラス"""
 
-    def on_status_change(
-        self, task_id: int, old_status: str, new_status: str
-    ) -> None:
+    def on_status_change(self, task_id: int, new_status: str) -> None:
         """
         ステータス変更時のフック
 
         Args:
             task_id: タスクID
-            old_status: 変更前のステータス
             new_status: 変更後のステータス
         """
         # 基本的な実装：ログ出力
-        print(
-            f"Task {task_id}: status changed from '{old_status}' to '{new_status}'"
-        )
+        print(f"Task {task_id}: status changed to '{new_status}'")
 
     def on_blocked(self, task_id: int) -> int:
         """
@@ -224,13 +219,11 @@ def update_task_status(task_id: int, new_status: str) -> dict:
                 }
             }
 
-        old_status = task["status"]
-
         # ステータスマネージャーのインスタンスを作成
         manager = TaskStatusManagerImpl()
 
         # ステータス変更フックを呼び出し
-        manager.on_status_change(task_id, old_status, new_status)
+        manager.on_status_change(task_id, new_status)
 
         # blockedになった場合はトピックを作成
         update_fields = {'status': new_status}
