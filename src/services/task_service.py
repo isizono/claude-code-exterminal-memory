@@ -1,10 +1,17 @@
 """タスク管理サービス"""
+import logging
 import sqlite3
 from typing import Optional
+
 from src.db import execute_query, row_to_dict
 from src.db_base import BaseDBService
 from src.base import TaskStatusListener
-from src.services import topic_service
+from src.services.topic_service import add_topic
+
+logger = logging.getLogger(__name__)
+
+# 有効なステータス値
+VALID_STATUSES = {"pending", "in_progress", "completed", "blocked"}
 
 
 class TaskStatusManagerImpl(TaskStatusListener):
@@ -18,8 +25,7 @@ class TaskStatusManagerImpl(TaskStatusListener):
             task_id: タスクID
             new_status: 変更後のステータス
         """
-        # 基本的な実装：ログ出力
-        print(f"Task {task_id}: status changed to '{new_status}'")
+        logger.info(f"Task {task_id}: status changed to '{new_status}'")
 
     def on_blocked(self, task_id: int) -> int:
         """
@@ -56,7 +62,7 @@ class TaskStatusManagerImpl(TaskStatusListener):
 議論を通じてブロック解消の方法を検討してください。
 """
 
-        result = topic_service.add_topic(
+        result = add_topic(
             project_id=task["project_id"],
             title=topic_title,
             description=topic_description.strip(),
@@ -81,6 +87,20 @@ class TaskDBService(BaseDBService):
 _task_db = TaskDBService()
 
 
+def _task_to_response(task: dict) -> dict:
+    """タスクデータをAPIレスポンス形式に変換"""
+    return {
+        "task_id": task["id"],
+        "project_id": task["project_id"],
+        "title": task["title"],
+        "description": task["description"],
+        "status": task["status"],
+        "topic_id": task["topic_id"],
+        "created_at": task["created_at"],
+        "updated_at": task["updated_at"],
+    }
+
+
 def add_task(project_id: int, title: str, description: str) -> dict:
     """
     タスクを作成してIDを返す
@@ -103,19 +123,9 @@ def add_task(project_id: int, title: str, description: str) -> dict:
 
         # 作成したタスクを取得
         task = _task_db._get_by_id(task_id)
-        if task:
-            return {
-                "task_id": task["id"],
-                "project_id": task["project_id"],
-                "title": task["title"],
-                "description": task["description"],
-                "status": task["status"],
-                "topic_id": task["topic_id"],
-                "created_at": task["created_at"],
-                "updated_at": task["updated_at"],
-            }
-        else:
+        if not task:
             raise Exception("Failed to retrieve created task")
+        return _task_to_response(task)
 
     except sqlite3.IntegrityError as e:
         return {
@@ -208,6 +218,15 @@ def update_task_status(task_id: int, new_status: str) -> dict:
     Returns:
         更新されたタスク情報
     """
+    # ステータスバリデーション
+    if new_status not in VALID_STATUSES:
+        return {
+            "error": {
+                "code": "INVALID_STATUS",
+                "message": f"Invalid status: {new_status}. Must be one of {VALID_STATUSES}",
+            }
+        }
+
     try:
         # 現在のタスク情報を取得
         task = _task_db._get_by_id(task_id)
@@ -236,19 +255,9 @@ def update_task_status(task_id: int, new_status: str) -> dict:
 
         # 更新後のタスクを取得
         task = _task_db._get_by_id(task_id)
-        if task:
-            return {
-                "task_id": task["id"],
-                "project_id": task["project_id"],
-                "title": task["title"],
-                "description": task["description"],
-                "status": task["status"],
-                "topic_id": task["topic_id"],
-                "created_at": task["created_at"],
-                "updated_at": task["updated_at"],
-            }
-        else:
+        if not task:
             raise Exception("Failed to retrieve updated task")
+        return _task_to_response(task)
 
     except sqlite3.IntegrityError as e:
         return {
