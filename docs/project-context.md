@@ -220,7 +220,7 @@ CREATE TABLE tasks (
     CHECK(status IN ('pending', 'in_progress', 'blocked', 'completed')),
   topic_id INTEGER REFERENCES discussion_topics(id) ON DELETE SET NULL,  -- blockedの時に関連する議論トピック
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP  -- TRIGGERで自動更新
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -256,19 +256,14 @@ CREATE TABLE tasks (
 
 タスクの実行ログを記録するテーブル。将来的に実装予定。
 
-```sql
--- 将来の実装予定
-CREATE TABLE task_logs (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  task_id INTEGER NOT NULL REFERENCES tasks(id),
-  session_id TEXT NOT NULL,
-  summary TEXT NOT NULL,
-  purpose TEXT NOT NULL,
-  result TEXT NOT NULL,
-  issues TEXT,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-```
+**想定カラム**:
+- task_id: 関連タスク
+- session_id: セッション識別子
+- summary: 作業概要
+- purpose: 作業目的
+- result: 作業結果
+- issues: 発生した問題
+- created_at: 作成日時
 
 **原則**: RDBには事実のみ。改善提案（事実じゃない）、学んだこと（→ knowledgeへ）は記録しない。
 
