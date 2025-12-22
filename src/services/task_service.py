@@ -221,7 +221,7 @@ def update_task_status(task_id: int, new_status: str) -> dict:
 
             # トピックを作成
             cursor = conn.execute(
-                "INSERT INTO topics (project_id, title, description) VALUES (?, ?, ?)",
+                "INSERT INTO discussion_topics (project_id, title, description) VALUES (?, ?, ?)",
                 (task["project_id"], topic_title, topic_description),
             )
             topic_id = cursor.lastrowid

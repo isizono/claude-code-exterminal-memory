@@ -137,13 +137,22 @@ mcp__knowledge__search
 複数プロジェクトの議論・タスクを分離管理するため、projectsテーブルを追加。
 
 - **projectsテーブル**: プロジェクト情報を管理
-- **task_statusesテーブル**: タスクステータスを正規化
-- **TEXT→VARCHAR**: パフォーマンス改善のため、固定長フィールドはVARCHAR(255)に変更
 - **プロジェクトスコープ**: すべてのテーブルにproject_id追加（tasksとdiscussion_topics）
 - **API変更**:
   - すべてのAPIにproject_id追加（引数の最初）
   - get-topicsを3つに分割（get-topics, get-decided-topics, get-undecided-topics）
   - 検索APIのproject_id必須化
+
+### タスク管理システム（実装済み - 2025-12-23）
+
+タスクのステータス管理とblocked時の自動トピック作成機能を実装。
+
+- **MCPツール**:
+  - `add_task`: 新しいタスクを追加
+  - `get_tasks`: タスク一覧を取得（statusフィルタ可）
+  - `update_task_status`: タスクステータスを更新
+- **ステータス**: pending / in_progress / blocked / completed
+- **blocked時の自動トピック作成**: blockedにするとdiscussion_topicsに自動でトピックが作成され、task.topic_idに紐付く
 
 ### スコープ外（後回し）
 - 複数エージェント間の会話機能（Issue上でも代替可能 - 合意済み）
@@ -200,32 +209,25 @@ description: "MCPサーバーを作るよ〜"
 asana_url: "https://app.asana.com/0/..."
 ```
 
-#### task_statusesテーブル（追加 - 2025-12-10）
-```sql
-CREATE TABLE task_statuses (
-  id INTEGER PRIMARY KEY,
-  name VARCHAR(255) NOT NULL UNIQUE
-);
-
--- 初期データ
-INSERT INTO task_statuses (name) VALUES ('active'), ('completed'), ('cancelled');
-```
-
-**目的**: タスクのステータスを正規化。
-
-#### tasksテーブル
+#### tasksテーブル（実装済み - 2025-12-23）
 ```sql
 CREATE TABLE tasks (
-  id INTEGER PRIMARY KEY,
-  project_id INTEGER NOT NULL REFERENCES projects(id),
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   title VARCHAR(255) NOT NULL,
   description TEXT NOT NULL,
-  status_id INTEGER NOT NULL DEFAULT 1 REFERENCES task_statuses(id),  -- 1='active'
+  status VARCHAR(20) NOT NULL DEFAULT 'pending'
+    CHECK(status IN ('pending', 'in_progress', 'blocked', 'completed')),
+  topic_id INTEGER REFERENCES discussion_topics(id) ON DELETE SET NULL,  -- blockedの時に関連する議論トピック
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  completed_at TIMESTAMP
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP  -- TRIGGERで自動更新
 );
 ```
+
+**変更点（2025-12-23）**:
+- `task_statuses`テーブルは廃止、`status`カラムにCHECK制約で直接管理
+- `topic_id`を追加（blocked時に自動作成されるトピックへの参照）
+- `completed_at`は廃止（シンプルさ優先）
 
 **descriptionテンプレート:**
 ```markdown
@@ -250,40 +252,22 @@ CREATE TABLE tasks (
 
 **タスク作成フロー:** ユーザーがタスクを依頼 → Claude Codeが確認質問（目的、背景、完了条件等）→ descriptionを生成 → MCPでtask作成
 
-#### task_logsテーブル
+#### task_logsテーブル（未実装）
+
+タスクの実行ログを記録するテーブル。将来的に実装予定。
+
 ```sql
+-- 将来の実装予定
 CREATE TABLE task_logs (
-  id SERIAL PRIMARY KEY,
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
   task_id INTEGER NOT NULL REFERENCES tasks(id),
-  session_id UUID NOT NULL,
-  summary TEXT NOT NULL,       -- 何をしたか（要約）
-  purpose TEXT NOT NULL,       -- なぜそれをしたか（目的）
-  result TEXT NOT NULL,        -- どうなったか（結果）
-  issues TEXT,                 -- 問題があった場合
-  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+  session_id TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  purpose TEXT NOT NULL,
+  result TEXT NOT NULL,
+  issues TEXT,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-```
-
-**summaryテンプレート:**
-```markdown
-## 実施内容
-[何をしたかの要約]
-
-## 使用ファイル
-
-### src/components/login.tsx
-```typescript
-+ export const LoginForm = () => {
-+   const [email, setEmail] = useState('')
-+   // 認証フォームの実装
-+ }
-```
-
-### src/types/auth.ts
-```typescript
-+ type User = { id: string; email: string }
-+ type LoginRequest = { email: string; password: string }
-```
 ```
 
 **原則**: RDBには事実のみ。改善提案（事実じゃない）、学んだこと（→ knowledgeへ）は記録しない。
@@ -411,12 +395,7 @@ reason: "設計議論では自由に発散→収束させたい。実装時は�
 
 ## 未決定事項・次回議論ポイント
 
-### 最高優先度（次回）
-
-1. **開発フローの詳細**
-   - プランモードの使い方
-   - タスク分解の粒度
-   - その他作業手順
+**注意**: 最新の未決定事項はMCPツール（`get_undecided_topics`）で確認すること。このセクションは参考情報。
 
 ### 後回し（直近のやりたいこと完了後）
 
@@ -429,44 +408,32 @@ reason: "設計議論では自由に発散→収束させたい。実装時は�
 
 ### 高優先度
 
-2. **MCPツールの詳細設計**
-   - 必要なツール一覧（create-task, log-completion, knowledge-search, その他）
-   - 各ツールの入力/出力スキーマ
-   - エラーハンドリング方針
-
-3. **PostToolUseフックの実装詳細**
+1. **PostToolUseフックの実装詳細**
    - フックスクリプトの書き方
    - プロンプトテンプレート
    - エラー時の挙動
 
-4. **既存タスク検索の方法**
-   - タイトルで検索？キーワード？
-   - 曖昧検索は必要？
-
-5. **インデックス設計**
-   - tasks, task_logs, decisionsテーブルのインデックス
-   - パフォーマンス最適化
+2. **task_logsテーブルとMCPツールの実装**
+   - log-completionツールの設計
+   - session_id管理との連携
 
 ### 中優先度
 
-6. **DB接続ライブラリの選定**
-   - asyncpg vs SQLAlchemy
-   - マイグレーション管理方法（Alembic等）
-
-7. **環境変数・設定管理**
+3. **環境変数・設定管理**
    - DB接続情報
    - KNOWLEDGE_ROOT
    - その他設定項目
 
-8. **エラーハンドリング・ロギング方針**
+4. **エラーハンドリング・ロギング方針**
    - エラーをどう記録するか
    - ログレベル設計
 
-### 低優先度
+### 実装済み（このドキュメントから削除予定の項目）
 
-9. **テストの方針**
-   - ユニットテスト書くか
-   - どこまでテストするか
+- ~~MCPツールの詳細設計~~（実装済み - 2025-12-23）
+- ~~既存タスク検索の方法~~（search_topics, search_decisionsで実装済み）
+- ~~インデックス設計~~（schema.sqlで実装済み）
+- ~~DB接続ライブラリの選定~~（sqlite3標準ライブラリを採用）
 
 ## 参考資料
 
