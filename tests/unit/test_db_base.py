@@ -246,3 +246,37 @@ def test_partial_update(temp_db):
     item = service._get_by_id(item_id)
     assert item["name"] == "updated_name"
     assert item["value"] == 100  # valueは変わっていない
+
+
+def test_insert_rejects_sql_injection_column_name(temp_db):
+    """INSERT時にSQLインジェクションを含むカラム名を拒否する"""
+    service = TestTable()
+    with pytest.raises(ValueError) as exc_info:
+        service._execute_insert({"name); DROP TABLE test_items; --": "evil"})
+    assert "Invalid column name" in str(exc_info.value)
+
+
+def test_update_rejects_sql_injection_column_name(temp_db):
+    """UPDATE時にSQLインジェクションを含むカラム名を拒否する"""
+    service = TestTable()
+    item_id = service._execute_insert({"name": "test", "value": 1})
+
+    with pytest.raises(ValueError) as exc_info:
+        service._execute_update(item_id, {"value = 999; --": "evil"})
+    assert "Invalid column name" in str(exc_info.value)
+
+
+def test_insert_rejects_uppercase_column_name(temp_db):
+    """大文字を含むカラム名を拒否する"""
+    service = TestTable()
+    with pytest.raises(ValueError) as exc_info:
+        service._execute_insert({"Name": "test"})
+    assert "Invalid column name" in str(exc_info.value)
+
+
+def test_insert_rejects_column_name_starting_with_number(temp_db):
+    """数字で始まるカラム名を拒否する"""
+    service = TestTable()
+    with pytest.raises(ValueError) as exc_info:
+        service._execute_insert({"1column": "test"})
+    assert "Invalid column name" in str(exc_info.value)

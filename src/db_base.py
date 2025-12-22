@@ -1,8 +1,20 @@
 """データベース操作の基底クラス"""
-from abc import ABC
-from typing import Optional
-from src.db import get_connection, execute_query, row_to_dict
+import re
 import sqlite3
+from abc import ABC
+from typing import Any, Optional
+
+from src.db import execute_query, get_connection, row_to_dict
+
+# カラム名として許可されるパターン（英小文字で始まり、英数字とアンダースコアのみ）
+_VALID_COLUMN_NAME = re.compile(r'^[a-z][a-z0-9_]*$')
+
+
+def _validate_column_names(columns: list[str]) -> None:
+    """カラム名がSQLインジェクションに安全かバリデーション"""
+    for col in columns:
+        if not _VALID_COLUMN_NAME.match(col):
+            raise ValueError(f"Invalid column name: {col}")
 
 
 class BaseDBService(ABC):
@@ -21,18 +33,24 @@ class BaseDBService(ABC):
         if not cls.table_name.replace('_', '').isalnum():
             raise ValueError(f"Invalid table_name: {cls.table_name}")
 
-    def _execute_insert(self, fields: dict) -> int:
+    def _execute_insert(self, fields: dict[str, Any]) -> int:
         """
         INSERT操作を実行
-        created_atは自動で追加される（デフォルト値）
+        created_atはテーブルのデフォルト値により自動設定される
 
         Args:
             fields: 挿入するフィールドの辞書
 
         Returns:
             挿入されたレコードのID
+
+        Raises:
+            ValueError: カラム名が不正な場合
         """
-        columns = ', '.join(fields.keys())
+        column_names = list(fields.keys())
+        _validate_column_names(column_names)
+
+        columns = ', '.join(column_names)
         placeholders = ', '.join(['?' for _ in fields])
         values = tuple(fields.values())
 
@@ -50,14 +68,20 @@ class BaseDBService(ABC):
         finally:
             conn.close()
 
-    def _execute_update(self, id: int, fields: dict) -> None:
+    def _execute_update(self, id: int, fields: dict[str, Any]) -> None:
         """
-        UPDATE操作を実行（updated_atを自動追加）
+        UPDATE操作を実行（updated_atを自動更新）
 
         Args:
             id: 更新対象のレコードID
             fields: 更新するフィールドの辞書
+
+        Raises:
+            ValueError: カラム名が不正な場合
         """
+        column_names = list(fields.keys())
+        _validate_column_names(column_names)
+
         set_parts = []
         values = []
 
@@ -82,7 +106,7 @@ class BaseDBService(ABC):
         finally:
             conn.close()
 
-    def _get_by_id(self, id: int) -> Optional[dict]:
+    def _get_by_id(self, id: int) -> Optional[dict[str, Any]]:
         """
         IDでレコードを取得
 
