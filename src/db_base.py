@@ -13,6 +13,14 @@ class BaseDBService(ABC):
 
     table_name: str = ""  # 継承先でテーブル名を指定
 
+    def __init_subclass__(cls, **kwargs):
+        """サブクラス作成時にtable_nameのバリデーションを実行"""
+        super().__init_subclass__(**kwargs)
+        if not cls.table_name:
+            raise ValueError(f"{cls.__name__} must define table_name")
+        if not cls.table_name.replace('_', '').isalnum():
+            raise ValueError(f"Invalid table_name: {cls.table_name}")
+
     def _execute_insert(self, fields: dict) -> int:
         """
         INSERT操作を実行
@@ -50,37 +58,22 @@ class BaseDBService(ABC):
             id: 更新対象のレコードID
             fields: 更新するフィールドの辞書
         """
-        # updated_atを自動追加
-        fields['updated_at'] = 'CURRENT_TIMESTAMP'
-
-        set_clause = ', '.join([f"{k} = ?" for k in fields.keys()])
-        # CURRENT_TIMESTAMPは文字列として渡すとSQLiteが解釈してくれる
-        values = []
-        for v in fields.values():
-            if v == 'CURRENT_TIMESTAMP':
-                values.append(v)
-            else:
-                values.append(v)
-        values = tuple(values) + (id,)
-
-        # CURRENT_TIMESTAMPをプレースホルダーではなく直接埋め込む
         set_parts = []
-        value_list = []
+        values = []
+
         for k, v in fields.items():
-            if v == 'CURRENT_TIMESTAMP':
-                set_parts.append(f"{k} = CURRENT_TIMESTAMP")
-            else:
-                set_parts.append(f"{k} = ?")
-                value_list.append(v)
+            set_parts.append(f"{k} = ?")
+            values.append(v)
+
+        # updated_atは常に追加
+        set_parts.append("updated_at = CURRENT_TIMESTAMP")
 
         set_clause = ', '.join(set_parts)
-        values = tuple(value_list) + (id,)
-
         conn = get_connection()
         try:
             conn.execute(
                 f"UPDATE {self.table_name} SET {set_clause} WHERE id = ?",
-                values
+                tuple(values) + (id,)
             )
             conn.commit()
         except sqlite3.Error as e:
