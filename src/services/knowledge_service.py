@@ -11,10 +11,10 @@ import yaml
 class KnowledgeCategory(str, Enum):
     """ナレッジのカテゴリ"""
     REFERENCES = "references"  # 外部情報（web検索結果、公式ドキュメント等）
-    FACTS = "facts"  # コードベース情報
+    FACTS = "facts"  # 事実情報（コードベースの調査結果、実験・検証の記録等）
 
 
-def get_knowledge_root() -> Path:
+def _get_knowledge_root() -> Path:
     """
     KNOWLEDGE_ROOT環境変数からナレッジ保存先を取得
     未設定の場合は ~/.claude/knowledge/ をデフォルトとする
@@ -25,7 +25,7 @@ def get_knowledge_root() -> Path:
     return Path.home() / ".claude" / "knowledge"
 
 
-def ensure_directories(root: Path) -> None:
+def _ensure_directories(root: Path) -> None:
     """
     ナレッジディレクトリ構造を初期化
     - root/references/
@@ -35,7 +35,7 @@ def ensure_directories(root: Path) -> None:
         (root / category.value).mkdir(parents=True, exist_ok=True)
 
 
-def generate_filename(title: str) -> str:
+def _generate_filename(title: str) -> str:
     """
     タイトルからファイル名を生成
     日本語そのままでOK（決定事項: ID:80）
@@ -48,7 +48,7 @@ def generate_filename(title: str) -> str:
     return filename.strip()
 
 
-def get_unique_filepath(directory: Path, base_name: str) -> Path:
+def _get_unique_filepath(directory: Path, base_name: str) -> Path:
     """
     衝突しないファイルパスを取得
     同名ファイルが存在する場合は連番を付与（例: タイトル_1.md）
@@ -65,7 +65,7 @@ def get_unique_filepath(directory: Path, base_name: str) -> Path:
         counter += 1
 
 
-def create_frontmatter(tags: list[str], created_at: Optional[datetime] = None) -> str:
+def _create_frontmatter(tags: list[str], created_at: Optional[datetime] = None) -> str:
     """
     YAMLフロントマターを生成
     PyYAMLを使用して特殊文字を適切にエスケープする
@@ -119,11 +119,11 @@ def add_knowledge(
             }
 
         # ディレクトリ構造を確保
-        root = get_knowledge_root()
-        ensure_directories(root)
+        root = _get_knowledge_root()
+        _ensure_directories(root)
 
         # ファイル名生成
-        base_name = generate_filename(title)
+        base_name = _generate_filename(title)
         if not base_name:
             return {
                 "error": {
@@ -136,10 +136,10 @@ def add_knowledge(
         target_dir = root / cat.value
 
         # 衝突しないファイルパスを取得
-        filepath = get_unique_filepath(target_dir, base_name)
+        filepath = _get_unique_filepath(target_dir, base_name)
 
         # フロントマター + コンテンツを作成
-        frontmatter = create_frontmatter(tags)
+        frontmatter = _create_frontmatter(tags)
         full_content = frontmatter + "\n" + content
 
         # ファイル書き込み

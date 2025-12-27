@@ -4,11 +4,11 @@ import tempfile
 import pytest
 from pathlib import Path
 from src.services.knowledge_service import (
-    get_knowledge_root,
-    ensure_directories,
-    generate_filename,
-    get_unique_filepath,
-    create_frontmatter,
+    _get_knowledge_root,
+    _ensure_directories,
+    _generate_filename,
+    _get_unique_filepath,
+    _create_frontmatter,
     add_knowledge,
     KnowledgeCategory,
 )
@@ -34,7 +34,7 @@ def test_get_knowledge_root_from_env():
     """環境変数からKNOWLEDGE_ROOTを取得できる"""
     os.environ["KNOWLEDGE_ROOT"] = "/custom/path"
     try:
-        result = get_knowledge_root()
+        result = _get_knowledge_root()
         assert result == Path("/custom/path")
     finally:
         del os.environ["KNOWLEDGE_ROOT"]
@@ -44,7 +44,7 @@ def test_get_knowledge_root_default():
     """環境変数未設定時はデフォルトパスを返す"""
     if "KNOWLEDGE_ROOT" in os.environ:
         del os.environ["KNOWLEDGE_ROOT"]
-    result = get_knowledge_root()
+    result = _get_knowledge_root()
     assert result == Path.home() / ".claude" / "knowledge"
 
 
@@ -52,7 +52,7 @@ def test_get_knowledge_root_expands_tilde():
     """チルダ展開ができる"""
     os.environ["KNOWLEDGE_ROOT"] = "~/my-knowledge"
     try:
-        result = get_knowledge_root()
+        result = _get_knowledge_root()
         assert result == Path.home() / "my-knowledge"
     finally:
         del os.environ["KNOWLEDGE_ROOT"]
@@ -65,7 +65,7 @@ def test_get_knowledge_root_expands_tilde():
 
 def test_ensure_directories_creates_structure(temp_knowledge_root):
     """ディレクトリ構造を作成できる"""
-    ensure_directories(temp_knowledge_root)
+    _ensure_directories(temp_knowledge_root)
 
     assert (temp_knowledge_root / "references").exists()
     assert (temp_knowledge_root / "facts").exists()
@@ -75,9 +75,9 @@ def test_ensure_directories_creates_structure(temp_knowledge_root):
 
 def test_ensure_directories_idempotent(temp_knowledge_root):
     """ディレクトリが既に存在していてもエラーにならない"""
-    ensure_directories(temp_knowledge_root)
+    _ensure_directories(temp_knowledge_root)
     # 2回目の呼び出しでもエラーにならない
-    ensure_directories(temp_knowledge_root)
+    _ensure_directories(temp_knowledge_root)
 
     assert (temp_knowledge_root / "references").exists()
     assert (temp_knowledge_root / "facts").exists()
@@ -90,19 +90,19 @@ def test_ensure_directories_idempotent(temp_knowledge_root):
 
 def test_generate_filename_japanese():
     """日本語タイトルがそのままファイル名になる"""
-    result = generate_filename("テストナレッジ")
+    result = _generate_filename("テストナレッジ")
     assert result == "テストナレッジ"
 
 
 def test_generate_filename_english():
     """英語タイトルがそのままファイル名になる"""
-    result = generate_filename("Test Knowledge")
+    result = _generate_filename("Test Knowledge")
     assert result == "Test Knowledge"
 
 
 def test_generate_filename_removes_unsafe_chars():
     """危険な文字が除去される"""
-    result = generate_filename("test/path:file*name?\"<>|")
+    result = _generate_filename("test/path:file*name?\"<>|")
     assert "/" not in result
     assert ":" not in result
     assert "*" not in result
@@ -115,20 +115,20 @@ def test_generate_filename_removes_unsafe_chars():
 
 def test_generate_filename_replaces_with_underscore():
     """危険な文字がアンダースコアに置換される"""
-    result = generate_filename("test/file")
+    result = _generate_filename("test/file")
     assert result == "test_file"
 
 
 def test_generate_filename_removes_newlines():
     """改行文字が除去される"""
-    result = generate_filename("test\ntitle\r\n")
+    result = _generate_filename("test\ntitle\r\n")
     assert "\n" not in result
     assert "\r" not in result
 
 
 def test_generate_filename_strips_whitespace():
     """前後の空白がトリムされる"""
-    result = generate_filename("  test title  ")
+    result = _generate_filename("  test title  ")
     assert result == "test title"
 
 
@@ -142,7 +142,7 @@ def test_get_unique_filepath_no_conflict(temp_knowledge_root):
     directory = temp_knowledge_root / "references"
     directory.mkdir(parents=True, exist_ok=True)
 
-    result = get_unique_filepath(directory, "test")
+    result = _get_unique_filepath(directory, "test")
     assert result == directory / "test.md"
 
 
@@ -154,7 +154,7 @@ def test_get_unique_filepath_with_conflict(temp_knowledge_root):
     # 既存ファイルを作成
     (directory / "test.md").write_text("existing")
 
-    result = get_unique_filepath(directory, "test")
+    result = _get_unique_filepath(directory, "test")
     assert result == directory / "test_1.md"
 
 
@@ -168,7 +168,7 @@ def test_get_unique_filepath_multiple_conflicts(temp_knowledge_root):
     (directory / "test_1.md").write_text("existing")
     (directory / "test_2.md").write_text("existing")
 
-    result = get_unique_filepath(directory, "test")
+    result = _get_unique_filepath(directory, "test")
     assert result == directory / "test_3.md"
 
 
@@ -179,7 +179,7 @@ def test_get_unique_filepath_multiple_conflicts(temp_knowledge_root):
 
 def test_create_frontmatter_with_tags():
     """タグ付きのフロントマターを生成できる"""
-    result = create_frontmatter(["tag1", "tag2"])
+    result = _create_frontmatter(["tag1", "tag2"])
 
     assert "---" in result
     assert "tags:" in result
@@ -190,7 +190,7 @@ def test_create_frontmatter_with_tags():
 
 def test_create_frontmatter_empty_tags():
     """空のタグでもフロントマターを生成できる"""
-    result = create_frontmatter([])
+    result = _create_frontmatter([])
 
     assert "---" in result
     assert "tags: []" in result
@@ -199,7 +199,7 @@ def test_create_frontmatter_empty_tags():
 
 def test_create_frontmatter_format():
     """YAMLフロントマターの形式が正しい"""
-    result = create_frontmatter(["test"])
+    result = _create_frontmatter(["test"])
 
     lines = result.strip().split("\n")
     assert lines[0] == "---"
@@ -209,7 +209,7 @@ def test_create_frontmatter_format():
 def test_create_frontmatter_escapes_special_chars():
     """特殊文字を含むタグが適切にエスケープされる"""
     # YAMLメタキャラクタを含むタグ
-    result = create_frontmatter(["tag: with colon", "tag #hash", "tag 'quoted'"])
+    result = _create_frontmatter(["tag: with colon", "tag #hash", "tag 'quoted'"])
 
     # エラーなく生成される
     assert "---" in result
