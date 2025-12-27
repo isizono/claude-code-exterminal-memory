@@ -5,6 +5,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
+import yaml
+
 
 class KnowledgeCategory(str, Enum):
     """ナレッジのカテゴリ"""
@@ -66,18 +68,24 @@ def get_unique_filepath(directory: Path, base_name: str) -> Path:
 def create_frontmatter(tags: list[str], created_at: Optional[datetime] = None) -> str:
     """
     YAMLフロントマターを生成
+    PyYAMLを使用して特殊文字を適切にエスケープする
     """
     if created_at is None:
         created_at = datetime.now()
 
-    tags_yaml = "\n".join(f"  - {tag}" for tag in tags) if tags else ""
-    tags_section = f"tags:\n{tags_yaml}" if tags else "tags: []"
+    frontmatter_data = {
+        "tags": tags if tags else [],
+        "created_at": created_at.strftime("%Y-%m-%d %H:%M:%S"),
+    }
 
-    return f"""---
-{tags_section}
-created_at: {created_at.strftime("%Y-%m-%d %H:%M:%S")}
----
-"""
+    yaml_content = yaml.dump(
+        frontmatter_data,
+        default_flow_style=False,
+        allow_unicode=True,
+        sort_keys=False,
+    )
+
+    return f"---\n{yaml_content}---\n"
 
 
 def add_knowledge(

@@ -183,8 +183,8 @@ def test_create_frontmatter_with_tags():
 
     assert "---" in result
     assert "tags:" in result
-    assert "  - tag1" in result
-    assert "  - tag2" in result
+    assert "- tag1" in result
+    assert "- tag2" in result
     assert "created_at:" in result
 
 
@@ -204,6 +204,24 @@ def test_create_frontmatter_format():
     lines = result.strip().split("\n")
     assert lines[0] == "---"
     assert lines[-1] == "---"
+
+
+def test_create_frontmatter_escapes_special_chars():
+    """特殊文字を含むタグが適切にエスケープされる"""
+    # YAMLメタキャラクタを含むタグ
+    result = create_frontmatter(["tag: with colon", "tag #hash", "tag 'quoted'"])
+
+    # エラーなく生成される
+    assert "---" in result
+    assert "tags:" in result
+    # PyYAMLによって適切にエスケープされている
+    import yaml
+    # フロントマター部分をパースしてみる
+    yaml_content = result.replace("---\n", "", 1).replace("---\n", "")
+    parsed = yaml.safe_load(yaml_content)
+    assert "tag: with colon" in parsed["tags"]
+    assert "tag #hash" in parsed["tags"]
+    assert "tag 'quoted'" in parsed["tags"]
 
 
 # ========================================
@@ -246,7 +264,7 @@ def test_add_knowledge_file_content(temp_knowledge_root):
     # フロントマターがある
     assert content.startswith("---")
     assert "tags:" in content
-    assert "  - tag1" in content
+    assert "- tag1" in content
     assert "created_at:" in content
 
     # 本文がある

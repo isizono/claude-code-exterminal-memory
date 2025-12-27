@@ -67,8 +67,8 @@ def test_add_knowledge_file_content_format(temp_knowledge_root):
     # YAMLフロントマターの確認
     assert content.startswith("---")
     assert "tags:" in content
-    assert "  - tag1" in content
-    assert "  - tag2" in content
+    assert "- tag1" in content
+    assert "- tag2" in content
     assert "created_at:" in content
     # フロントマターが閉じていることを確認
     assert content.count("---") >= 2
@@ -197,10 +197,10 @@ def test_add_knowledge_multiple_tags(temp_knowledge_root):
     # ファイル内容を確認
     filepath = Path(result["file_path"])
     content = filepath.read_text(encoding="utf-8")
-    assert "  - tag1" in content
-    assert "  - tag2" in content
-    assert "  - tag3" in content
-    assert "  - 日本語タグ" in content
+    assert "- tag1" in content
+    assert "- tag2" in content
+    assert "- tag3" in content
+    assert "- 日本語タグ" in content
 
 
 def test_add_knowledge_markdown_content(temp_knowledge_root):
