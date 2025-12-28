@@ -1,6 +1,6 @@
 """MCPサーバーのメインエントリーポイント"""
 from fastmcp import FastMCP
-from typing import Optional
+from typing import Literal, Optional
 from src.services import (
     project_service,
     topic_service,
@@ -8,6 +8,7 @@ from src.services import (
     decision_service,
     search_service,
     task_service,
+    knowledge_service,
 )
 
 # MCPサーバーを作成
@@ -211,6 +212,38 @@ def update_task_status(
         更新されたタスク情報（blocked時はtopic_idも含む）
     """
     return task_service.update_task_status(task_id, new_status)
+
+
+@mcp.tool()
+def add_knowledge(
+    title: str,
+    content: str,
+    tags: list[str],
+    category: Literal["references", "facts"],
+) -> dict:
+    """
+    ナレッジをmdファイルとして保存する。
+
+    典型的な使い方:
+    - web検索結果を保存: add_knowledge("Claude Code hooks調査", "...", ["claude-code", "hooks"], "references")
+    - コードベース調査結果を保存: add_knowledge("認証フローの仕組み", "...", ["auth", "architecture"], "facts")
+
+    ワークフロー位置: リサーチ完了後、ナレッジとして記録する時
+
+    カテゴリの選び方:
+    - references: 外部情報（web検索結果、公式ドキュメント、技術記事など）
+    - facts: 事実情報（コードベースの調査結果、実験・検証の記録等）
+
+    Args:
+        title: ナレッジのタイトル（そのままファイル名になる。日本語OK）
+        content: 本文（マークダウン形式）
+        tags: タグ一覧（検索用）
+        category: カテゴリ（"references" または "facts"）
+
+    Returns:
+        保存結果（file_path, title, category, tags）
+    """
+    return knowledge_service.add_knowledge(title, content, tags, category)
 
 
 # リソース機能
