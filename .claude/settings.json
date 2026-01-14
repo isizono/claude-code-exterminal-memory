@@ -21,6 +21,17 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__claude-code-exterminal-memory__add_decision",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/remind_task_on_decision.sh"
+          }
+        ]
+      }
     ]
   }
 }
