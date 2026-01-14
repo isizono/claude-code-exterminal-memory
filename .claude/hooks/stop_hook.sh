@@ -3,10 +3,13 @@
 # Stopフック: 毎ターンの会話を自動でログに記録する
 #
 # 処理フロー:
-# 1. stop_hook_active=true → approve（無限ループ防止）
-# 2. メタタグチェック → なければblock
-# 3. トピック変更チェック → 前topicにdecisionなければblock
-# 4. approve + バックグラウンドでログ記録
+# 1. メタタグチェック → なければblock
+# 2. トピック変更チェック → 前topicにdecisionなければblock
+# 3. approve + バックグラウンドでログ記録
+#
+# 無限ループ防止:
+#   record_log.py内でHaikuを呼ぶ際に --setting-sources "" を使用することで
+#   プロジェクト設定（フック含む）を無視し、Stopフックが再発火しないようにしている
 
 set -e
 
@@ -19,15 +22,8 @@ INPUT=$(cat)
 echo "$INPUT" >> /tmp/stop_hook_input.log
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
-STOP_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active')
 
-# 1. 無限ループ防止
-if [ "$STOP_ACTIVE" = "true" ]; then
-  echo '{"decision": "approve"}'
-  exit 0
-fi
-
-# 2. メタタグチェック
+# 1. メタタグチェック
 META_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/parse_meta_tag.py" "$TRANSCRIPT_PATH" 2>/dev/null || echo '{"found": false}')
 META_FOUND=$(echo "$META_RESULT" | jq -r '.found')
 
@@ -38,7 +34,7 @@ fi
 
 CURRENT_TOPIC=$(echo "$META_RESULT" | jq -r '.topic_id')
 
-# 3. トピック変更チェック
+# 2. トピック変更チェック
 PREV_TOPIC_FILE="/tmp/claude_prev_topic_${SESSION_ID}"
 PREV_TOPIC=$(cat "$PREV_TOPIC_FILE" 2>/dev/null || echo "")
 
@@ -51,10 +47,10 @@ if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
   fi
 fi
 
-# 4. 現在のトピックを保存
+# 3. 現在のトピックを保存
 echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
-# 5. approve + バックグラウンドでログ記録
+# 4. approve + バックグラウンドでログ記録
 # nohupで完全にデタッチして、親プロセスの終了を待たせない
 nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '$TRANSCRIPT_PATH' '$CURRENT_TOPIC'" >> /tmp/claude_record_log.log 2>&1 &
 disown
