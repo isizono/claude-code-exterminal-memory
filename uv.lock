@@ -193,12 +193,14 @@ source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "pytest" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "fastmcp" },
     { name = "pytest", specifier = ">=7.4.0" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]

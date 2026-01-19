@@ -39,11 +39,16 @@ PREV_TOPIC_FILE="/tmp/claude_prev_topic_${SESSION_ID}"
 PREV_TOPIC=$(cat "$PREV_TOPIC_FILE" 2>/dev/null || echo "")
 
 if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
-  # 前のトピックにdecisionがあるかチェック
-  HAS_DECISION=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_decision.py" "$PREV_TOPIC" 2>/dev/null || echo "false")
-  if [ "$HAS_DECISION" = "false" ]; then
-    echo "{\"decision\": \"block\", \"reason\": \"トピックが変わりました。前のトピック(id=$PREV_TOPIC)に決定事項を記録してから移動してください\"}"
-    exit 0
+  # セッション開始直後のプレースホルダー(topic_id=0)からの移動はスキップ
+  if [ "$PREV_TOPIC" = "0" ]; then
+    : # 何もしない（決定事項チェックをスキップ）
+  else
+    # 前のトピックにdecisionがあるかチェック
+    HAS_DECISION=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_decision.py" "$PREV_TOPIC" 2>/dev/null || echo "false")
+    if [ "$HAS_DECISION" = "false" ]; then
+      echo "{\"decision\": \"block\", \"reason\": \"トピックが変わりました。前のトピック(id=$PREV_TOPIC)に決定事項を記録してから移動してください\"}"
+      exit 0
+    fi
   fi
 fi
 
