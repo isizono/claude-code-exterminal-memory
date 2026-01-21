@@ -22,7 +22,21 @@ def add_project(
     description: str,
     asana_url: Optional[str] = None,
 ) -> dict:
-    """新しいプロジェクトを追加する。"""
+    """
+    新しいプロジェクトを追加する。
+
+    Projectとは「独立した関心事・取り組み」の単位。リポジトリではなく「何について話すか」で区切る。
+
+    新規作成すべきとき:
+    - 既存Projectのどれとも関係ない話題が始まった
+    - 別プロダクト・サービスの話になった
+    - 新しいAsanaタスクに取り組む
+
+    既存Projectを使うとき:
+    - 既存Projectの関心事の「中」の話（→ add_topicで新規Topic）
+
+    判断に迷ったらユーザーに「どのProjectで進める？」と確認すること。
+    """
     return project_service.add_project(name, description, asana_url)
 
 
