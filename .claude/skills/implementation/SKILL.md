@@ -1,0 +1,140 @@
+---
+name: implementation
+description: 実装に取り掛かるときに発動する。設計フェーズで決まった方針に従ってコードを書く。
+---
+
+# 実装フェーズ Skill
+
+## 目的
+
+設計フェーズで決まった方針・仕様に従って、実際にコードを書く。
+
+## 開始前チェック（必須）
+
+**このSkillを実行する前に、必ず以下を確認する：**
+
+1. 関連する `[設計]` タスクを探す
+2. そのタスクに紐づくdecision（How/Interface/Edge cases）があるか確認
+3. **decisionがない場合**:
+   - ユーザーを設計フェーズへ誘導する
+   - **このSkillの処理は中断する**
+
+```
+例: 「トピック検索機能」の実装を始める場合
+
+1. タスク一覧から [設計] タスクを探す
+   get_tasks(project_id=2)
+   → { tasks: [{ id: 39, title: "[設計] トピック検索機能の方針決定", topic_id: 85, ... }] }
+
+2. そのタスクに紐づくトピックの決定事項を確認
+   get_decisions(topic_id=85)
+   → How/Interface/Edge cases/Verificationが揃っている
+
+3. 揃っている → 実装フェーズへ進める
+   ※ 不足している場合は設計フェーズへ戻す
+```
+
+## 開始時のアクション
+
+開始前チェックをパスしたら：
+
+1. `[実装]` タスクを作成する
+2. 設計フェーズのdecisionをユーザーに提示し、「この仕様で実装していい？」と確認
+3. ユーザーのOKを得てから実装開始
+
+```
+例: 「トピック検索機能」の実装を開始
+
+1. 実装タスクを作成
+   add_task(
+       project_id=2,
+       title="[実装] トピック検索機能の実装",
+       description="設計フェーズで決めたHow/Interface/Edge cases/Verificationに従って実装する"
+   )
+
+2. 設計フェーズの決定事項をユーザーに共有
+   「設計フェーズで以下が決まってるね：
+   - How: SQLiteのLIKE句、title/description検索、大文字小文字区別なし
+   - Interface: search_topics(project_id, keyword, limit=30)
+   - Edge cases: 空文字→エラー、該当なし→空配列、%や_→エスケープ
+   - Verification: 「hook」検索でヒット確認、空文字でエラー確認、等
+
+   この仕様で実装していい？」
+```
+
+## 完了条件
+
+- 設計で決めた仕様を満たすコードができていること
+- 必要なテストがあること（設計で決めた範囲）
+
+## エージェントの振る舞い
+
+### やること
+
+- 設計のdecisionに従って実装する
+- リポジトリの規約（CLAUDE.md等）に従う
+- 実装完了時にテスト結果を報告する
+
+### やらないこと
+
+- 設計にないことを勝手に追加・判断する
+- 新しい論点が出たのに実装を続ける
+
+## 新しい論点が出たら
+
+実装中に設計で決めてないことが出てきた場合：
+
+1. 実装を一旦止める
+2. ユーザーに「〇〇についてまだ決めてなかったね」と伝える
+3. 必要なフェーズ（議論 or 設計）に戻る
+
+## 成果物
+
+- 実装したコード
+
+## フェーズ移行
+
+実装が完了したら：
+
+1. ユーザーにテスト結果を報告する
+2. ユーザーのOKを得てからタスクを完了にする
+
+```
+例: 「トピック検索機能」の実装完了報告
+
+「実装完了したよ！Verificationに沿ってテストした結果を報告するね。
+
+【正常系】
+✓ 「hook」で検索
+  入力: search_topics(project_id=2, keyword="hook")
+  出力: { topics: [{ id: 55, title: "Stopフック実装", ... }, { id: 58, title: "PostToolUseフック", ... }] }
+  期待: hooks関連のトピックがヒットする → OK
+
+✓ 「HOOK」で検索（大文字小文字無視の確認）
+  入力: search_topics(project_id=2, keyword="HOOK")
+  出力: { topics: [{ id: 55, title: "Stopフック実装", ... }, { id: 58, title: "PostToolUseフック", ... }] }
+  期待: 「hook」と同じ結果 → OK
+
+【異常系】
+✓ 空文字で検索
+  入力: search_topics(project_id=2, keyword="")
+  出力: エラー "keyword must not be empty"
+  期待: エラーが返る → OK
+
+✓ 存在しないproject_idで検索
+  入力: search_topics(project_id=9999, keyword="test")
+  出力: { topics: [] }
+  期待: 空配列が返る → OK
+
+【エッジケース】
+✓ 「%」で検索（ワイルドカードエスケープの確認）
+  入力: search_topics(project_id=2, keyword="%")
+  出力: { topics: [] }
+  期待: %を含むトピックのみヒット（ワイルドカードとして解釈されない）→ OK（該当トピックなし）
+
+気になる点ある？特に問題なければタスク完了で記録しちゃうよ！」
+
+--- ユーザーが「OK」と回答 ---
+
+update_task_status(task_id=40, new_status="completed")
+```
