@@ -12,6 +12,9 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+# モデル定数
+DEFAULT_SUMMARY_MODEL = "haiku"
+
 # プロジェクトルートをパスに追加
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
@@ -132,8 +135,8 @@ def format_relay_for_summary(relay: list[dict]) -> str:
     return "\n\n".join(parts)
 
 
-def summarize_with_haiku(relay_text: str) -> Optional[str]:
-    """Haikuで要約する"""
+def summarize_with_model(relay_text: str, model: str = DEFAULT_SUMMARY_MODEL) -> Optional[str]:
+    """指定モデルで要約する"""
     if not relay_text:
         return None
 
@@ -144,7 +147,7 @@ def summarize_with_haiku(relay_text: str) -> Optional[str]:
 
     try:
         result = subprocess.run(
-            ["claude", "--model", "haiku", "--setting-sources", "", "-p", prompt],
+            ["claude", "--model", model, "--setting-sources", "", "-p", prompt],
             capture_output=True,
             text=True,
             timeout=60,
@@ -154,7 +157,7 @@ def summarize_with_haiku(relay_text: str) -> Optional[str]:
         else:
             return None
     except Exception as e:
-        print(f"Error calling Haiku: {e}", file=sys.stderr)
+        print(f"Error calling {model}: {e}", file=sys.stderr)
         return None
 
 
@@ -188,7 +191,7 @@ def main():
         sys.exit(1)
 
     # 3. Haikuで要約
-    summary = summarize_with_haiku(relay_text)
+    summary = summarize_with_model(relay_text)
     if not summary:
         # 要約に失敗した場合は元のテキストを短縮して保存
         summary = relay_text[:500] + "..." if len(relay_text) > 500 else relay_text
