@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Stopフックからバックグラウンドで呼び出されるログ記録スクリプト。
-transcriptから直近1リレーを抽出し、Haikuで要約してDBに保存する。
+transcriptから直近1リレーを抽出し、LLMで要約してDBに保存する。
 
 Usage:
     python record_log.py <transcript_path> <topic_id>
@@ -190,7 +190,7 @@ def main():
         print("Empty relay text", file=sys.stderr)
         sys.exit(1)
 
-    # 3. Haikuで要約
+    # 3. モデルで要約
     summary = summarize_with_model(relay_text)
     if not summary:
         # 要約に失敗した場合は元のテキストを短縮して保存
