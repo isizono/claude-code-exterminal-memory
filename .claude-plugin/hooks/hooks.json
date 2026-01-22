@@ -6,7 +6,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/load-undecided-topics.sh"
+            "command": "cat ${CLAUDE_PLUGIN_ROOT}/rules/*.md"
+          },
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/load-undecided-topics.sh"
           }
         ]
       }
@@ -17,18 +21,18 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/stop_hook.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop_hook.sh"
           }
         ]
       }
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__claude-code-exterminal-memory__add_decision",
+        "matcher": "mcp__claude-code-memory__add_decision",
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/remind_task_on_decision.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/remind_task_on_decision.sh"
           }
         ]
       }
