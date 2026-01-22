@@ -10,7 +10,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/load-undecided-topics.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/load-undecided-topics.sh"
           }
         ]
       }
@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/stop_hook.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop_hook.sh"
           }
         ]
       }
@@ -32,7 +32,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/remind_task_on_decision.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/remind_task_on_decision.sh"
           }
         ]
       }
