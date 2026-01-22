@@ -17,9 +17,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# 状態・ログディレクトリの設定
+STATE_DIR="${HOME}/.claude/.claude-code-memory/state"
+LOG_DIR="${HOME}/.claude/.claude-code-memory/logs"
+mkdir -p "$STATE_DIR" "$LOG_DIR"
+
 # stdinからJSON入力を読み込み
 INPUT=$(cat)
-echo "$INPUT" >> /tmp/stop_hook_input.log
+echo "$INPUT" >> "$LOG_DIR/stop_hook_input.log"
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 
@@ -35,7 +40,7 @@ fi
 CURRENT_TOPIC=$(echo "$META_RESULT" | jq -r '.topic_id')
 
 # 2. トピック変更チェック
-PREV_TOPIC_FILE="/tmp/claude_prev_topic_${SESSION_ID}"
+PREV_TOPIC_FILE="${STATE_DIR}/prev_topic_${SESSION_ID}"
 PREV_TOPIC=$(cat "$PREV_TOPIC_FILE" 2>/dev/null || echo "")
 
 if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
@@ -57,7 +62,7 @@ echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
 # 4. approve + バックグラウンドでログ記録
 # nohupで完全にデタッチして、親プロセスの終了を待たせない
-nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '$TRANSCRIPT_PATH' '$CURRENT_TOPIC'" >> /tmp/claude_record_log.log 2>&1 &
+nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '$TRANSCRIPT_PATH' '$CURRENT_TOPIC'" >> "$LOG_DIR/record_log.log" 2>&1 &
 disown
 
 echo '{"decision": "approve"}'
