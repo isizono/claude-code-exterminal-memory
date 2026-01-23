@@ -1,13 +1,5 @@
 # メタタグ出力ルール
 
-## 応答の最初にトピックタイトルを出力
-
-毎ターンの応答の最初に、現在のトピックタイトルを太字で出力すること。
-
-```
-**トピック: {トピックタイトル}**
-```
-
 ## 応答の最後にメタタグを出力
 
 毎ターンの応答の最後に、以下の形式でメタタグを出力すること。
@@ -27,14 +19,20 @@
 
 ## 例
 
-応答の最初:
-```
-**トピック: Stopフック自動ログ記録の実装**
+### 基本例
+
+```html
+<!-- [meta] project: claude-code-exterminal-memory (id: 2) | topic: [実装]Stopフック並列実行時のtopic_id競合バグ (id: 93) -->
 ```
 
-応答の最後:
+### 様々なプロジェクト・トピックの例
+
 ```html
-<!-- [meta] project: claude-code-exterminal-memory (id: 2) | topic: Stopフック自動ログ記録の実装 (id: 55) -->
+<!-- [meta] project: claude-code-exterminal-memory (id: 2) | topic: [議論]プラグインキャッシュとコンポーネント読み込み問題 (id: 95) -->
+
+<!-- [meta] project: LLM技術ブログ執筆 (id: 6) | topic: [議論]第4章: コンテキストエンジニアリングの必要性 (id: 99) -->
+
+<!-- [meta] project: drift (id: 5) | topic: [設計]ローカルテスト戦略の検討 (id: 77) -->
 ```
 
 ## 注意
