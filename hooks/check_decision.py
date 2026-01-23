@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["pyyaml>=6.0"]
+# ///
 """
 指定トピックに決定事項があるかチェックするスクリプト。
 Stopフックからトピック変更時に呼び出される。
@@ -13,7 +17,7 @@ import sys
 from pathlib import Path
 
 # プロジェクトルートをパスに追加
-project_root = Path(__file__).resolve().parents[2]
+project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
 from src.services.decision_service import get_decisions

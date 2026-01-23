@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["pyyaml>=6.0"]
+# ///
 """
 Stopフックからバックグラウンドで呼び出されるログ記録スクリプト。
 transcriptから直近1リレーを抽出し、Haikuで要約してDBに保存する。
@@ -16,7 +20,7 @@ from typing import Optional
 DEFAULT_SUMMARY_MODEL = "haiku"
 
 # プロジェクトルートをパスに追加
-project_root = Path(__file__).resolve().parents[2]
+project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
 from src.services.discussion_log_service import add_log
