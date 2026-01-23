@@ -44,8 +44,8 @@ PREV_TOPIC_FILE="${STATE_DIR}/prev_topic_${SESSION_ID}"
 PREV_TOPIC=$(cat "$PREV_TOPIC_FILE" 2>/dev/null || echo "")
 
 if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
-  # セッション開始直後のプレースホルダー(topic_id=0)からの移動はスキップ
-  if [ "$PREV_TOPIC" = "0" ]; then
+  # セッション開始直後のfirst_topic(topic_id=1)からの移動はスキップ
+  if [ "$PREV_TOPIC" = "1" ]; then
     : # 何もしない（決定事項チェックをスキップ）
   else
     # 前のトピックにdecisionがあるかチェック
