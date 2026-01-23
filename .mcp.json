@@ -1,6 +1,6 @@
 {
     "claude-code-memory": {
       "command": "uv",
-      "args": ["run", "--directory", "{plugin_dir}", "python", "-m", "src.main"]
+      "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}", "python", "-m", "src.main"]
     }
   }
