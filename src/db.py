@@ -28,7 +28,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_database() -> None:
-    """データベースを初期化する（スキーマ適用）"""
+    """データベースを初期化する（スキーマ適用と初期データ投入）"""
     schema_path = Path(__file__).parent.parent / "schema.sql"
 
     if not schema_path.exists():
@@ -40,6 +40,21 @@ def init_database() -> None:
     conn = get_connection()
     try:
         conn.executescript(schema_sql)
+        conn.commit()
+
+        # 初期データの投入（既存データがある場合は挿入しない）
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO projects (id, name, description)
+            VALUES (1, 'first_project', 'これはサンプルのプロジェクトです。プロジェクトは関連する議論トピックをまとめる名前空間です。新しい関心事の塊が出てきたら、積極的に新しいプロジェクトを作成してください。')
+            """
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO discussion_topics (id, project_id, title, description)
+            VALUES (1, 1, 'first_topic', 'これはサンプルのトピックです。トピックは「この会話、一言で何の話？」に答えられる粒度にしてください。例: 「ログイン機能の設計」「APIレスポンス形式の決定」「バグ: 画面遷移時のクラッシュ」など。新しい話題が出てきたら積極的に新しいトピックを切ってください。話題がプロジェクトの関心事からはみ出したら、プロジェクトの変更も検討してください。')
+            """
+        )
         conn.commit()
     finally:
         conn.close()
