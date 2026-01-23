@@ -640,4 +640,6 @@ def tools_reference() -> str:
 
 
 if __name__ == "__main__":
+    from src.db import init_database
+    init_database()
     mcp.run()
