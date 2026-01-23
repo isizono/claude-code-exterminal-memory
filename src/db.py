@@ -43,18 +43,34 @@ def init_database() -> None:
         conn.commit()
 
         # 初期データの投入（既存データがある場合は挿入しない）
+        # nameのUNIQUE制約を活用してIDハードコードを避ける
         conn.execute(
             """
-            INSERT OR IGNORE INTO projects (id, name, description)
-            VALUES (1, 'first_project', 'これはサンプルのプロジェクトです。プロジェクトは関連する議論トピックをまとめる名前空間です。新しい関心事の塊が出てきたら、積極的に新しいプロジェクトを作成してください。')
+            INSERT OR IGNORE INTO projects (name, description)
+            VALUES ('first_project', 'これはサンプルのプロジェクトです。プロジェクトは1つの取り組み・関心事を表す単位で、関連するトピックを束ねるグループです。新しい取り組みや関心事が出てきたら、新しいプロジェクトを作成してください。')
             """
         )
-        conn.execute(
-            """
-            INSERT OR IGNORE INTO discussion_topics (id, project_id, title, description)
-            VALUES (1, 1, 'first_topic', 'これはサンプルのトピックです。トピックは「この会話、一言で何の話？」に答えられる粒度にしてください。例: 「ログイン機能の設計」「APIレスポンス形式の決定」「バグ: 画面遷移時のクラッシュ」など。新しい話題が出てきたら積極的に新しいトピックを切ってください。話題がプロジェクトの関心事からはみ出したら、プロジェクトの変更も検討してください。')
-            """
+
+        # first_projectのIDを取得してdiscussion_topicsに使用
+        cursor = conn.execute(
+            "SELECT id FROM projects WHERE name = 'first_project'"
         )
+        row = cursor.fetchone()
+        if row:
+            project_id = row[0]
+            # discussion_topicsにはtitleのUNIQUE制約がないため、存在確認してから挿入
+            cursor = conn.execute(
+                "SELECT id FROM discussion_topics WHERE project_id = ? AND title = 'first_topic'",
+                (project_id,)
+            )
+            if cursor.fetchone() is None:
+                conn.execute(
+                    """
+                    INSERT INTO discussion_topics (project_id, title, description)
+                    VALUES (?, 'first_topic', 'これはサンプルのトピックです。トピックは「この会話を一言で表すと？」に答えられる粒度が目安です。例：「[議論] ユーザー認証に使う外部サービスの選定」「[設計] エラーAPIのレスポンス形式」「[実装] 商品詳細→カート画面遷移時のクラッシュ」など。新しい話題が出てきたら、新しいトピックを作成してください。話題がプロジェクトの範囲を超えたら、プロジェクトの変更も検討してください。')
+                    """,
+                    (project_id,)
+                )
         conn.commit()
     finally:
         conn.close()

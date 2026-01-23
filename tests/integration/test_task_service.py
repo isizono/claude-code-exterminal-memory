@@ -197,6 +197,6 @@ class TestBlockedStatusWithTopicCreation:
 
         assert result1["topic_id"] != result2["topic_id"]
 
-        # トピックが2つ作成されている
+        # トピックが3つ存在（初期データ1 + 新規作成2）
         rows = execute_query("SELECT COUNT(*) as count FROM discussion_topics", ())
-        assert rows[0]["count"] == 2
+        assert rows[0]["count"] == 3
