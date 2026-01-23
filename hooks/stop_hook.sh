@@ -34,7 +34,7 @@ META_EXIT_CODE=$?
 
 if [ $META_EXIT_CODE -ne 0 ]; then
   # スクリプト実行エラー
-  echo "{\"decision\": \"block\", \"reason\": \"parse_meta_tag.py failed: $META_RESULT\"}"
+  jq -n --arg reason "parse_meta_tag.py failed: $META_RESULT" '{decision: "block", reason: $reason}'
   exit 0
 fi
 
@@ -62,12 +62,12 @@ if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
 
     if [ $DECISION_EXIT_CODE -ne 0 ]; then
       # スクリプト実行エラー
-      echo "{\"decision\": \"block\", \"reason\": \"check_decision.py failed: $DECISION_RESULT\"}"
+      jq -n --arg reason "check_decision.py failed: $DECISION_RESULT" '{decision: "block", reason: $reason}'
       exit 0
     fi
 
     if [ "$DECISION_RESULT" = "false" ]; then
-      echo "{\"decision\": \"block\", \"reason\": \"トピックが変わりました。前のトピック(id=$PREV_TOPIC)に決定事項を記録してから移動してください\"}"
+      jq -n --arg topic "$PREV_TOPIC" '{decision: "block", reason: ("トピックが変わりました。前のトピック(id=" + $topic + ")に決定事項を記録してから移動してください")}'
       exit 0
     fi
   fi
