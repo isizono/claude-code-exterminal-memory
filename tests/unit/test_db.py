@@ -82,8 +82,8 @@ def test_get_connection_returns_row_factory(temp_db):
         )
         conn.commit()
 
-        # Row として取得できることを確認
-        cursor = conn.execute("SELECT * FROM projects")
+        # Row として取得できることを確認（追加したプロジェクトを名前で検索）
+        cursor = conn.execute("SELECT * FROM projects WHERE name = 'test-project'")
         row = cursor.fetchone()
         assert row["name"] == "test-project"  # 辞書ライクなアクセス
     finally:

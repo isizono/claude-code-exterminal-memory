@@ -82,9 +82,56 @@ def test_get_connection_returns_row_factory(temp_db):
         )
         conn.commit()
 
-        # Row として取得できることを確認
-        cursor = conn.execute("SELECT * FROM projects")
+        # Row として取得できることを確認（追加したプロジェクトを名前で検索）
+        cursor = conn.execute("SELECT * FROM projects WHERE name = 'test-project'")
         row = cursor.fetchone()
         assert row["name"] == "test-project"  # 辞書ライクなアクセス
+    finally:
+        conn.close()
+
+
+def test_init_database_seeds_initial_data(temp_db):
+    """init_database()で初期データ（first_project, first_topic）が投入される"""
+    conn = get_connection()
+    try:
+        # first_projectが存在することを確認
+        cursor = conn.execute("SELECT * FROM projects WHERE name = 'first_project'")
+        project = cursor.fetchone()
+        assert project is not None
+        assert "サンプルのプロジェクト" in project["description"]
+        assert "取り組み・関心事" in project["description"]
+
+        # first_topicが存在することを確認
+        cursor = conn.execute("SELECT * FROM discussion_topics WHERE title = 'first_topic'")
+        topic = cursor.fetchone()
+        assert topic is not None
+        assert topic["project_id"] == project["id"]
+        assert "サンプルのトピック" in topic["description"]
+        assert "一言で表すと" in topic["description"]
+    finally:
+        conn.close()
+
+
+def test_init_database_multiple_calls_no_duplicate(temp_db):
+    """init_database()を複数回実行しても初期データが重複しない"""
+    # temp_dbフィクスチャ内で既に1回init_database()が呼ばれている
+
+    # 2回目の呼び出し
+    init_database()
+
+    # 3回目の呼び出し
+    init_database()
+
+    conn = get_connection()
+    try:
+        # first_projectが1件のみであることを確認
+        cursor = conn.execute("SELECT COUNT(*) as cnt FROM projects WHERE name = 'first_project'")
+        row = cursor.fetchone()
+        assert row["cnt"] == 1
+
+        # first_topicが1件のみであることを確認
+        cursor = conn.execute("SELECT COUNT(*) as cnt FROM discussion_topics WHERE title = 'first_topic'")
+        row = cursor.fetchone()
+        assert row["cnt"] == 1
     finally:
         conn.close()

@@ -28,7 +28,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_database() -> None:
-    """データベースを初期化する（スキーマ適用）"""
+    """データベースを初期化する（スキーマ適用と初期データ投入）"""
     schema_path = Path(__file__).parent.parent / "schema.sql"
 
     if not schema_path.exists():
@@ -40,6 +40,37 @@ def init_database() -> None:
     conn = get_connection()
     try:
         conn.executescript(schema_sql)
+        conn.commit()
+
+        # 初期データの投入（既存データがある場合は挿入しない）
+        # nameのUNIQUE制約を活用してIDハードコードを避ける
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO projects (name, description)
+            VALUES ('first_project', 'これはサンプルのプロジェクトです。プロジェクトは1つの取り組み・関心事を表す単位で、関連するトピックを束ねるグループです。新しい取り組みや関心事が出てきたら、新しいプロジェクトを作成してください。')
+            """
+        )
+
+        # first_projectのIDを取得してdiscussion_topicsに使用
+        cursor = conn.execute(
+            "SELECT id FROM projects WHERE name = 'first_project'"
+        )
+        row = cursor.fetchone()
+        if row:
+            project_id = row[0]
+            # discussion_topicsにはtitleのUNIQUE制約がないため、存在確認してから挿入
+            cursor = conn.execute(
+                "SELECT id FROM discussion_topics WHERE project_id = ? AND title = 'first_topic'",
+                (project_id,)
+            )
+            if cursor.fetchone() is None:
+                conn.execute(
+                    """
+                    INSERT INTO discussion_topics (project_id, title, description)
+                    VALUES (?, 'first_topic', 'これはサンプルのトピックです。トピックは「この会話を一言で表すと？」に答えられる粒度が目安です。例：「[議論] ユーザー認証に使う外部サービスの選定」「[設計] エラーAPIのレスポンス形式」「[実装] 商品詳細→カート画面遷移時のクラッシュ」など。新しい話題が出てきたら、新しいトピックを作成してください。話題がプロジェクトの範囲を超えたら、プロジェクトの変更も検討してください。')
+                    """,
+                    (project_id,)
+                )
         conn.commit()
     finally:
         conn.close()
