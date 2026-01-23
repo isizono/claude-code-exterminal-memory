@@ -15,7 +15,7 @@ set -e
 
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 状態・ログディレクトリの設定
 STATE_DIR="${HOME}/.claude/.claude-code-memory/state"
@@ -29,7 +29,15 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 
 # 1. メタタグチェック
-META_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/parse_meta_tag.py" "$TRANSCRIPT_PATH" 2>/dev/null || echo '{"found": false}')
+META_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/parse_meta_tag.py" "$TRANSCRIPT_PATH" 2>&1)
+META_EXIT_CODE=$?
+
+if [ $META_EXIT_CODE -ne 0 ]; then
+  # スクリプト実行エラー
+  jq -n --arg reason "parse_meta_tag.py failed: $META_RESULT" '{decision: "block", reason: $reason}'
+  exit 0
+fi
+
 META_FOUND=$(echo "$META_RESULT" | jq -r '.found')
 
 if [ "$META_FOUND" != "true" ]; then
@@ -49,9 +57,17 @@ if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
     : # 何もしない（決定事項チェックをスキップ）
   else
     # 前のトピックにdecisionがあるかチェック
-    HAS_DECISION=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_decision.py" "$PREV_TOPIC" 2>/dev/null || echo "false")
-    if [ "$HAS_DECISION" = "false" ]; then
-      echo "{\"decision\": \"block\", \"reason\": \"トピックが変わりました。前のトピック(id=$PREV_TOPIC)に決定事項を記録してから移動してください\"}"
+    DECISION_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_decision.py" "$PREV_TOPIC" 2>&1)
+    DECISION_EXIT_CODE=$?
+
+    if [ $DECISION_EXIT_CODE -ne 0 ]; then
+      # スクリプト実行エラー
+      jq -n --arg reason "check_decision.py failed: $DECISION_RESULT" '{decision: "block", reason: $reason}'
+      exit 0
+    fi
+
+    if [ "$DECISION_RESULT" = "false" ]; then
+      jq -n --arg topic "$PREV_TOPIC" '{decision: "block", reason: ("トピックが変わりました。前のトピック(id=" + $topic + ")に決定事項を記録してから移動してください")}'
       exit 0
     fi
   fi
