@@ -76,10 +76,26 @@ fi
 # 3. 現在のトピックを保存
 echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
-# 4. approve + バックグラウンドでログ記録
+# 4. ターン数カウント & sync_memoryリマインダー
+TURN_COUNT_FILE="${STATE_DIR}/turn_count_${SESSION_ID}"
+TURN_COUNT=$(cat "$TURN_COUNT_FILE" 2>/dev/null || echo "0")
+TURN_COUNT=$((TURN_COUNT + 1))
+echo "$TURN_COUNT" > "$TURN_COUNT_FILE"
+
+SYNC_REMINDER=""
+if [ $((TURN_COUNT % 3)) -eq 0 ]; then
+  SYNC_REMINDER="<!-- [sync_memory推奨] ${TURN_COUNT}ターン経過しました。/sync_memory でセッション内容を記録することを検討してください。 -->"
+fi
+
+# 5. approve + バックグラウンドでログ記録
 # nohupで完全にデタッチして、親プロセスの終了を待たせない
 nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '$TRANSCRIPT_PATH' '$CURRENT_TOPIC'" >> "$LOG_DIR/record_log.log" 2>&1 &
 disown
 
-echo '{"decision": "approve"}'
+# 6. 結果を出力
+if [ -n "$SYNC_REMINDER" ]; then
+  jq -n --arg reminder "$SYNC_REMINDER" '{decision: "approve", reason: $reminder}'
+else
+  echo '{"decision": "approve"}'
+fi
 exit 0
