@@ -1,6 +1,6 @@
 ---
 name: design
-description: 設計タスクをするときに発動。方針・仕様を決め、実装に必要な決定事項を揃える。Planの作成や、実装に着手する前に使用するようにしてください。
+description: This skill determines implementation approach and technical decisions. This skill should be used when design decisions (How/Interface/Edge cases) are missing before implementation, when the user asks "how should we build this?", "どう実装する？", "方針決めよう", or after discussion phase is complete but before coding starts.
 ---
 
 # 設計フェーズ Skill
