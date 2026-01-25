@@ -63,36 +63,39 @@ def read_transcript_tail(transcript_path: str, max_lines: int = 1000) -> list[di
     return entries
 
 
-def extract_last_relay(entries: list[dict]) -> list[dict]:
+def extract_last_relay(entries: list[dict], n: int = 1) -> list[dict]:
     """
-    直近1リレーを抽出する。
+    直近nリレーを抽出する。
 
-    1リレーの定義:
-    - 人間のユーザー発言（type=user, toolUseResultなし）から開始
-    - 次の人間のユーザー発言の直前まで
+    1リレー = 人間のユーザー発言から次の人間発言の直前まで
+
+    Args:
+        entries: transcriptのエントリリスト
+        n: 抽出するリレー数（デフォルト1）
+
+    Returns:
+        直近nリレーのエントリリスト（システムエントリを除く）
     """
-    relay = []
-    found_human = False
+    # システムエントリを除外
+    filtered = [
+        e for e in entries
+        if e.get("type") not in ("file-history-snapshot", "system", "summary")
+    ]
 
-    for entry in reversed(entries):
-        entry_type = entry.get("type", "")
+    # 人間のユーザー発言の位置を集める
+    human_positions = [
+        i for i, e in enumerate(filtered)
+        if e.get("type") == "user" and "toolUseResult" not in e
+    ]
 
-        # システムエントリはスキップ
-        if entry_type in ("file-history-snapshot", "system", "summary"):
-            continue
+    if not human_positions:
+        return []
 
-        # 人間のユーザー発言を判定
-        is_human = entry_type == "user" and "toolUseResult" not in entry
+    if len(human_positions) < n:
+        return filtered  # 全部返す
 
-        if is_human:
-            if found_human:
-                # 前のリレーに到達したので終了
-                break
-            found_human = True
-
-        relay.insert(0, entry)
-
-    return relay
+    start = human_positions[-n]
+    return filtered[start:]
 
 
 def extract_text_content(entry: dict) -> str:
