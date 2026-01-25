@@ -9,13 +9,14 @@ Usage:
     python sync_memory.py <transcript_path> <topic_id>
 """
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-# モデル定数
+# 定数
 ANALYSIS_MODEL = "sonnet"
+MAX_USER_CONTENT_LENGTH = 1000
+MAX_ASSISTANT_CONTENT_LENGTH = 2000
 
 # プロジェクトルートをパスに追加
 project_root = Path(__file__).resolve().parents[1]
@@ -31,6 +32,7 @@ from hooks.record_log import (
     extract_last_relay,
     extract_text_content,
 )
+from hooks.utils import extract_json_from_text
 
 
 def format_relay_for_analysis(relay: list[dict]) -> str:
@@ -49,9 +51,9 @@ def format_relay_for_analysis(relay: list[dict]) -> str:
                 # ツール結果は省略
                 parts.append("[Tool Result]")
             else:
-                parts.append(f"User: {content[:1000]}")
+                parts.append(f"User: {content[:MAX_USER_CONTENT_LENGTH]}")
         elif entry_type == "assistant":
-            parts.append(f"Assistant: {content[:2000]}")
+            parts.append(f"Assistant: {content[:MAX_ASSISTANT_CONTENT_LENGTH]}")
 
     return "\n\n".join(parts)
 
@@ -130,21 +132,14 @@ def analyze_with_sonnet(relay_text: str) -> dict | None:
 
         output = result.stdout.strip()
 
-        # JSON部分を抽出（```json ... ``` で囲まれている場合）
-        json_match = output
-        if "```json" in output:
-            match = re.search(r'```json\s*(\{.*?\})\s*```', output, re.DOTALL)
-            if match:
-                json_match = match.group(1)
+        # JSON部分を抽出してパース
+        data = extract_json_from_text(output)
+        if data is None:
+            print("Error: Failed to extract JSON from Sonnet output", file=sys.stderr)
+            print(f"Output: {output}", file=sys.stderr)
+            return None
 
-        # JSONをパース
-        data = json.loads(json_match)
         return data
-
-    except json.JSONDecodeError as e:
-        print(f"Error: Failed to parse JSON from Sonnet output: {e}", file=sys.stderr)
-        print(f"Output: {output}", file=sys.stderr)
-        return None
     except Exception as e:
         print(f"Error calling Sonnet: {e}", file=sys.stderr)
         return None
@@ -228,6 +223,9 @@ def main():
 
     # 決定事項を記録
     for decision_data in analysis_result.get("decisions", []):
+        if "decision" not in decision_data or "reason" not in decision_data:
+            results["errors"].append(f"Invalid decision format: {decision_data}")
+            continue
         result = add_decision(
             decision=decision_data["decision"],
             reason=decision_data["reason"],
@@ -240,6 +238,9 @@ def main():
 
     # タスクを記録
     for task_data in analysis_result.get("tasks", []):
+        if "title" not in task_data or "description" not in task_data:
+            results["errors"].append(f"Invalid task format: {task_data}")
+            continue
         result = add_task(
             project_id=project_id,
             title=task_data["title"],
@@ -252,6 +253,9 @@ def main():
 
     # トピックを記録
     for topic_data in analysis_result.get("topics", []):
+        if "title" not in topic_data or "description" not in topic_data:
+            results["errors"].append(f"Invalid topic format: {topic_data}")
+            continue
         result = add_topic(
             project_id=project_id,
             title=topic_data["title"],
