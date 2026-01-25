@@ -1,6 +1,6 @@
 ---
 name: implementation
-description: 実装に取り掛かるときに発動する。設計フェーズで決まった方針に従ってコードを書く。
+description: This skill writes code following the design decisions. This skill should be used when design decisions (How/Interface/Edge cases) are already recorded and the user asks "let's implement this", "コード書こう", "実装しよう", "作って", or when transitioning from design phase to coding.
 ---
 
 # 実装フェーズ Skill
