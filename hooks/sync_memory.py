@@ -6,7 +6,9 @@
 直近3リレーをSonnetで解析し、決定事項・タスク・トピックを一括でDBに記録するスクリプト。
 
 Usage:
-    python sync_memory.py <transcript_path> <topic_id>
+    python sync_memory.py <transcript_path>
+
+    または環境変数 TRANSCRIPT_PATH で渡す（Stop hook用）
 """
 import json
 import subprocess
@@ -172,15 +174,16 @@ def parse_meta_tag_from_transcript(transcript_path: str) -> dict | None:
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("Usage: sync_memory.py <transcript_path> <topic_id>", file=sys.stderr)
-        sys.exit(1)
+    # 引数または環境変数からtranscript_pathを取得
+    import os
+    if len(sys.argv) >= 2:
+        transcript_path = sys.argv[1]
+    else:
+        transcript_path = os.environ.get("TRANSCRIPT_PATH")
 
-    transcript_path = sys.argv[1]
-    try:
-        current_topic_id = int(sys.argv[2])
-    except ValueError:
-        print("Invalid topic_id", file=sys.stderr)
+    if not transcript_path:
+        print("Usage: sync_memory.py <transcript_path>", file=sys.stderr)
+        print("  or set TRANSCRIPT_PATH environment variable", file=sys.stderr)
         sys.exit(1)
 
     # 1. transcriptから直近3リレーを抽出
@@ -194,13 +197,14 @@ def main():
         print("No relay found", file=sys.stderr)
         sys.exit(1)
 
-    # 2. メタタグからproject_idを取得
+    # 2. メタタグからproject_idとtopic_idを取得
     meta_result = parse_meta_tag_from_transcript(transcript_path)
     if not meta_result.get("found"):
         print("Error: Meta tag not found in transcript", file=sys.stderr)
         sys.exit(1)
 
     project_id = meta_result["project_id"]
+    current_topic_id = meta_result["topic_id"]
 
     # 3. 解析用にフォーマット
     relay_text = format_relay_for_analysis(relay)

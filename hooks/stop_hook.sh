@@ -92,7 +92,7 @@ fi
 # 4. 現在のトピックを保存
 echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
-# 5. ターン数カウント & sync_memoryリマインダー
+# 5. ターン数カウント & 3ターンごとにsync_memory自動実行
 TURN_COUNT_FILE="${STATE_DIR}/turn_count_${SESSION_ID}"
 TURN_COUNT=$(cat "$TURN_COUNT_FILE" 2>/dev/null || echo "0")
 TURN_COUNT=$((TURN_COUNT + 1))
@@ -100,7 +100,10 @@ echo "$TURN_COUNT" > "$TURN_COUNT_FILE"
 
 SYNC_REMINDER=""
 if [ $((TURN_COUNT % 3)) -eq 0 ]; then
-  SYNC_REMINDER="<!-- [sync_memory推奨] ${TURN_COUNT}ターン経過しました。/sync_memory でセッション内容を記録することを検討してください。 -->"
+  # 3ターンごとにsync_memoryをバックグラウンドで実行
+  nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/sync_memory.py' '$TRANSCRIPT_PATH'" >> "$LOG_DIR/sync_memory.log" 2>&1 &
+  disown
+  SYNC_REMINDER="<!-- [sync_memory] ${TURN_COUNT}ターン経過。バックグラウンドでsync_memoryを実行中... -->"
 fi
 
 # 6. approve + バックグラウンドでログ記録
