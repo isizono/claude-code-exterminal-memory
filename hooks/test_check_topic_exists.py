@@ -48,16 +48,6 @@ def temp_db():
             del os.environ["DISCUSSION_DB_PATH"]
 
 
-# check_topic_exists.py の関数をインポート（DB設定後）
-def get_check_topic_exists_main():
-    """temp_db fixture適用後にcheck_topic_exists.pyのmainをインポート"""
-    # モジュールを再読み込みしてDB設定を反映
-    import importlib
-    import check_topic_exists
-    importlib.reload(check_topic_exists)
-    return check_topic_exists
-
-
 class TestCheckTopicExists:
     """check_topic_exists の動作テスト"""
 

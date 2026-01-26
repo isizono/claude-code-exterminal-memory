@@ -1,6 +1,14 @@
 """parse_meta_tag.py のユニットテスト"""
 
+import sys
+from pathlib import Path
+
 import pytest
+
+# hooksディレクトリをパスに追加
+hooks_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(hooks_dir))
+
 from parse_meta_tag import parse_meta_tag, extract_text_from_entry
 
 
