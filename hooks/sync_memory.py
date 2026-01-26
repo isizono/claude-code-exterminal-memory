@@ -32,7 +32,7 @@ from hooks.record_log import (
     extract_last_relay,
     extract_text_content,
 )
-from hooks.utils import extract_json_from_text
+from hooks.llm_response_parser import extract_json_from_text
 
 
 def format_relay_for_analysis(relay: list[dict]) -> str:
