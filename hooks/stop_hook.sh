@@ -92,15 +92,18 @@ fi
 # 4. 現在のトピックを保存
 echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
-# 5. ターン数カウント & sync_memoryリマインダー
+# 5. ターン数カウント & sync_memory自動実行
 TURN_COUNT_FILE="${STATE_DIR}/turn_count_${SESSION_ID}"
 TURN_COUNT=$(cat "$TURN_COUNT_FILE" 2>/dev/null || echo "0")
 TURN_COUNT=$((TURN_COUNT + 1))
 echo "$TURN_COUNT" > "$TURN_COUNT_FILE"
 
-SYNC_REMINDER=""
+SYNC_MESSAGE=""
 if [ $((TURN_COUNT % 3)) -eq 0 ]; then
-  SYNC_REMINDER="<!-- [sync_memory推奨] ${TURN_COUNT}ターン経過しました。/sync_memory でセッション内容を記録することを検討してください。 -->"
+  # バックグラウンドでsync_memory実行（Sonnetで解析するので時間がかかる）
+  nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/sync_memory.py' '$TRANSCRIPT_PATH'" >> "$LOG_DIR/sync_memory.log" 2>&1 &
+  disown
+  SYNC_MESSAGE="<!-- [sync_memory実行中] ${TURN_COUNT}ターン経過。バックグラウンドでsync_memoryを実行しています。 -->"
 fi
 
 # 6. approve + バックグラウンドでログ記録
@@ -109,8 +112,8 @@ nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '
 disown
 
 # 7. 結果を出力
-if [ -n "$SYNC_REMINDER" ]; then
-  jq -n --arg reminder "$SYNC_REMINDER" '{decision: "approve", reason: $reminder}'
+if [ -n "$SYNC_MESSAGE" ]; then
+  jq -n --arg message "$SYNC_MESSAGE" '{decision: "approve", reason: $message}'
 else
   echo '{"decision": "approve"}'
 fi
