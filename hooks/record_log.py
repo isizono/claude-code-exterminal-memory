@@ -92,7 +92,7 @@ def extract_last_relay(entries: list[dict], n: int = 1) -> list[dict]:
         return []
 
     if len(human_positions) < n:
-        # 利用可能なリレー数だけ返す（最初のhuman_positionから開始）
+        # 要求より少ない場合は利用可能な全リレーを返す
         start = human_positions[0]
         return filtered[start:]
 
