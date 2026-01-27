@@ -1,5 +1,5 @@
 {
-    "claude-code-memory": {
+    "cc-memory": {
       "command": "uv",
       "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}", "python", "-m", "src.main"]
     }
