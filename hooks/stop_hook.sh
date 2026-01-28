@@ -4,9 +4,10 @@
 #
 # 処理フロー:
 # 1. メタタグチェック → なければblock
-# 2. トピック存在チェック → 存在しなければblock
-# 3. トピック変更チェック → 前topicにdecisionなければblock
-# 4. approve + バックグラウンドでログ記録
+# 2. プロジェクト存在チェック → 存在しなければblock
+# 3. トピック存在チェック → 存在しなければblock
+# 4. トピック変更チェック → 前topicにdecisionなければblock
+# 5. approve + バックグラウンドでログ記録
 #
 # 無限ループ防止:
 #   record_log.py内でHaikuを呼ぶ際に --setting-sources "" を使用することで
@@ -46,9 +47,25 @@ if [ "$META_FOUND" != "true" ]; then
   exit 0
 fi
 
+CURRENT_PROJECT=$(echo "$META_RESULT" | jq -r '.project_id')
 CURRENT_TOPIC=$(echo "$META_RESULT" | jq -r '.topic_id')
 
-# 2. トピック存在チェック
+# 2. プロジェクト存在チェック
+PROJECT_EXISTS=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_project_exists.py" "$CURRENT_PROJECT" 2>&1)
+PROJECT_EXISTS_EXIT_CODE=$?
+
+if [ $PROJECT_EXISTS_EXIT_CODE -ne 0 ]; then
+  # スクリプト実行エラー
+  jq -n --arg reason "check_project_exists.py failed: $PROJECT_EXISTS" '{decision: "block", reason: $reason}'
+  exit 0
+fi
+
+if [ "$PROJECT_EXISTS" = "false" ]; then
+  jq -n --arg project "$CURRENT_PROJECT" '{decision: "block", reason: ("project_id=" + $project + " は存在しません。get_projects で正しいproject_idを確認してください")}'
+  exit 0
+fi
+
+# 3. トピック存在チェック
 TOPIC_EXISTS=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_exists.py" "$CURRENT_TOPIC" 2>&1)
 TOPIC_EXISTS_EXIT_CODE=$?
 
@@ -63,7 +80,7 @@ if [ "$TOPIC_EXISTS" = "false" ]; then
   exit 0
 fi
 
-# 3. トピック変更チェック
+# 4. トピック変更チェック
 PREV_TOPIC_FILE="${STATE_DIR}/prev_topic_${SESSION_ID}"
 PREV_TOPIC=$(cat "$PREV_TOPIC_FILE" 2>/dev/null || echo "")
 
@@ -89,10 +106,10 @@ if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
   fi
 fi
 
-# 4. 現在のトピックを保存
+# 5. 現在のトピックを保存
 echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
-# 5. ターン数カウント & sync_memoryリマインダー
+# 6. ターン数カウント & sync_memoryリマインダー
 TURN_COUNT_FILE="${STATE_DIR}/turn_count_${SESSION_ID}"
 TURN_COUNT=$(cat "$TURN_COUNT_FILE" 2>/dev/null || echo "0")
 TURN_COUNT=$((TURN_COUNT + 1))
@@ -103,12 +120,12 @@ if [ $((TURN_COUNT % 3)) -eq 0 ]; then
   SYNC_REMINDER="<!-- [sync_memory推奨] ${TURN_COUNT}ターン経過しました。/sync_memory でセッション内容を記録することを検討してください。 -->"
 fi
 
-# 6. approve + バックグラウンドでログ記録
+# 7. approve + バックグラウンドでログ記録
 # nohupで完全にデタッチして、親プロセスの終了を待たせない
 nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '$TRANSCRIPT_PATH' '$CURRENT_TOPIC'" >> "$LOG_DIR/record_log.log" 2>&1 &
 disown
 
-# 7. 結果を出力
+# 8. 結果を出力
 if [ -n "$SYNC_REMINDER" ]; then
   jq -n --arg reminder "$SYNC_REMINDER" '{decision: "approve", reason: $reminder}'
 else
