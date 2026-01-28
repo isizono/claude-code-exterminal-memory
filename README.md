@@ -21,7 +21,7 @@ Claude Codeの記憶を外部DBに保存し、セッション間で知識・決�
 
 ```bash
 # 1. マーケットプレイスを追加
-claude plugin marketplace add isizono/claude-code-exterminal-memory
+claude plugin marketplace add isizono/claude-code-memory
 
 # 2. プラグインをインストール
 claude plugin install claude-code-memory
@@ -31,10 +31,10 @@ claude plugin install claude-code-memory
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/isizono/claude-code-exterminal-memory.git
+git clone https://github.com/isizono/claude-code-memory.git
 
 # プラグインディレクトリを指定して起動
-claude --plugin-dir /path/to/claude-code-exterminal-memory
+claude --plugin-dir /path/to/claude-code-memory
 ```
 
 ## 提供されるMCPツール
@@ -59,7 +59,7 @@ claude --plugin-dir /path/to/claude-code-exterminal-memory
 ## ディレクトリ構成
 
 ```
-claude-code-exterminal-memory/
+claude-code-memory/
 ├── .claude-plugin/
 │   └── plugin.json          # プラグインマニフェスト
 ├── .mcp.json                 # MCPサーバー設定

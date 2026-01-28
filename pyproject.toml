@@ -1,5 +1,5 @@
 [project]
-name = "claude-code-exterminal-memory"
+name = "claude-code-memory"
 version = "0.1.0"
 description = "Claude Codeの作業記録をDBに保存し、複数のClaude Codeエージェント間で協調作業を可能にするシステム"
 requires-python = ">=3.12"

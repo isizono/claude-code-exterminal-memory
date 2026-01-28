@@ -187,7 +187,7 @@ wheels = [
 ]
 
 [[package]]
-name = "claude-code-exterminal-memory"
+name = "claude-code-memory"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
