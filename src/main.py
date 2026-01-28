@@ -12,7 +12,7 @@ from src.services import (
 )
 
 # MCPサーバーを作成
-mcp = FastMCP("claude-code-exterminal-memory")
+mcp = FastMCP("cc-memory")
 
 
 # MCPツール定義
