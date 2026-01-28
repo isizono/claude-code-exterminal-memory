@@ -22,13 +22,13 @@
 ### 基本例
 
 ```html
-<!-- [meta] project: claude-code-exterminal-memory (id: 2) | topic: [実装]Stopフック並列実行時のtopic_id競合バグ (id: 93) -->
+<!-- [meta] project: claude-code-memory (id: 2) | topic: [実装]Stopフック並列実行時のtopic_id競合バグ (id: 93) -->
 ```
 
 ### 様々なプロジェクト・トピックの例
 
 ```html
-<!-- [meta] project: claude-code-exterminal-memory (id: 2) | topic: [議論]プラグインキャッシュとコンポーネント読み込み問題 (id: 95) -->
+<!-- [meta] project: claude-code-memory (id: 2) | topic: [議論]プラグインキャッシュとコンポーネント読み込み問題 (id: 95) -->
 
 <!-- [meta] project: LLM技術ブログ執筆 (id: 6) | topic: [議論]第4章: コンテキストエンジニアリングの必要性 (id: 99) -->
 
