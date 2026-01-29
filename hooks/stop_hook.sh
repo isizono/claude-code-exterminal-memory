@@ -5,7 +5,7 @@
 # 処理フロー:
 # 1. メタタグチェック → なければblock
 # 2. トピック存在チェック → 存在しなければblock
-# 3. トピック変更チェック → 前topicにdecisionなければblock
+# 3. トピック変更チェック → 前topicにdecision/logなければblock
 # 4. approve + バックグラウンドでログ記録
 #
 # 無限ループ防止:
@@ -72,18 +72,18 @@ if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
   if [ "$PREV_TOPIC" = "1" ]; then
     : # 何もしない（決定事項チェックをスキップ）
   else
-    # 前のトピックにdecisionがあるかチェック
-    DECISION_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_decision.py" "$PREV_TOPIC" 2>&1)
-    DECISION_EXIT_CODE=$?
+    # 前のトピックにadd_decisionまたはadd_logが呼び出されたかチェック
+    RECORDED_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_recorded.py" "$PREV_TOPIC" "$TRANSCRIPT_PATH" 2>&1)
+    RECORDED_EXIT_CODE=$?
 
-    if [ $DECISION_EXIT_CODE -ne 0 ]; then
+    if [ $RECORDED_EXIT_CODE -ne 0 ]; then
       # スクリプト実行エラー
-      jq -n --arg reason "check_decision.py failed: $DECISION_RESULT" '{decision: "block", reason: $reason}'
+      jq -n --arg reason "check_topic_recorded.py failed: $RECORDED_RESULT" '{decision: "block", reason: $reason}'
       exit 0
     fi
 
-    if [ "$DECISION_RESULT" = "false" ]; then
-      jq -n --arg topic "$PREV_TOPIC" '{decision: "block", reason: ("トピックが変わりました。前のトピック(id=" + $topic + ")に決定事項を記録してから移動してください")}'
+    if [ "$RECORDED_RESULT" = "false" ]; then
+      jq -n --arg topic "$PREV_TOPIC" '{decision: "block", reason: ("トピックが変わりました。前のトピック(id=" + $topic + ")に決定事項(add_decision)またはログ(add_log)を記録してから移動してください")}'
       exit 0
     fi
   fi
