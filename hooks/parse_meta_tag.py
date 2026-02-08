@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 
@@ -95,19 +96,23 @@ def main():
         sys.exit(0)
 
     transcript_path = sys.argv[1]
-    entry = get_last_assistant_entry(transcript_path)
 
-    if not entry:
-        print(json.dumps({"found": False}))
-        sys.exit(0)
+    max_retries = 3
+    for attempt in range(max_retries):
+        entry = get_last_assistant_entry(transcript_path)
 
-    text = extract_text_from_entry(entry)
-    result = parse_meta_tag(text)
+        if entry:
+            text = extract_text_from_entry(entry)
+            result = parse_meta_tag(text)
 
-    if result:
-        print(json.dumps(result))
-    else:
-        print(json.dumps({"found": False}))
+            if result:
+                print(json.dumps(result))
+                return
+
+        if attempt < max_retries - 1:
+            time.sleep(0.3)
+
+    print(json.dumps({"found": False}))
 
 
 if __name__ == "__main__":
