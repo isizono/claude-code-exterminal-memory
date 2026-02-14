@@ -24,8 +24,8 @@ MAX_ASSISTANT_CONTENT_LENGTH = 2000
 project_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(project_root))
 
-from src.services.decision_service import add_decision
-from src.services.task_service import add_task
+from src.services.decision_service import add_decision, get_decisions
+from src.services.task_service import add_task, get_tasks
 from src.services.topic_service import add_topic
 
 # record_log.pyから共通関数をインポート
@@ -141,14 +141,50 @@ def format_relays_for_analysis(relays_with_meta: list[tuple[list[dict], dict | N
     return "\n\n".join(formatted_relays)
 
 
-def analyze_with_sonnet(relay_text: str, default_project_id: int, default_topic_id: int) -> dict | None:
+def fetch_existing_data(topic_ids: set[int], project_id: int) -> str:
     """
-    Sonnetで直近3リレーを解析し、決定事項・タスク・トピックを抽出する。
+    DBから既存のdecisions/tasksを取得し、プロンプト用にフォーマットする。
+
+    Args:
+        topic_ids: 対象のtopic_idの集合
+        project_id: 対象のproject_id
+
+    Returns:
+        既存データのフォーマット済みテキスト（空なら空文字列）
+    """
+    parts = []
+
+    # 各トピックのdecisionsを取得
+    all_decisions = []
+    for topic_id in topic_ids:
+        result = get_decisions(topic_id=topic_id, limit=30)
+        if "decisions" in result:
+            all_decisions.extend(result["decisions"])
+
+    if all_decisions:
+        parts.append("## 既に記録済みの決定事項")
+        for d in all_decisions:
+            parts.append(f"- [topic_id:{d['topic_id']}] {d['decision']}")
+
+    # pendingタスクを取得
+    task_result = get_tasks(project_id=project_id, status="pending")
+    if "tasks" in task_result and task_result["tasks"]:
+        parts.append("\n## 既に記録済みのタスク（pending）")
+        for t in task_result["tasks"]:
+            parts.append(f"- {t['title']}")
+
+    return "\n".join(parts)
+
+
+def analyze_with_sonnet(relay_text: str, default_project_id: int, default_topic_id: int, existing_data: str = "") -> dict | None:
+    """
+    Sonnetで直近3リレーを解析し、まだ記録されていない決定事項・タスク・トピックを抽出する。
 
     Args:
         relay_text: フォーマット済みのリレーテキスト（各リレーに[project_id, topic_id]が含まれる）
         default_project_id: デフォルトのproject_id（リレーにメタタグがない場合のフォールバック）
         default_topic_id: デフォルトのtopic_id（リレーにメタタグがない場合のフォールバック）
+        existing_data: 既存のdecisions/tasksのフォーマット済みテキスト（重複防止用）
 
     Returns:
         {
@@ -160,14 +196,29 @@ def analyze_with_sonnet(relay_text: str, default_project_id: int, default_topic_
     if not relay_text:
         return None
 
-    prompt = f"""以下の会話を解析して、決定事項・タスク・トピックを抽出してください。
+    # 既存データセクションを構築
+    existing_section = ""
+    if existing_data:
+        existing_section = f"""
+【既に記録済みのデータ】
+以下はDBに既に記録されている内容です。**これらと同じ意味・内容のものは出力しないでください。**
+完全一致でなくても、意味が同じならスキップしてください。
+記録済みデータにない、新しい情報だけを補完してください。
 
+{existing_data}
+"""
+
+    prompt = f"""あなたはデータ処理パイプラインの一部として呼び出されています。出力はプログラムがパースするため、指定されたJSON形式のみを出力してください。
+
+以下の会話を解析して、**まだ記録されていない**決定事項・タスク・トピックを抽出してください。
+メインエージェントやStopフックが既に記録した内容との重複を避け、足りない部分だけを補完するのがあなたの役割です。
+{existing_section}
 【重要】各リレーの先頭に `[project_id: X, topic_id: Y]` が記載されています。
 各項目を抽出する際は、**その項目が議論されていたリレーのproject_id/topic_idを含めて**ください。
 メタタグがないリレーの場合は、project_id: {default_project_id}, topic_id: {default_topic_id} を使用してください。
 
 【抽出ルール】
-1. **決定事項（decisions）**: 確定した内容と未決定の論点の両方を記録
+1. **決定事項（decisions）**: 確定した内容と未決定の論点のうち、**まだ記録されていないもの**を記録
 
    **確定した決定事項:**
    - 「これでいこう」「OK」「了解」など明確な合意があったもの
@@ -284,19 +335,29 @@ def main():
         print("Error: No meta tag found in any relay", file=sys.stderr)
         sys.exit(1)
 
-    # 3. 解析用にフォーマット
+    # 3. 既存データを取得（重複防止）
+    topic_ids = set()
+    for _, meta in relays_with_meta:
+        if meta and meta.get("found"):
+            topic_ids.add(meta["topic_id"])
+    if default_topic_id:
+        topic_ids.add(default_topic_id)
+
+    existing_data = fetch_existing_data(topic_ids, default_project_id)
+
+    # 4. 解析用にフォーマット
     relay_text = format_relays_for_analysis(relays_with_meta)
     if not relay_text:
         print("Empty relay text", file=sys.stderr)
         sys.exit(1)
 
-    # 4. Sonnetで解析
-    analysis_result = analyze_with_sonnet(relay_text, default_project_id, default_topic_id)
+    # 5. Sonnetで解析（既存データを渡して補完のみ行わせる）
+    analysis_result = analyze_with_sonnet(relay_text, default_project_id, default_topic_id, existing_data)
     if not analysis_result:
         print("Error: Failed to analyze with Sonnet", file=sys.stderr)
         sys.exit(1)
 
-    # 5. DBに記録
+    # 6. DBに記録
     results = {
         "decisions": [],
         "tasks": [],
@@ -353,7 +414,7 @@ def main():
         else:
             results["topics"].append(result.get("topic_id"))
 
-    # 6. 結果を出力
+    # 7. 結果を出力
     print(json.dumps(results, ensure_ascii=False, indent=2))
 
     # エラーがあった場合は終了コード1
