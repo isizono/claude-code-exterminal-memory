@@ -10,7 +10,7 @@
           },
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/load-undecided-topics.sh"
+            "command": "cd ${CLAUDE_PLUGIN_ROOT} && uv run python ${CLAUDE_PLUGIN_ROOT}/hooks/load_active_context.py"
           }
         ]
       }
