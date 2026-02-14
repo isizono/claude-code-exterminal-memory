@@ -13,13 +13,15 @@
 
 ### コミット規約
 
-**フォーマット**: Conventional Commits形式を使用する
+**フォーマット**: Conventional Commits形式（scopeなし）
 
 ```
-<type>: <subject>
+<type>: <日本語のsubject>
 
-<body>（任意）
+<body>（変更理由が自明でない場合のみ）
 ```
+
+**typeは英語、subjectは日本語**で記述する。
 
 **タイプ一覧**:
 - `feat:` - 新機能の追加
@@ -31,33 +33,35 @@
 
 **粒度**: 一言で描写できる程度にまとめる
 
+**body**: subjectだけでは「なぜこの変更が必要か」が伝わらない場合に記述する。ワンライナーで済む修正には不要。
+
 **例**:
 ```
 feat: tasksテーブルのスキーマを実装
 docs: ChromaDB vs pgvectorの調査結果を追加
-fix: session_id生成時のUUID形式を修正
+fix: CIテストのuv依存を解消
 ```
 
 ### ブランチ戦略
 
 **main直push禁止**: pre-pushフックで防止する
 
-**作業方法**: 原則としてgit worktreeを使用する
+**ブランチの起点**: 必ず `origin/main` の最新から切る
 
 ```bash
-# 新しい作業ツリーを作成（.trees/配下に格納）
-git worktree add .trees/feature-x feature/feature-x
+# 1. リモートを最新化
+git fetch origin
 
-# 作業完了後
-git worktree remove .trees/feature-x
+# 2. origin/mainから新しいブランチ+worktreeを作成
+git worktree add .trees/fix-xxx -b fix/xxx origin/main
 
-# worktree一覧を確認
-git worktree list
+# 3. 作業完了後
+git worktree remove .trees/fix-xxx
 ```
 
 **配置ルール**: worktreeは必ず`.trees/`ディレクトリ配下に作成する（`.gitignore`に登録済み）
 
-**ブランチ命名規則**: `feature/<feature-name>`, `fix/<issue-name>` など
+**ブランチ命名規則**: `feature/<内容要約>`, `fix/<内容要約>`, `docs/<内容要約>` など。英語のケバブケースで内容がわかる名前をつける。
 
 ### ドキュメント管理
 
