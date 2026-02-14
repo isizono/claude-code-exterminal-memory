@@ -99,7 +99,7 @@ class TestCheckTopicExistsScript:
         """スクリプト実行: 存在するtopic_idでtrueを出力"""
         import subprocess
         result = subprocess.run(
-            ["uv", "run", "python", "hooks/check_topic_exists.py", "100"],
+            [sys.executable, "hooks/check_topic_exists.py", "100"],
             capture_output=True,
             text=True,
             cwd=str(project_root),
@@ -112,7 +112,7 @@ class TestCheckTopicExistsScript:
         """スクリプト実行: 存在しないtopic_idでfalseを出力"""
         import subprocess
         result = subprocess.run(
-            ["uv", "run", "python", "hooks/check_topic_exists.py", "99999"],
+            [sys.executable, "hooks/check_topic_exists.py", "99999"],
             capture_output=True,
             text=True,
             cwd=str(project_root),
@@ -125,7 +125,7 @@ class TestCheckTopicExistsScript:
         """スクリプト実行: 不正なtopic_idでエラー"""
         import subprocess
         result = subprocess.run(
-            ["uv", "run", "python", "hooks/check_topic_exists.py", "invalid"],
+            [sys.executable, "hooks/check_topic_exists.py", "invalid"],
             capture_output=True,
             text=True,
             cwd=str(project_root),
@@ -138,7 +138,7 @@ class TestCheckTopicExistsScript:
         """スクリプト実行: 引数なしでfalseを出力"""
         import subprocess
         result = subprocess.run(
-            ["uv", "run", "python", "hooks/check_topic_exists.py"],
+            [sys.executable, "hooks/check_topic_exists.py"],
             capture_output=True,
             text=True,
             cwd=str(project_root),
