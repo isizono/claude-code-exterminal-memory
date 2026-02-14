@@ -102,6 +102,7 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+    except FileNotFoundError as e:
+        print(f"load_active_context: DB not found - {e}", file=sys.stderr)
     except Exception as e:
-        # DBエラー等でセッション起動をブロックしない
-        print(f"load_active_context error: {e}", file=sys.stderr)
+        print(f"load_active_context: {type(e).__name__}: {e}", file=sys.stderr)
