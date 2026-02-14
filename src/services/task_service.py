@@ -105,6 +105,9 @@ def add_task(project_id: int, title: str, description: str) -> dict:
         }
 
 
+VALID_TASK_STATUSES = {"pending", "in_progress", "blocked", "completed"}
+
+
 def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> dict:
     """
     タスク一覧を取得（statusでフィルタリング）
@@ -117,6 +120,22 @@ def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> d
     Returns:
         タスク一覧とtotal_count
     """
+    if limit < 1:
+        return {
+            "error": {
+                "code": "INVALID_PARAMETER",
+                "message": f"limit must be positive, got {limit}",
+            }
+        }
+
+    if status not in VALID_TASK_STATUSES:
+        return {
+            "error": {
+                "code": "INVALID_STATUS",
+                "message": f"Invalid status: {status}. Must be one of {sorted(VALID_TASK_STATUSES)}",
+            }
+        }
+
     try:
         # 1. total_count取得（LIMITなし）
         count_rows = execute_query(

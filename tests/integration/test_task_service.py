@@ -159,6 +159,31 @@ class TestGetTasks:
         assert len(result["tasks"]) == 3   # limit分のみ
 
 
+    def test_get_tasks_invalid_limit_zero(self, temp_db):
+        """limit=0でINVALID_PARAMETERエラーになる"""
+        project = add_project(name="test-project", description="Test")
+        result = get_tasks(project_id=project["project_id"], status="pending", limit=0)
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_PARAMETER"
+
+    def test_get_tasks_invalid_limit_negative(self, temp_db):
+        """limit=-1でINVALID_PARAMETERエラーになる"""
+        project = add_project(name="test-project", description="Test")
+        result = get_tasks(project_id=project["project_id"], status="pending", limit=-1)
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_PARAMETER"
+
+    def test_get_tasks_invalid_status(self, temp_db):
+        """無効なstatusでINVALID_STATUSエラーになる"""
+        project = add_project(name="test-project", description="Test")
+        result = get_tasks(project_id=project["project_id"], status="invalid_status")
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_STATUS"
+
+
 class TestUpdateTaskStatus:
     """update_task_statusの統合テスト"""
 
