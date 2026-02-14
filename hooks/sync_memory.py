@@ -184,6 +184,8 @@ def analyze_with_sonnet(relay_text: str, default_project_id: int, default_topic_
    - 実装、調査、設計、議論、レビューなど種類は問わない
    - 「〜する」「〜を確認する」など明確なアクションが求められるもの
    - 既に完了したタスクは含めない
+   - **descriptionは構造化して詳細に書く**（## 背景、## やること、## 関連 など）
+   - **周辺情報が必要なタスク**（動作確認、テスト、セットアップ等）は、手順・コード例・確認ポイントまで含めてOK
 
 3. **トピック（topics）**: 新しく立ち上がった議論テーマ
    - 新しい機能や改善案の議論が始まった場合
@@ -197,14 +199,15 @@ def analyze_with_sonnet(relay_text: str, default_project_id: int, default_topic_
 ```json
 {{
   "decisions": [
-    {{"decision": "確定した決定内容", "reason": "理由", "project_id": 2, "topic_id": 55}},
-    {{"decision": "[議論中] 未決定の論点", "reason": "議論は出たが結論未定", "project_id": 2, "topic_id": 55}}
+    {{"decision": "record_logの要約を3-5文に拡充、重要なら長さ無視", "reason": "後から見返したとき文脈がわからない問題。ユーザーが承認済み", "project_id": 2, "topic_id": 140}},
+    {{"decision": "[議論中] sync_memoryのreasonにADR的要素を含めるか", "reason": "決定事項の背景情報を充実させたいが、具体的な実装方法は未決定", "project_id": 2, "topic_id": 140}}
   ],
   "tasks": [
-    {{"title": "タスク名", "description": "詳細説明", "project_id": 2}}
+    {{"title": "[バグ修正] sync_memory 手動実行時の重複保存問題", "description": "## 問題\\nsync_memoryを手動で実行すると、3ターンごとの自動実行と合わせて同じ内容が二回保存される可能性がある。\\n\\n## 対応案\\n- 重複チェックの仕組みを入れる\\n- 直近のdecision/task/topicと同一内容なら保存しない\\n- または、実行履歴を記録して同一transcriptへの二重実行を防ぐ", "project_id": 2}},
+    {{"title": "SessionStart hook + catでrules読み込みの動作確認", "description": "【目的】\\npluginでrules/ディレクトリをSessionStart hookでcatして読み込ませる方式が動作するか確認する。\\n\\n【手順】\\n1. テスト用の最小plugin構造を作成\\n   test-plugin/\\n   ├── .claude-plugin/plugin.json\\n   ├── hooks/hooks.json\\n   └── rules/test-rule.md\\n\\n2. plugin.json\\n   {{\\\"name\\\": \\\"test-plugin\\\", \\\"description\\\": \\\"rules読み込みテスト\\\", ...}}\\n\\n3. hooks/hooks.json\\n   SessionStartでcat ${{CLAUDE_PLUGIN_ROOT}}/rules/*.md を実行\\n\\n... (手順4-5省略)\\n\\n【確認ポイント】\\n- エージェントが「rulesテスト成功」と言うか\\n- ${{CLAUDE_PLUGIN_ROOT}}が正しく展開されているか\\n\\n【関連決定事項】\\ndecision_id: 166", "project_id": 2}}
   ],
   "topics": [
-    {{"title": "トピック名", "description": "説明", "project_id": 2, "parent_topic_id": null}}
+    {{"title": "[議論] トピック切り替え判断の迷いを減らす", "description": "エージェントがトピック切り替えを自分の判断でスムーズに行えるよう、システムプロンプトの改善点を検討する", "project_id": 2, "parent_topic_id": null}}
   ]
 }}
 ```

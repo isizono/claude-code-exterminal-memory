@@ -30,7 +30,7 @@ TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 
 # 1. メタタグチェック
-META_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/parse_meta_tag.py" "$TRANSCRIPT_PATH" 2>&1)
+META_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/parse_meta_tag.py" "$TRANSCRIPT_PATH" 2>>"$LOG_DIR/uv_stderr.log")
 META_EXIT_CODE=$?
 
 if [ $META_EXIT_CODE -ne 0 ]; then
@@ -49,7 +49,7 @@ fi
 CURRENT_TOPIC=$(echo "$META_RESULT" | jq -r '.topic_id')
 
 # 2. トピック存在チェック
-TOPIC_EXISTS=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_exists.py" "$CURRENT_TOPIC" 2>&1)
+TOPIC_EXISTS=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_exists.py" "$CURRENT_TOPIC" 2>>"$LOG_DIR/uv_stderr.log")
 TOPIC_EXISTS_EXIT_CODE=$?
 
 if [ $TOPIC_EXISTS_EXIT_CODE -ne 0 ]; then
@@ -73,7 +73,7 @@ if [ -n "$PREV_TOPIC" ] && [ "$PREV_TOPIC" != "$CURRENT_TOPIC" ]; then
     : # 何もしない（決定事項チェックをスキップ）
   else
     # 前のトピックにadd_decisionまたはadd_logが呼び出されたかチェック
-    RECORDED_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_recorded.py" "$PREV_TOPIC" "$TRANSCRIPT_PATH" 2>&1)
+    RECORDED_RESULT=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_recorded.py" "$PREV_TOPIC" "$TRANSCRIPT_PATH" 2>>"$LOG_DIR/uv_stderr.log")
     RECORDED_EXIT_CODE=$?
 
     if [ $RECORDED_EXIT_CODE -ne 0 ]; then

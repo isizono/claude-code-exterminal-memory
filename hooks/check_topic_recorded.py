@@ -47,8 +47,8 @@ def find_tool_calls_for_topic(entries: list[dict], topic_id: int) -> bool:
     指定topic_idに対する呼び出しがあるかチェックする。
     """
     target_tools = [
-        "mcp__plugin_claude-code-memory_claude-code-memory__add_decision",
-        "mcp__plugin_claude-code-memory_claude-code-memory__add_log",
+        "mcp__plugin_claude-code-memory_cc-memory__add_decision",
+        "mcp__plugin_claude-code-memory_cc-memory__add_log",
     ]
 
     for entry in entries:
