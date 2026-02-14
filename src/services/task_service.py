@@ -1,7 +1,6 @@
 """タスク管理サービス"""
 import logging
 import sqlite3
-from typing import Optional
 
 from src.db import execute_query, get_connection, row_to_dict
 from src.db_base import BaseDBService
@@ -106,36 +105,55 @@ def add_task(project_id: int, title: str, description: str) -> dict:
         }
 
 
-def get_tasks(project_id: int, status: Optional[str] = None) -> dict:
+VALID_TASK_STATUSES = {"pending", "in_progress", "blocked", "completed"}
+
+
+def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> dict:
     """
-    タスク一覧を取得（statusでフィルタ可能）
+    タスク一覧を取得（statusでフィルタリング）
 
     Args:
         project_id: プロジェクトID
-        status: フィルタするステータス（未指定なら全件取得）
+        status: フィルタするステータス（デフォルト: in_progress）
+        limit: 取得件数上限（デフォルト: 5）
 
     Returns:
-        タスク一覧
+        タスク一覧とtotal_count
     """
+    if limit < 1:
+        return {
+            "error": {
+                "code": "INVALID_PARAMETER",
+                "message": f"limit must be positive, got {limit}",
+            }
+        }
+
+    if status not in VALID_TASK_STATUSES:
+        return {
+            "error": {
+                "code": "INVALID_STATUS",
+                "message": f"Invalid status: {status}. Must be one of {sorted(VALID_TASK_STATUSES)}",
+            }
+        }
+
     try:
-        if status is None:
-            rows = execute_query(
-                """
-                SELECT * FROM tasks
-                WHERE project_id = ?
-                ORDER BY created_at ASC, id ASC
-                """,
-                (project_id,),
-            )
-        else:
-            rows = execute_query(
-                """
-                SELECT * FROM tasks
-                WHERE project_id = ? AND status = ?
-                ORDER BY created_at ASC, id ASC
-                """,
-                (project_id, status),
-            )
+        # 1. total_count取得（LIMITなし）
+        count_rows = execute_query(
+            "SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = ?",
+            (project_id, status),
+        )
+        total_count = count_rows[0]["count"]
+
+        # 2. LIMIT付きでデータ取得
+        rows = execute_query(
+            """
+            SELECT * FROM tasks
+            WHERE project_id = ? AND status = ?
+            ORDER BY created_at ASC, id ASC
+            LIMIT ?
+            """,
+            (project_id, status, limit),
+        )
 
         tasks = []
         for row in rows:
@@ -151,7 +169,7 @@ def get_tasks(project_id: int, status: Optional[str] = None) -> dict:
                 "updated_at": task["updated_at"],
             })
 
-        return {"tasks": tasks}
+        return {"tasks": tasks, "total_count": total_count}
 
     except sqlite3.IntegrityError as e:
         return {
