@@ -69,10 +69,11 @@ class TestGetTasks:
     def test_get_tasks_empty(self, temp_db):
         """タスクが存在しない場合、空のリストが返る"""
         project = add_project(name="test-project", description="Test")
-        result = get_tasks(project_id=project["project_id"])
+        result = get_tasks(project_id=project["project_id"], status="pending")
 
         assert "error" not in result
         assert result["tasks"] == []
+        assert result["total_count"] == 0
 
     def test_get_tasks_with_status_filter(self, temp_db):
         """ステータスでフィルタできる"""
@@ -91,6 +92,71 @@ class TestGetTasks:
 
         assert len(result["tasks"]) == 1
         assert result["tasks"][0]["title"] == "Task 2"
+        assert result["total_count"] == 1
+
+    def test_get_tasks_default_status_is_in_progress(self, temp_db):
+        """statusなしで呼んだらin_progressのみ返る"""
+        project = add_project(name="test-project", description="Test")
+        pid = project["project_id"]
+
+        # pending x2, in_progress x1 を作成
+        add_task(project_id=pid, title="Pending 1", description="Desc")
+        task_ip = add_task(project_id=pid, title="In Progress 1", description="Desc")
+        add_task(project_id=pid, title="Pending 2", description="Desc")
+
+        update_task_status(task_ip["task_id"], "in_progress")
+
+        # statusを指定せずに呼び出し → デフォルトでin_progressのみ
+        result = get_tasks(project_id=pid)
+
+        assert "error" not in result
+        assert len(result["tasks"]) == 1
+        assert result["tasks"][0]["title"] == "In Progress 1"
+        assert result["total_count"] == 1
+
+    def test_get_tasks_limit(self, temp_db):
+        """limitが正しく動作する（タスク10件作成、limit=3で3件のみ返る）"""
+        project = add_project(name="test-project", description="Test")
+        pid = project["project_id"]
+
+        # pending状態のタスクを10件作成
+        for i in range(10):
+            add_task(project_id=pid, title=f"Task {i}", description=f"Desc {i}")
+
+        result = get_tasks(project_id=pid, status="pending", limit=3)
+
+        assert "error" not in result
+        assert len(result["tasks"]) == 3
+
+    def test_get_tasks_total_count(self, temp_db):
+        """total_countが正しい全件数を返す"""
+        project = add_project(name="test-project", description="Test")
+        pid = project["project_id"]
+
+        # pending状態のタスクを5件作成
+        for i in range(5):
+            add_task(project_id=pid, title=f"Task {i}", description=f"Desc {i}")
+
+        result = get_tasks(project_id=pid, status="pending")
+
+        assert "error" not in result
+        assert result["total_count"] == 5
+        assert len(result["tasks"]) == 5
+
+    def test_get_tasks_total_count_exceeds_limit(self, temp_db):
+        """limit超過時にtotal_countは全件数、tasksはlimit分のみ"""
+        project = add_project(name="test-project", description="Test")
+        pid = project["project_id"]
+
+        # pending状態のタスクを8件作成
+        for i in range(8):
+            add_task(project_id=pid, title=f"Task {i}", description=f"Desc {i}")
+
+        result = get_tasks(project_id=pid, status="pending", limit=3)
+
+        assert "error" not in result
+        assert result["total_count"] == 8  # 全件数
+        assert len(result["tasks"]) == 3   # limit分のみ
 
 
 class TestUpdateTaskStatus:

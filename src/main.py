@@ -178,26 +178,28 @@ def add_task(
 @mcp.tool()
 def get_tasks(
     project_id: int,
-    status: Optional[str] = None,
+    status: str = "in_progress",
+    limit: int = 5,
 ) -> dict:
     """
     タスク一覧を取得する（statusでフィルタリング可能）。
 
     典型的な使い方:
-    - 全タスク確認: get_tasks(project_id)
-    - 進行中のタスク確認: get_tasks(project_id, status="in_progress")
+    - 進行中のタスク確認: get_tasks(project_id)
+    - 未着手のタスク確認: get_tasks(project_id, status="pending")
     - ブロック中のタスク確認: get_tasks(project_id, status="blocked")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
         project_id: プロジェクトID
-        status: フィルタするステータス（pending/in_progress/blocked/completed、未指定なら全件取得）
+        status: フィルタするステータス（pending/in_progress/blocked/completed、デフォルト: in_progress）
+        limit: 取得件数上限（デフォルト: 5）
 
     Returns:
-        タスク一覧
+        タスク一覧（total_countで該当ステータスの全件数を確認可能）
     """
-    return task_service.get_tasks(project_id, status)
+    return task_service.get_tasks(project_id, status, limit)
 
 
 @mcp.tool()
