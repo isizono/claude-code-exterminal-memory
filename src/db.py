@@ -1,8 +1,11 @@
 """データベース接続と初期化を管理するモジュール"""
 import sqlite3
 import os
+import logging
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 def get_db_path() -> str:
@@ -71,9 +74,71 @@ def init_database() -> None:
                     """,
                     (project_id,)
                 )
+        # FTS5初期マイグレーション
+        _migrate_fts5_search_index(conn)
+
         conn.commit()
     finally:
         conn.close()
+
+
+def _check_fts5_available(conn: sqlite3.Connection) -> bool:
+    """FTS5が利用可能か確認する"""
+    try:
+        conn.execute("CREATE VIRTUAL TABLE IF NOT EXISTS _fts5_check USING fts5(x)")
+        conn.execute("DROP TABLE IF EXISTS _fts5_check")
+        return True
+    except sqlite3.OperationalError:
+        return False
+
+
+def _migrate_fts5_search_index(conn: sqlite3.Connection) -> None:
+    """FTS5検索インデックスの初期データマイグレーション（contentless方式）"""
+    if not _check_fts5_available(conn):
+        logger.warning("FTS5 is not available. Skipping search index migration.")
+        return
+
+    # search_indexが空の場合のみ実行
+    cursor = conn.execute("SELECT COUNT(*) FROM search_index")
+    if cursor.fetchone()[0] > 0:
+        return  # 既にデータがある場合はスキップ
+
+    # topics
+    conn.execute("""
+        INSERT OR IGNORE INTO search_index (source_type, source_id, project_id, title)
+        SELECT 'topic', id, project_id, title
+        FROM discussion_topics
+    """)
+
+    # decisions（topic_id IS NOT NULLのもののみ）
+    conn.execute("""
+        INSERT OR IGNORE INTO search_index (source_type, source_id, project_id, title)
+        SELECT 'decision', d.id, dt.project_id, d.decision
+        FROM decisions d
+        JOIN discussion_topics dt ON d.topic_id = dt.id
+    """)
+
+    # tasks
+    conn.execute("""
+        INSERT OR IGNORE INTO search_index (source_type, source_id, project_id, title)
+        SELECT 'task', id, project_id, title
+        FROM tasks
+    """)
+
+    # FTS5インデックスにデータを投入（contentless方式ではrebuildが使えない）
+    conn.execute("""
+        INSERT INTO search_index_fts (rowid, title, body)
+        SELECT si.id, si.title,
+          COALESCE(
+            CASE si.source_type
+              WHEN 'topic' THEN (SELECT description FROM discussion_topics WHERE id = si.source_id)
+              WHEN 'decision' THEN (SELECT reason FROM decisions WHERE id = si.source_id)
+              WHEN 'task' THEN (SELECT description FROM tasks WHERE id = si.source_id)
+            END,
+            ''
+          )
+        FROM search_index si
+    """)
 
 
 def execute_query(query: str, params: tuple = ()) -> list[sqlite3.Row]:
