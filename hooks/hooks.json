@@ -6,11 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat ${CLAUDE_PLUGIN_ROOT}/rules/*.md"
-          },
-          {
-            "type": "command",
-            "command": "cd ${CLAUDE_PLUGIN_ROOT} && uv run python ${CLAUDE_PLUGIN_ROOT}/hooks/load_active_context.py"
+            "command": "python3 -c \"import json, sys; from pathlib import Path; data = json.loads(sys.stdin.read()); sid = data.get('session_id', ''); (Path.home() / '.claude' / '.claude-code-memory' / 'state' / f'prev_topic_{sid}').unlink(missing_ok=True)\""
           }
         ]
       }
