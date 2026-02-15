@@ -1,6 +1,7 @@
 """MCPサーバーのメインエントリーポイント"""
 from fastmcp import FastMCP
 from typing import Literal, Optional
+from src.db import execute_query
 from src.services import (
     project_service,
     topic_service,
@@ -11,8 +12,124 @@ from src.services import (
     knowledge_service,
 )
 
+DESC_MAX_LEN = 30
+
+
+def _get_active_projects() -> list[dict]:
+    """直近7日以内にトピック更新があったプロジェクトを取得する"""
+    rows = execute_query(
+        """
+        SELECT DISTINCT p.id, p.name
+        FROM projects p
+        JOIN discussion_topics t ON p.id = t.project_id
+        WHERE t.created_at > datetime('now', '-7 days')
+        ORDER BY p.id
+        """
+    )
+    return [{"id": row["id"], "name": row["name"]} for row in rows]
+
+
+def _get_recent_topics(project_id: int) -> list[dict]:
+    """プロジェクトの最新トピック3件を取得する"""
+    rows = execute_query(
+        """
+        SELECT id, title, description
+        FROM discussion_topics
+        WHERE project_id = ?
+        ORDER BY created_at DESC
+        LIMIT 3
+        """,
+        (project_id,),
+    )
+    results = []
+    for row in rows:
+        desc = row["description"] or ""
+        if len(desc) > DESC_MAX_LEN:
+            desc = desc[:DESC_MAX_LEN] + "..."
+        results.append({"id": row["id"], "title": row["title"], "description": desc})
+    return results
+
+
+def _get_in_progress_tasks(project_id: int) -> list[dict]:
+    """プロジェクトのin_progressタスクを取得する"""
+    rows = execute_query(
+        """
+        SELECT id, title
+        FROM tasks
+        WHERE project_id = ? AND status = 'in_progress'
+        ORDER BY updated_at DESC
+        """,
+        (project_id,),
+    )
+    return [{"id": row["id"], "title": row["title"]} for row in rows]
+
+
+def _build_active_context() -> str:
+    """アクティブプロジェクトのコンテキスト文字列を組み立てる"""
+    try:
+        projects = _get_active_projects()
+        if not projects:
+            return ""
+
+        lines = ["# アクティブプロジェクト（直近7日）\n"]
+        for p in projects:
+            lines.append(f"## {p['name']} (id: {p['id']})")
+
+            topics = _get_recent_topics(p["id"])
+            if topics:
+                lines.append("最新トピック:")
+                for t in topics:
+                    lines.append(f"- [{t['id']}] {t['title']}: {t['description']}")
+
+            tasks = _get_in_progress_tasks(p["id"])
+            if tasks:
+                lines.append("進行中タスク:")
+                for task in tasks:
+                    lines.append(f"- [{task['id']}] {task['title']}")
+
+            lines.append("")
+
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+# ルール文字列（rules/ディレクトリの内容を統合）
+RULES = """# cc-memory 運用ルール
+
+## トピック管理
+- 1トピック = 1つの論点・問題・機能
+- 迷ったらトピックを切る（粗いと後で分割が大変）
+
+## 決定事項の記録
+- ユーザーと認識合わせを行い、承認を得た時点で即座にadd_decisionで記録する
+- 仕様・設計方針、技術選定、スコープ、命名規約、トレードオフの選択を記録する
+- 曖昧な表現（「適切に」「必要に応じて」）を避け、具体的な条件・数値で記録する
+- 決定の理由（なぜその選択をしたか）を必ず含める
+
+### 認識合わせの姿勢
+- 性急に結論を出さず、懸念点・代替案・見落としを積極的に指摘する
+- 論点の網羅性を意識し、関連する未検討の論点がないか確認する
+- ユーザーの発言は「提案」であり、双方が合意して初めて決定事項となる
+
+## タスクフェーズ
+- 作業は「話し合い」「設計」「実装」の3フェーズに分け、混ぜない
+- タスク名にはフェーズプレフィックスをつける: [議論], [設計], [実装]
+- 現フェーズを完了し、ユーザー確認を得てから次フェーズに移行する
+- 話し合い中に実装を始めない、設計が固まる前にコードを書かない
+"""
+
+
+def build_instructions() -> str:
+    """ルール + アクティブコンテキストを組み立てる"""
+    context = _build_active_context()
+    if context:
+        return f"{RULES}\n{context}"
+    return RULES
+
+
 # MCPサーバーを作成
-mcp = FastMCP("cc-memory")
+mcp = FastMCP("cc-memory", instructions=build_instructions())
 
 
 # MCPツール定義
@@ -260,385 +377,6 @@ def add_knowledge(
         保存結果（file_path, title, category, tags）
     """
     return knowledge_service.add_knowledge(title, content, tags, category)
-
-
-# リソース機能
-@mcp.resource("docs://workflow")
-def workflow_docs() -> str:
-    """MCPツールを使った議論管理の典型的なフロー"""
-    return """# 議論管理ワークフロー
-
-## 1. プロジェクトの特定
-まず作業対象のプロジェクトを特定する。
-
-```
-get_projects() → project_id を確認
-```
-
-## 2. 設計議論の開始
-新しい議論トピックを作成する。
-
-```
-add_topic(project_id, title="○○機能の設計", description="...")
-→ topic_id が返される
-```
-
-## 3. 議論のやりとり記録
-AIとユーザーのやりとりを記録。
-
-```
-add_log(topic_id, content="AI: 提案\\nユーザー: フィードバック")
-```
-
-記録タイミング:
-- 重要な議論の節目
-- 決定事項の前提となる議論
-
-## 4. 決定事項の記録
-認識合わせ → ユーザーOK → 即座に記録。
-
-```
-add_decision(
-    decision="決定内容",
-    reason="理由",
-    topic_id=関連トピックID
-)
-```
-
-**重要**: 後回しにせず即座に記録すること。
-
-## 5. 議論状況の確認
-
-未決定事項:
-```
-get_undecided_topics(project_id)
-get_undecided_topics(project_id, parent_topic_id=親ID)
-```
-
-決定済み:
-```
-get_decided_topics(project_id)
-get_decisions(topic_id)
-```
-
-トピック構造:
-```
-get_topics(project_id)  # 最上位
-get_topic_tree(project_id, topic_id)  # ツリー全体
-```
-
-検索:
-```
-search_topics(project_id, keyword="...")
-search_decisions(project_id, keyword="...")
-```
-
-## 6. セッション開始時
-
-新しいセッション開始時の推奨フロー:
-1. get_projects() でプロジェクト特定
-2. get_topics(project_id) で最上位トピック確認
-3. get_undecided_topics(project_id) で未決定事項確認
-4. 必要に応じて get_topic_tree, get_logs, get_decisions
-
-## データベース構造
-
-```
-projects (プロジェクト)
-  ├── discussion_topics (議論トピック)
-  │     ├── discussion_logs (議論ログ)
-  │     └── decisions (決定事項)
-  └── tasks (タスク) ※未実装
-```
-
-主要な関係:
-- discussion_topics.parent_topic_id → discussion_topics.id (親子関係)
-- discussion_topics.project_id → projects.id
-- decisions.topic_id → discussion_topics.id
-"""
-
-
-@mcp.resource("docs://tools-reference")
-def tools_reference() -> str:
-    """各MCPツールの詳細な使い方とベストプラクティス"""
-    return """# MCPツール詳細リファレンス
-
-このドキュメントでは、各MCPツールの詳細な使い方、典型的なユースケース、パラメータの説明を提供します。
-
-## プロジェクト管理
-
-### add_project
-
-新しいプロジェクトを追加する。
-
-**典型的な使い方**:
-- 新プロジェクト開始時: `add_project("プロジェクト名", "説明", asana_url="...")`
-
-**ワークフロー位置**: プロジェクト管理の最初のステップ
-
-**パラメータ**:
-- `name` (str): プロジェクト名（ユニーク）
-- `description` (str): プロジェクトの説明（必須）
-- `asana_url` (Optional[str]): AsanaプロジェクトタスクのURL
-
-**返り値**: 作成されたプロジェクト情報
-
----
-
-### get_projects
-
-プロジェクト一覧を取得する（全件）。
-
-**典型的な使い方**:
-- セッション開始時にプロジェクト特定: `get_projects()` → project_id を確認
-
-**ワークフロー位置**: 全ての議論管理の起点（最初のステップ）
-
-**パラメータ**: なし
-
-**返り値**: プロジェクト一覧
-
----
-
-## トピック管理
-
-### add_topic
-
-新しい議論トピックを追加する。
-
-**典型的な使い方**:
-- 新しい設計議論を始める: `add_topic(project_id, "○○機能の設計", "...")`
-- 既存トピックの詳細論点: `add_topic(project_id, "詳細設計", "...", parent_topic_id=親ID)`
-
-**ワークフロー位置**: 議論開始時（最初のステップ）
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `title` (str): トピックのタイトル
-- `description` (str): トピックの説明（必須）
-- `parent_topic_id` (Optional[int]): 親トピックのID（未指定なら最上位トピック）
-
-**返り値**: 作成されたトピック情報
-
----
-
-### get_topics
-
-指定した親トピックの直下の子トピックを取得する（1階層・全件）。
-
-**典型的な使い方**:
-- 最上位トピック確認: `get_topics(project_id)`
-- 特定トピック配下の確認: `get_topics(project_id, parent_topic_id=親ID)`
-
-**ワークフロー位置**: セッション開始時、トピック構造の確認時
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `parent_topic_id` (Optional[int]): 親トピックのID（未指定なら最上位トピックのみ取得）
-
-**返り値**: トピック一覧
-
----
-
-### get_decided_topics
-
-指定した親トピックの直下の子トピックのうち、決定済み（decisionが存在する）トピックのみを取得する（1階層）。
-
-**典型的な使い方**:
-- 最上位の決定済み事項確認: `get_decided_topics(project_id)`
-- 特定トピック配下の決定済み論点確認: `get_decided_topics(project_id, parent_topic_id=親ID)`
-
-**ワークフロー位置**: 決定済み事項の確認時
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `parent_topic_id` (Optional[int]): 親トピックのID（未指定なら最上位トピックのみ取得）
-
-**返り値**: 決定済みトピック一覧
-
----
-
-### get_undecided_topics
-
-指定した親トピックの直下の子トピックのうち、未決定（decisionが存在しない）トピックのみを取得する（1階層）。
-
-**典型的な使い方**:
-- セッション開始時に未決定事項を確認: `get_undecided_topics(project_id)`
-- 特定トピック配下の未解決論点を確認: `get_undecided_topics(project_id, parent_topic_id=親ID)`
-
-**ワークフロー位置**: セッション開始時、次に議論すべきトピックの確認時
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `parent_topic_id` (Optional[int]): 親トピックのID（未指定なら最上位トピックのみ取得）
-
-**返り値**: 未決定トピック一覧
-
----
-
-### get_topic_tree
-
-指定したトピックを起点に、再帰的に全ツリーを取得する。
-
-**典型的な使い方**:
-- トピック全体の構造を把握: `get_topic_tree(project_id, topic_id)`
-
-**ワークフロー位置**: 議論全体の俯瞰時、構造確認時
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `topic_id` (int): 起点となるトピックのID
-- `limit` (int): 取得件数上限（最大100件、デフォルト100）
-
-**返り値**: トピックツリー
-
----
-
-### search_topics
-
-トピックをキーワード検索する。
-
-**典型的な使い方**:
-- 過去の議論を検索: `search_topics(project_id, keyword="認証")`
-
-**ワークフロー位置**: 関連する過去の議論を探す時
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `keyword` (str): 検索キーワード（title, descriptionから部分一致）
-- `limit` (int): 取得件数上限（最大30件、デフォルト30）
-
-**返り値**: 検索結果のトピック一覧
-
----
-
-## 議論ログ
-
-### add_log
-
-トピックに議論ログ（1やりとり）を追加する。
-
-**典型的な使い方**:
-- AIとユーザーのやりとりを記録: `add_log(topic_id, "AI: 提案\\nユーザー: フィードバック")`
-
-**ワークフロー位置**: 議論中（重要な節目で記録）
-
-**記録タイミング**:
-- 重要な議論の節目（提案→フィードバック）
-- 決定事項の前提となる議論
-
-**パラメータ**:
-- `topic_id` (int): 対象トピックのID
-- `content` (str): 議論内容（マークダウン可）
-
-**返り値**: 作成されたログ情報
-
----
-
-### get_logs
-
-指定トピックの議論ログを取得する。
-
-**典型的な使い方**:
-- トピックの議論履歴を確認: `get_logs(topic_id)`
-- ページング: `get_logs(topic_id, start_id=最後のID)`
-
-**ワークフロー位置**: 議論再開時、過去の議論確認時
-
-**パラメータ**:
-- `topic_id` (int): 対象トピックのID
-- `start_id` (Optional[int]): 取得開始位置のログID（ページネーション用）
-- `limit` (int): 取得件数上限（最大30件、デフォルト30）
-
-**返り値**: 議論ログ一覧
-
----
-
-## 決定事項
-
-### add_decision
-
-決定事項を記録する。
-
-**典型的な使い方**:
-- 認識合わせ後の即座の記録: `add_decision(decision="...", reason="...", topic_id=...)`
-
-**ワークフロー位置**: 認識合わせ→ユーザーOK直後（即座に記録）
-
-**重要**: 後回しにせず、決定が確定した時点で記録すること
-
-**パラメータ**:
-- `decision` (str): 決定内容
-- `reason` (str): 決定の理由
-- `topic_id` (Optional[int]): 関連するトピックのID（未指定も可）
-
-**返り値**: 作成された決定事項情報
-
----
-
-### get_decisions
-
-指定トピックに関連する決定事項を取得する。
-
-**典型的な使い方**:
-- トピックの決定事項を確認: `get_decisions(topic_id)`
-- ページング: `get_decisions(topic_id, start_id=最後のID)`
-
-**ワークフロー位置**: 決定済み事項の確認時
-
-**パラメータ**:
-- `topic_id` (int): 対象トピックのID
-- `start_id` (Optional[int]): 取得開始位置の決定事項ID（ページネーション用）
-- `limit` (int): 取得件数上限（最大30件、デフォルト30）
-
-**返り値**: 決定事項一覧
-
----
-
-### search_decisions
-
-決定事項をキーワード検索する。
-
-**典型的な使い方**:
-- 過去の決定を検索: `search_decisions(project_id, keyword="API設計")`
-
-**ワークフロー位置**: 関連する過去の決定事項を探す時
-
-**パラメータ**:
-- `project_id` (int): プロジェクトID
-- `keyword` (str): 検索キーワード（decision, reasonから部分一致）
-- `limit` (int): 取得件数上限（最大30件、デフォルト30）
-
-**返り値**: 検索結果の決定事項一覧
-
----
-
-## ベストプラクティス
-
-### ツール選択のガイドライン
-
-1. **セッション開始時**:
-   - `get_projects()` でプロジェクトを特定
-   - `get_undecided_topics(project_id)` で未決定事項を確認
-   - 必要に応じて `get_topic_tree()` で全体構造を把握
-
-2. **議論中**:
-   - `add_log()` で重要なやりとりを記録
-   - `add_decision()` で決定事項を即座に記録
-
-3. **情報検索時**:
-   - `search_topics()` で関連する過去の議論を探す
-   - `search_decisions()` で関連する決定事項を探す
-
-4. **階層的な議論**:
-   - `add_topic()` で親子関係を作る
-   - `get_topics()` で特定階層を確認
-   - `get_topic_tree()` で全体を俯瞰
-
-### 効率的なワークフロー
-
-詳細なワークフロー例については、`docs://workflow` リソースを参照してください。
-"""
 
 
 if __name__ == "__main__":
