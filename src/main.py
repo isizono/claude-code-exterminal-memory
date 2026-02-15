@@ -1,8 +1,6 @@
 """MCPサーバーのメインエントリーポイント"""
-import logging
 from fastmcp import FastMCP
 from typing import Literal, Optional
-from src.db import execute_query
 from src.services import (
     project_service,
     topic_service,
@@ -12,94 +10,6 @@ from src.services import (
     task_service,
     knowledge_service,
 )
-
-logger = logging.getLogger(__name__)
-
-ACTIVE_PROJECT_DAYS = 7
-RECENT_TOPICS_LIMIT = 3
-DESC_MAX_LEN = 30
-
-
-def _get_active_projects() -> list[dict]:
-    """直近7日以内にトピック更新があったプロジェクトを取得する"""
-    rows = execute_query(
-        """
-        SELECT DISTINCT p.id, p.name
-        FROM projects p
-        JOIN discussion_topics t ON p.id = t.project_id
-        WHERE t.created_at > datetime('now', ? || ' days')
-        ORDER BY p.id
-        """,
-        (f"-{ACTIVE_PROJECT_DAYS}",),
-    )
-    return [{"id": row["id"], "name": row["name"]} for row in rows]
-
-
-def _get_recent_topics(project_id: int) -> list[dict]:
-    """プロジェクトの最新トピック3件を取得する"""
-    rows = execute_query(
-        """
-        SELECT id, title, description
-        FROM discussion_topics
-        WHERE project_id = ?
-        ORDER BY created_at DESC
-        LIMIT ?
-        """,
-        (project_id, RECENT_TOPICS_LIMIT),
-    )
-    results = []
-    for row in rows:
-        desc = row["description"] or ""
-        if len(desc) > DESC_MAX_LEN:
-            desc = desc[:DESC_MAX_LEN] + "..."
-        results.append({"id": row["id"], "title": row["title"], "description": desc})
-    return results
-
-
-def _get_in_progress_tasks(project_id: int) -> list[dict]:
-    """プロジェクトのin_progressタスクを取得する"""
-    rows = execute_query(
-        """
-        SELECT id, title
-        FROM tasks
-        WHERE project_id = ? AND status = 'in_progress'
-        ORDER BY updated_at DESC
-        """,
-        (project_id,),
-    )
-    return [{"id": row["id"], "title": row["title"]} for row in rows]
-
-
-def _build_active_context() -> str:
-    """アクティブプロジェクトのコンテキスト文字列を組み立てる"""
-    try:
-        projects = _get_active_projects()
-        if not projects:
-            return ""
-
-        lines = ["# アクティブプロジェクト（直近7日）\n"]
-        for p in projects:
-            lines.append(f"## {p['name']} (id: {p['id']})")
-
-            topics = _get_recent_topics(p["id"])
-            if topics:
-                lines.append("最新トピック:")
-                for t in topics:
-                    lines.append(f"- [{t['id']}] {t['title']}: {t['description']}")
-
-            tasks = _get_in_progress_tasks(p["id"])
-            if tasks:
-                lines.append("進行中タスク:")
-                for task in tasks:
-                    lines.append(f"- [{task['id']}] {task['title']}")
-
-            lines.append("")
-
-        return "\n".join(lines)
-    except Exception:
-        logger.warning("Failed to build active context", exc_info=True)
-        return ""
-
 
 # ルール文字列（rules/ディレクトリの内容を統合）
 RULES = """# cc-memory 運用ルール
@@ -127,16 +37,8 @@ RULES = """# cc-memory 運用ルール
 """
 
 
-def build_instructions() -> str:
-    """ルール + アクティブコンテキストを組み立てる"""
-    context = _build_active_context()
-    if context:
-        return f"{RULES}\n{context}"
-    return RULES
-
-
 # MCPサーバーを作成
-mcp = FastMCP("cc-memory", instructions=build_instructions())
+mcp = FastMCP("cc-memory", instructions=RULES)
 
 
 # MCPツール定義
