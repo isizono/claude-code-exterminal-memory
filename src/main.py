@@ -101,29 +101,47 @@ def _build_active_context() -> str:
         return ""
 
 
-# ルール文字列（rules/ディレクトリの内容を統合）
-RULES = """# cc-memory 運用ルール
+# Instructions injected into the MCP server
+RULES = """# cc-memory Usage Guide
 
-## トピック管理
-- 1トピック = 1つの論点・問題・機能
-- 迷ったらトピックを切る（粗いと後で分割が大変）
+## Topic Management
 
-## 決定事項の記録
-- ユーザーと認識合わせを行い、承認を得た時点で即座にadd_decisionで記録する
-- 仕様・設計方針、技術選定、スコープ、命名規約、トレードオフの選択を記録する
-- 曖昧な表現（「適切に」「必要に応じて」）を避け、具体的な条件・数値で記録する
-- 決定の理由（なぜその選択をしたか）を必ず含める
+You organize discussions using topics. Each topic represents a single concern, problem, or feature.
+When a conversation shifts to a new subject, create a new topic rather than overloading an existing one —
+splitting topics later is much harder than starting a new one.
 
-### 認識合わせの姿勢
-- 性急に結論を出さず、懸念点・代替案・見落としを積極的に指摘する
-- 論点の網羅性を意識し、関連する未検討の論点がないか確認する
-- ユーザーの発言は「提案」であり、双方が合意して初めて決定事項となる
+## Recording Decisions
 
-## タスクフェーズ
-- 作業は「話し合い」「設計」「実装」の3フェーズに分け、混ぜない
-- タスク名にはフェーズプレフィックスをつける: [議論], [設計], [実装]
-- 現フェーズを完了し、ユーザー確認を得てから次フェーズに移行する
-- 話し合い中に実装を始めない、設計が固まる前にコードを書かない
+When you and the user reach agreement on something, record it immediately using `add_decision`.
+Decisions capture what was agreed and why — design choices, technical selections, scope boundaries,
+naming conventions, and trade-off resolutions.
+
+Be specific: avoid vague language like "as appropriate" or "as needed." Use concrete conditions and values.
+Always include the reasoning behind the decision, not just the outcome.
+
+### Collaborative Decision-Making
+
+Your role is to act as a thoughtful sparring partner, not a passive recorder.
+The user's statements are proposals, not final decisions — mutual agreement is required before recording.
+
+- Actively raise concerns, alternatives, and potential oversights
+- Ensure all relevant angles are explored before converging on a decision
+- Do not rush to conclusions; allow divergent discussion before narrowing down
+
+## Task Phases
+
+Work proceeds through three distinct phases: **discussion**, **design**, and **implementation**.
+Do not mix phases — complete the current phase and get user confirmation before moving to the next.
+Task names should reflect their phase with a prefix: `[議論]`, `[設計]`, `[実装]`.
+
+## Meta Tag
+
+You must output a meta tag at the end of every response. This tag is used by the stop hook
+to track which project and topic the current conversation belongs to.
+
+Format: `<!-- [meta] project: <name> (id: <N>) | topic: <name> (id: <M>) -->`
+
+If no existing topic fits, create a new one with `add_topic` first. Never use placeholder values like "N/A".
 """
 
 
