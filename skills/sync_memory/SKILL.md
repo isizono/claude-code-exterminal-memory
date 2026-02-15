@@ -1,4 +1,5 @@
 ---
+name: sync_memory
 description: セッション終了前にtranscriptを解析し、トピック・決定事項・タスク・仕様書を一括で記録・更新する
 ---
 
