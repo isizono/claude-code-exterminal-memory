@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.services.project_service import add_project, get_projects
+from src.services.project_service import add_project, list_projects
 
 
 @pytest.fixture
@@ -47,24 +47,26 @@ def test_add_project_duplicate_name(temp_db):
     assert result2["error"]["code"] == "DATABASE_ERROR"
 
 
-def test_get_projects_includes_initial_data(temp_db):
+def test_list_projects_includes_initial_data(temp_db):
     """初期データ（first_project）が含まれる"""
-    result = get_projects()
+    result = list_projects()
 
     assert "error" not in result
     # 初期データとして first_project が投入されている
     assert len(result["projects"]) == 1
     assert result["projects"][0]["name"] == "first_project"
+    # id + name のみ返す
+    assert set(result["projects"][0].keys()) == {"id", "name"}
 
 
-def test_get_projects_multiple(temp_db):
+def test_list_projects_multiple(temp_db):
     """複数のプロジェクトを取得できる"""
     # 3つプロジェクトを作成（初期データの first_project に追加）
     add_project(name="project-1", description="desc-1")
     add_project(name="project-2", description="desc-2")
     add_project(name="project-3", description="desc-3")
 
-    result = get_projects()
+    result = list_projects()
 
     assert "error" not in result
     # 初期データ(1) + 追加(3) = 4件
@@ -77,13 +79,13 @@ def test_get_projects_multiple(temp_db):
     assert result["projects"][3]["name"] == "first_project"
 
 
-def test_get_projects_returns_all(temp_db):
+def test_list_projects_returns_all(temp_db):
     """全件取得されることを確認"""
     # 35個プロジェクトを作成（初期データの first_project に追加）
     for i in range(35):
         add_project(name=f"project-{i}", description=f"Description {i}")
 
-    result = get_projects()
+    result = list_projects()
 
     assert "error" not in result
     # 初期データ(1) + 追加(35) = 36件

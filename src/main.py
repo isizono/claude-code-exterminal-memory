@@ -183,9 +183,9 @@ def add_project(
 
 
 @mcp.tool()
-def get_projects() -> dict:
-    """プロジェクト一覧を取得する。"""
-    return project_service.get_projects()
+def list_projects() -> dict:
+    """プロジェクト一覧を取得する。id + name のみ返す軽量版。"""
+    return project_service.list_projects()
 
 
 @mcp.tool()
@@ -225,24 +225,6 @@ def get_topics(
 
 
 @mcp.tool()
-def get_decided_topics(
-    project_id: int,
-    parent_topic_id: Optional[int] = None,
-) -> dict:
-    """指定した親トピックの直下の決定済みトピックのみを取得する。"""
-    return topic_service.get_decided_topics(project_id, parent_topic_id)
-
-
-@mcp.tool()
-def get_undecided_topics(
-    project_id: int,
-    parent_topic_id: Optional[int] = None,
-) -> dict:
-    """指定した親トピックの直下の未決定トピックのみを取得する。"""
-    return topic_service.get_undecided_topics(project_id, parent_topic_id)
-
-
-@mcp.tool()
 def get_logs(
     topic_id: int,
     start_id: Optional[int] = None,
@@ -260,16 +242,6 @@ def get_decisions(
 ) -> dict:
     """指定トピックに関連する決定事項を取得する。"""
     return decision_service.get_decisions(topic_id, start_id, limit)
-
-
-@mcp.tool()
-def get_topic_tree(
-    project_id: int,
-    topic_id: int,
-    limit: int = 100,
-) -> dict:
-    """指定したトピックを起点に、再帰的に全ツリーを取得する。"""
-    return topic_service.get_topic_tree(project_id, topic_id, limit)
 
 
 @mcp.tool()
