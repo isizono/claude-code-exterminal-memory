@@ -273,23 +273,50 @@ def get_topic_tree(
 
 
 @mcp.tool()
-def search_topics(
+def search(
     project_id: int,
     keyword: str,
-    limit: int = 30,
+    type_filter: Optional[str] = None,
+    limit: int = 10,
 ) -> dict:
-    """トピックをキーワード検索する。"""
-    return search_service.search_topics(project_id, keyword, limit)
+    """
+    プロジェクト内をキーワードで横断検索する。
+
+    FTS5 trigramトークナイザによる部分文字列マッチ。3文字以上のキーワードを指定する。
+    結果はBM25スコア順でランキングされる。
+    詳細情報が必要な場合は get_by_id(type, id) で取得する。
+
+    Args:
+        project_id: プロジェクトID
+        keyword: 検索キーワード（3文字以上）
+        type_filter: 検索対象の絞り込み（'topic', 'decision', 'task'。未指定で全種類）
+        limit: 取得件数上限（デフォルト10件、最大50件）
+
+    Returns:
+        検索結果一覧（type, id, title, score）
+    """
+    return search_service.search(project_id, keyword, type_filter, limit)
 
 
 @mcp.tool()
-def search_decisions(
-    project_id: int,
-    keyword: str,
-    limit: int = 30,
+def get_by_id(
+    type: str,
+    id: int,
 ) -> dict:
-    """決定事項をキーワード検索する。"""
-    return search_service.search_decisions(project_id, keyword, limit)
+    """
+    search結果の詳細情報を取得する。
+
+    searchツールで得られたtype + idの組み合わせを指定して、
+    元データの完全な情報を取得する。
+
+    Args:
+        type: データ種別（'topic', 'decision', 'task'）
+        id: データのID
+
+    Returns:
+        指定した種別に応じた詳細情報
+    """
+    return search_service.get_by_id(type, id)
 
 
 @mcp.tool()

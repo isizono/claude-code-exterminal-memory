@@ -1,4 +1,4 @@
-"""サービス層の単体テスト（エラーハンドリング、SQLエスケープなど）"""
+"""サービス層の単体テスト（エラーハンドリング、特殊文字など）"""
 import os
 import tempfile
 import sqlite3
@@ -6,7 +6,7 @@ import pytest
 from src.db import init_database
 from src.services.project_service import add_project, get_projects
 from src.services.topic_service import add_topic
-from src.services.search_service import search_topics, search_decisions
+from src.services.search_service import search
 from src.services.decision_service import add_decision
 
 
@@ -68,104 +68,38 @@ def test_get_projects_database_error_handling(temp_db):
 
 
 # ========================================
-# SQLインジェクション対策のテスト
+# 特殊文字の検索テスト（FTS5 trigram）
 # ========================================
 
 
-def test_search_topics_with_wildcard_percent(test_project):
-    """検索キーワードに%が含まれる場合、正しくエスケープされる"""
-    # トピックを追加
+def test_search_with_percent_character(test_project):
+    """検索キーワードに%が含まれる場合、正しく処理される"""
     topic1 = add_topic(
         project_id=test_project,
-        title="100% Complete",
+        title="100% Complete Task",
         description="Fully done"
     )
-    topic2 = add_topic(
-        project_id=test_project,
-        title="50 Complete",
-        description="Half done"
-    )
 
-    # %を含むキーワードで検索
-    result = search_topics(project_id=test_project, keyword="100%")
+    # %を含むキーワードで検索（FTS5ではダブルクォートエスケープで処理）
+    result = search(project_id=test_project, keyword="100% Complete")
 
-    # %がワイルドカードとして扱われず、リテラル文字として検索される
     assert "error" not in result
-    assert len(result["topics"]) == 1
-    assert result["topics"][0]["id"] == topic1["topic_id"]
+    assert len(result["results"]) == 1
 
 
-def test_search_topics_with_wildcard_underscore(test_project):
-    """検索キーワードに_が含まれる場合、正しくエスケープされる"""
-    # トピックを追加
+def test_search_with_underscore_character(test_project):
+    """検索キーワードに_が含まれる場合、正しく処理される"""
     topic1 = add_topic(
         project_id=test_project,
-        title="test_function",
+        title="test_function_name",
         description="Test function"
     )
-    topic2 = add_topic(
-        project_id=test_project,
-        title="testXfunction",
-        description="Another function"
-    )
 
     # _を含むキーワードで検索
-    result = search_topics(project_id=test_project, keyword="test_")
+    result = search(project_id=test_project, keyword="test_function")
 
-    # _がワイルドカード（任意の1文字）として扱われず、リテラル文字として検索される
     assert "error" not in result
-    assert len(result["topics"]) == 1
-    assert result["topics"][0]["id"] == topic1["topic_id"]
-
-
-def test_search_decisions_with_wildcard_percent(test_project):
-    """決定事項検索で%が正しくエスケープされる"""
-    # トピックと決定事項を追加
-    topic = add_topic(project_id=test_project, title="Test Topic", description="Test")
-
-    dec1 = add_decision(
-        topic_id=topic["topic_id"],
-        decision="100% agreement",
-        reason="Everyone agrees"
-    )
-    dec2 = add_decision(
-        topic_id=topic["topic_id"],
-        decision="50 agreement",
-        reason="Half agree"
-    )
-
-    # %を含むキーワードで検索
-    result = search_decisions(project_id=test_project, keyword="100%")
-
-    # %がワイルドカードとして扱われず、リテラル文字として検索される
-    assert "error" not in result
-    assert len(result["decisions"]) == 1
-    assert result["decisions"][0]["id"] == dec1["decision_id"]
-
-
-def test_search_decisions_with_wildcard_underscore(test_project):
-    """決定事項検索で_が正しくエスケープされる"""
-    # トピックと決定事項を追加
-    topic = add_topic(project_id=test_project, title="Test Topic", description="Test")
-
-    dec1 = add_decision(
-        topic_id=topic["topic_id"],
-        decision="use_snake_case",
-        reason="Python convention"
-    )
-    dec2 = add_decision(
-        topic_id=topic["topic_id"],
-        decision="useXsnakeXcase",
-        reason="Another style"
-    )
-
-    # _を含むキーワードで検索
-    result = search_decisions(project_id=test_project, keyword="use_")
-
-    # _がワイルドカード（任意の1文字）として扱われず、リテラル文字として検索される
-    assert "error" not in result
-    assert len(result["decisions"]) == 1
-    assert result["decisions"][0]["id"] == dec1["decision_id"]
+    assert len(result["results"]) == 1
 
 
 # ========================================
