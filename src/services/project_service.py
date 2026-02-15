@@ -58,27 +58,23 @@ def add_project(
         }
 
 
-def get_projects() -> dict:
+def list_projects() -> dict:
     """
-    プロジェクト一覧を取得する（全件）。
+    プロジェクト一覧を取得する（id + name のみの軽量版）。
 
     Returns:
-        プロジェクト一覧
+        プロジェクト一覧（id, name）
     """
     try:
         rows = execute_query(
-            "SELECT * FROM projects ORDER BY created_at DESC, id DESC",
+            "SELECT id, name FROM projects ORDER BY created_at DESC, id DESC",
         )
 
         projects = []
         for row in rows:
-            project = row_to_dict(row)
             projects.append({
-                "id": project["id"],
-                "name": project["name"],
-                "description": project["description"],
-                "asana_url": project["asana_url"],
-                "created_at": project["created_at"],
+                "id": row["id"],
+                "name": row["name"],
             })
 
         return {"projects": projects}

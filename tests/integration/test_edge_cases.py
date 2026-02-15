@@ -4,7 +4,7 @@ import tempfile
 import sqlite3
 import pytest
 from src.db import init_database
-from src.services.project_service import add_project, get_projects
+from src.services.project_service import add_project, list_projects
 from src.services.topic_service import add_topic
 from src.services.search_service import search
 from src.services.decision_service import add_decision
@@ -59,10 +59,10 @@ def test_add_topic_foreign_key_violation(temp_db):
     assert result["error"]["code"] in ["CONSTRAINT_VIOLATION", "DATABASE_ERROR"]
 
 
-def test_get_projects_database_error_handling(temp_db):
+def test_list_projects_database_error_handling(temp_db):
     """データベースエラー時にDATABASE_ERRORが返る"""
     # 正常ケースでエラーが発生しないことを確認
-    result = get_projects()
+    result = list_projects()
     assert "error" not in result
     assert "projects" in result
 

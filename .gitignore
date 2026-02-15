@@ -49,3 +49,6 @@ htmlcov/
 
 # Git worktrees
 .trees/
+
+# Work files
+work/
