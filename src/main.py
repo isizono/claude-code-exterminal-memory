@@ -1,4 +1,5 @@
 """MCPサーバーのメインエントリーポイント"""
+import logging
 from fastmcp import FastMCP
 from typing import Literal, Optional
 from src.db import execute_query
@@ -12,6 +13,10 @@ from src.services import (
     knowledge_service,
 )
 
+logger = logging.getLogger(__name__)
+
+ACTIVE_PROJECT_DAYS = 7
+RECENT_TOPICS_LIMIT = 3
 DESC_MAX_LEN = 30
 
 
@@ -22,9 +27,10 @@ def _get_active_projects() -> list[dict]:
         SELECT DISTINCT p.id, p.name
         FROM projects p
         JOIN discussion_topics t ON p.id = t.project_id
-        WHERE t.created_at > datetime('now', '-7 days')
+        WHERE t.created_at > datetime('now', ? || ' days')
         ORDER BY p.id
-        """
+        """,
+        (f"-{ACTIVE_PROJECT_DAYS}",),
     )
     return [{"id": row["id"], "name": row["name"]} for row in rows]
 
@@ -37,9 +43,9 @@ def _get_recent_topics(project_id: int) -> list[dict]:
         FROM discussion_topics
         WHERE project_id = ?
         ORDER BY created_at DESC
-        LIMIT 3
+        LIMIT ?
         """,
-        (project_id,),
+        (project_id, RECENT_TOPICS_LIMIT),
     )
     results = []
     for row in rows:
@@ -91,6 +97,7 @@ def _build_active_context() -> str:
 
         return "\n".join(lines)
     except Exception:
+        logger.warning("Failed to build active context", exc_info=True)
         return ""
 
 
