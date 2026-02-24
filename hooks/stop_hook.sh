@@ -1,16 +1,12 @@
 #!/bin/bash
 #
-# Stopフック: 毎ターンの会話を自動でログに記録する
+# Stopフック: メタタグ・トピック管理の強制
 #
 # 処理フロー:
 # 1. メタタグチェック → なければblock
 # 2. トピック存在チェック → 存在しなければblock
 # 3. トピック変更チェック → 前topicにdecision/logなければblock
-# 4. approve + バックグラウンドでログ記録
-#
-# 無限ループ防止:
-#   record_log.py内でHaikuを呼ぶ際に --setting-sources "" を使用することで
-#   プロジェクト設定（フック含む）を無視し、Stopフックが再発火しないようにしている
+# 4. approve
 
 set -e
 
@@ -92,29 +88,6 @@ fi
 # 4. 現在のトピックを保存
 echo "$CURRENT_TOPIC" > "$PREV_TOPIC_FILE"
 
-# 5. ターン数カウント & 3ターンごとにsync_memory自動実行
-TURN_COUNT_FILE="${STATE_DIR}/turn_count_${SESSION_ID}"
-TURN_COUNT=$(cat "$TURN_COUNT_FILE" 2>/dev/null || echo "0")
-TURN_COUNT=$((TURN_COUNT + 1))
-echo "$TURN_COUNT" > "$TURN_COUNT_FILE"
-
-SYNC_REMINDER=""
-if [ $((TURN_COUNT % 3)) -eq 0 ]; then
-  # 3ターンごとにsync_memoryをバックグラウンドで実行
-  nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/sync_memory.py' '$TRANSCRIPT_PATH'" >> "$LOG_DIR/sync_memory.log" 2>&1 &
-  disown
-  SYNC_REMINDER="<!-- [sync_memory] ${TURN_COUNT}ターン経過。バックグラウンドでsync_memoryを実行中... -->"
-fi
-
-# 6. approve + バックグラウンドでログ記録
-# nohupで完全にデタッチして、親プロセスの終了を待たせない
-nohup bash -c "cd '$PROJECT_ROOT' && uv run python '$SCRIPT_DIR/record_log.py' '$TRANSCRIPT_PATH' '$CURRENT_TOPIC'" >> "$LOG_DIR/record_log.log" 2>&1 &
-disown
-
-# 7. 結果を出力
-if [ -n "$SYNC_REMINDER" ]; then
-  jq -n --arg reminder "$SYNC_REMINDER" '{decision: "approve", reason: $reminder}'
-else
-  echo '{"decision": "approve"}'
-fi
+# 5. approve
+echo '{"decision": "approve"}'
 exit 0
