@@ -28,7 +28,7 @@ if [ -f "$PENDING_FILE" ]; then
   rm -f "$PENDING_FILE"
 
   # additionalContextにリマインダーを注入
-  NUDGE_MSG="<system-reminder>The decision/topic recording tools (add_decision, add_topic) haven't been used recently. If there are any agreements, design choices, or noteworthy conclusions from the recent conversation, consider recording them with add_decision. Ignore if not applicable.</system-reminder>"
+  NUDGE_MSG="<system-reminder>Self-check before continuing: (1) Does your current topic still match the conversation? If the discussion has shifted, create a new topic with add_topic. (2) Have you and the user reached any agreements that should be recorded? Examples: design choices, naming conventions, scope boundaries, implementation approaches, or trade-off resolutions. If yes, record them now with add_decision before proceeding.</system-reminder>"
 
   jq -n --arg ctx "$NUDGE_MSG" '{
     "hookSpecificOutput": {
