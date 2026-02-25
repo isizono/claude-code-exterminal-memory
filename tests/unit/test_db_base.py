@@ -185,11 +185,9 @@ def test_insert_constraint_violation(temp_db):
     """制約違反の場合、例外が発生する"""
     service = TestTable()
 
-    with pytest.raises(sqlite3.Error) as exc_info:
+    with pytest.raises(sqlite3.IntegrityError):
         # nameはNOT NULL制約があるため、Noneを挿入するとエラー
         service._execute_insert({"name": None, "value": 1})
-
-    assert "INSERT実行エラー" in str(exc_info.value)
 
 
 def test_update_non_existing_id(temp_db):
