@@ -41,7 +41,7 @@ claude --plugin-dir /path/to/claude-code-memory
 
 | カテゴリ | ツール | 説明 |
 |---------|--------|------|
-| プロジェクト | `add_project`, `get_projects` | プロジェクト管理 |
+| サブジェクト | `add_subject`, `list_subjects` | サブジェクト管理 |
 | トピック | `add_topic`, `get_topics`, `get_decided_topics`, `get_undecided_topics`, `get_topic_tree`, `search_topics` | 議論トピック管理 |
 | ログ | `add_log`, `get_logs` | 議論ログ記録 |
 | 決定 | `add_decision`, `get_decisions`, `search_decisions` | 決定事項管理 |

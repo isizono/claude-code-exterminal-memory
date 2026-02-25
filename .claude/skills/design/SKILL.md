@@ -24,7 +24,7 @@ description: This skill determines implementation approach and technical decisio
 例: 「トピック検索機能」の設計を始める場合
 
 1. タスク一覧から [議論] タスクを探す
-   get_tasks(project_id=2)
+   get_tasks(subject_id=2)
    → { tasks: [{ id: 38, title: "[議論] トピック検索機能の要件整理", topic_id: 85, ... }] }
 
 2. そのタスクに紐づくトピックの決定事項を確認
@@ -55,7 +55,7 @@ description: This skill determines implementation approach and technical decisio
 
 1. 設計タスクを作成
    add_task(
-       project_id=2,
+       subject_id=2,
        title="[設計] トピック検索機能の方針決定",
        description="議論フェーズで決まったWhat/Why/Scope/Acceptanceをもとに、How/Interface/Edge cases/Verificationを決める"
    )
@@ -99,7 +99,7 @@ description: This skill determines implementation approach and technical decisio
 - 結果の並び順: created_at DESC（新しい順）
 
 【Interface】
-- MCPツール: search_topics(project_id: int, keyword: str, limit: int = 30)
+- MCPツール: search_topics(subject_id: int, keyword: str, limit: int = 30)
 - 戻り値: { topics: [{ id, title, description, parent_topic_id, created_at }, ...] }
 - エラー時: MCPの標準エラー形式で返す
 
@@ -108,7 +108,7 @@ description: This skill determines implementation approach and technical decisio
 - keywordが1文字 → 許可する（ただし結果が多くなる可能性あり）
 - 該当なし → 空配列を返す（エラーではない）
 - keywordに%や_が含まれる → エスケープしてリテラル検索する
-- project_idが存在しない → 空配列を返す（エラーではない）
+- subject_idが存在しない → 空配列を返す（エラーではない）
 
 【Verification】
 - 正常系
@@ -117,7 +117,7 @@ description: This skill determines implementation approach and technical decisio
   - descriptionに「自動記録」を含むトピック → 「自動記録」で検索してヒット
 - 異常系
   - 空文字で検索 → エラーが返る
-  - 存在しないproject_id=9999で検索 → 空配列が返る
+  - 存在しないsubject_id=9999で検索 → 空配列が返る
 - エッジケース
   - 「%」で検索 → %を含むトピックのみヒット（ワイルドカードとして解釈されない）
   - limit=1で検索 → 1件だけ返る
@@ -176,7 +176,7 @@ add_decision(
 
 2. 実装タスクを作成（背景情報を詳しく）
 add_task(
-    project_id=<該当プロジェクトID>,
+    subject_id=<該当サブジェクトID>,
     title="[実装] トピック検索機能",
     description="""
 ## 背景
@@ -190,7 +190,7 @@ add_task(
 - 結果の並び順: created_at DESC
 
 【Interface】
-- MCPツール: search_topics(project_id: int, keyword: str, limit: int = 30)
+- MCPツール: search_topics(subject_id: int, keyword: str, limit: int = 30)
 - 戻り値: { topics: [{ id, title, description, parent_topic_id, created_at }, ...] }
 
 【Edge cases】
@@ -198,7 +198,7 @@ add_task(
 - keywordが1文字 → 許可する（ただし結果が多くなる可能性あり）
 - 該当なし → 空配列を返す（エラーではない）
 - keywordに%や_が含まれる → エスケープしてリテラル検索する
-- project_idが存在しない → 空配列を返す（エラーではない）
+- subject_idが存在しない → 空配列を返す（エラーではない）
 
 【Verification】
 - 「hook」で検索 → hooks関連トピックがヒット
