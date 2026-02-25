@@ -23,7 +23,7 @@ description: This skill writes code following the design decisions. Use when des
 例: 「トピック検索機能」の実装を始める場合
 
 1. タスク一覧から [設計] タスクを探す
-   get_tasks(project_id=2)
+   get_tasks(subject_id=2)
    → { tasks: [{ id: 39, title: "[設計] トピック検索機能の方針決定", topic_id: 85, ... }] }
 
 2. そのタスクに紐づくトピックの決定事項を確認
@@ -47,7 +47,7 @@ description: This skill writes code following the design decisions. Use when des
 
 1. 実装タスクを作成
    add_task(
-       project_id=2,
+       subject_id=2,
        title="[実装] トピック検索機能の実装",
        description="設計フェーズで決めたHow/Interface/Edge cases/Verificationに従って実装する"
    )
@@ -55,7 +55,7 @@ description: This skill writes code following the design decisions. Use when des
 2. 設計フェーズの決定事項をユーザーに共有
    「設計フェーズで以下が決まってるね：
    - How: SQLiteのLIKE句、title/description検索、大文字小文字区別なし
-   - Interface: search_topics(project_id, keyword, limit=30)
+   - Interface: search_topics(subject_id, keyword, limit=30)
    - Edge cases: 空文字→エラー、該当なし→空配列、%や_→エスケープ
    - Verification: 「hook」検索でヒット確認、空文字でエラー確認、等
 
@@ -106,29 +106,29 @@ description: This skill writes code following the design decisions. Use when des
 
 【正常系】
 ✓ 「hook」で検索
-  入力: search_topics(project_id=2, keyword="hook")
+  入力: search_topics(subject_id=2, keyword="hook")
   出力: { topics: [{ id: 55, title: "Stopフック実装", ... }, { id: 58, title: "PostToolUseフック", ... }] }
   期待: hooks関連のトピックがヒットする → OK
 
 ✓ 「HOOK」で検索（大文字小文字無視の確認）
-  入力: search_topics(project_id=2, keyword="HOOK")
+  入力: search_topics(subject_id=2, keyword="HOOK")
   出力: { topics: [{ id: 55, title: "Stopフック実装", ... }, { id: 58, title: "PostToolUseフック", ... }] }
   期待: 「hook」と同じ結果 → OK
 
 【異常系】
 ✓ 空文字で検索
-  入力: search_topics(project_id=2, keyword="")
+  入力: search_topics(subject_id=2, keyword="")
   出力: エラー "keyword must not be empty"
   期待: エラーが返る → OK
 
-✓ 存在しないproject_idで検索
-  入力: search_topics(project_id=9999, keyword="test")
+✓ 存在しないsubject_idで検索
+  入力: search_topics(subject_id=9999, keyword="test")
   出力: { topics: [] }
   期待: 空配列が返る → OK
 
 【エッジケース】
 ✓ 「%」で検索（ワイルドカードエスケープの確認）
-  入力: search_topics(project_id=2, keyword="%")
+  入力: search_topics(subject_id=2, keyword="%")
   出力: { topics: [] }
   期待: %を含むトピックのみヒット（ワイルドカードとして解釈されない）→ OK（該当トピックなし）
 

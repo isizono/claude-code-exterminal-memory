@@ -15,7 +15,7 @@ description: セッション終了前にtranscriptを解析し、トピック・
 
 **アクション:**
 - セッション中に使ったトピックの `get_decisions(topic_id=...)` を実行し、直近の決定事項を取得
-- `get_tasks(project_id=..., status="pending")` で未完了タスクを取得
+- `get_tasks(subject_id=..., status="pending")` で未完了タスクを取得
 - 取得した既存データと会話内容を照合し、**既に記録済みの内容は記録しない**
 
 **重複の判定基準:**
