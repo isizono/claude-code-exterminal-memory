@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"import json, sys; from pathlib import Path; data = json.loads(sys.stdin.read()); sid = data.get('session_id', ''); (Path.home() / '.claude' / '.claude-code-memory' / 'state' / f'prev_topic_{sid}').unlink(missing_ok=True)\""
+            "command": "python3 -c \"import json, sys; from pathlib import Path; data = json.loads(sys.stdin.read()); sid = data.get('session_id', ''); sid_safe = sid.replace('/', '_'); state = Path.home() / '.claude' / '.claude-code-memory' / 'state'; (state / f'prev_topic_{sid}').unlink(missing_ok=True); (state / f'nudge_counter_{sid_safe}').unlink(missing_ok=True); (state / f'nudge_pending_{sid_safe}').unlink(missing_ok=True)\""
           }
         ]
       }
@@ -17,7 +17,27 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop_hook.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop_enforce_metatag.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/stop_nudge_record.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse_nudge_record.sh"
           }
         ]
       }
