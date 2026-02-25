@@ -161,6 +161,7 @@ description: This skill determines implementation approach and technical decisio
 設計で決まった内容はデシジョン（decision）として記録する。
 そのうえで、実装に必要な情報を実装タスク（`[実装]` プレフィックス付き）として作成する。
 実装タスクにはHow/Interface/Edge cases/Verification等の背景情報をなるべく詳しく書くこと。
+特にEdge casesは網羅的に記載すること（実装者が判断に迷わないレベルまで）。
 実装は別のAIが担う可能性が高く、原則としてタスクの情報だけを見て仕事をする。
 
 ```
@@ -175,7 +176,7 @@ add_decision(
 
 2. 実装タスクを作成（背景情報を詳しく）
 add_task(
-    project_id=2,
+    project_id=<該当プロジェクトID>,
     title="[実装] トピック検索機能",
     description="""
 ## 背景
@@ -193,9 +194,11 @@ add_task(
 - 戻り値: { topics: [{ id, title, description, parent_topic_id, created_at }, ...] }
 
 【Edge cases】
-- keywordが空文字 → エラー
-- 該当なし → 空配列
-- %や_を含む → エスケープしてリテラル検索
+- keywordが空文字 → エラーを返す（全件取得はget_topicsを使う）
+- keywordが1文字 → 許可する（ただし結果が多くなる可能性あり）
+- 該当なし → 空配列を返す（エラーではない）
+- keywordに%や_が含まれる → エスケープしてリテラル検索する
+- project_idが存在しない → 空配列を返す（エラーではない）
 
 【Verification】
 - 「hook」で検索 → hooks関連トピックがヒット
