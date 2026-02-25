@@ -164,6 +164,9 @@ def execute_insert(query: str, params: tuple = ()) -> int:
         cursor = conn.execute(query, params)
         conn.commit()
         return cursor.lastrowid
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise
     except sqlite3.Error as e:
         conn.rollback()
         raise sqlite3.Error(f"INSERT実行エラー: {e}") from e

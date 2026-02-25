@@ -42,7 +42,7 @@ def test_add_subject_duplicate_name(temp_db):
     # 2つ目はエラー
     result2 = add_subject(name="duplicate-test", description="Test description")
     assert "error" in result2
-    assert result2["error"]["code"] == "DATABASE_ERROR"
+    assert result2["error"]["code"] == "CONSTRAINT_VIOLATION"
 
 
 def test_list_subjects_includes_initial_data(temp_db):

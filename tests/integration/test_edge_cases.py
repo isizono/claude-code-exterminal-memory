@@ -44,7 +44,7 @@ def test_add_subject_unique_constraint_violation(temp_db):
     # 同じ名前で2つ目のサブジェクトを追加（UNIQUE制約違反）
     result2 = add_subject(name="unique-subject", description="Second")
     assert "error" in result2
-    assert result2["error"]["code"] == "DATABASE_ERROR"
+    assert result2["error"]["code"] == "CONSTRAINT_VIOLATION"
     assert "UNIQUE" in result2["error"]["message"] or "unique" in result2["error"]["message"].lower()
 
 

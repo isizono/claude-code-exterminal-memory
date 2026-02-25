@@ -15,7 +15,7 @@ from src.services import (
 
 logger = logging.getLogger(__name__)
 
-ACTIVE_PROJECT_DAYS = 7
+ACTIVE_SUBJECT_DAYS = 7
 RECENT_TOPICS_LIMIT = 3
 DESC_MAX_LEN = 30
 
@@ -30,7 +30,7 @@ def _get_active_subjects() -> list[dict]:
         WHERE t.created_at > datetime('now', ? || ' days')
         ORDER BY s.id
         """,
-        (f"-{ACTIVE_PROJECT_DAYS}",),
+        (f"-{ACTIVE_SUBJECT_DAYS}",),
     )
     return [{"id": row["id"], "name": row["name"]} for row in rows]
 

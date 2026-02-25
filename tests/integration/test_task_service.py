@@ -59,8 +59,8 @@ class TestAddTask:
         )
 
         assert "error" in result
-        # FK制約違反はDATABASE_ERRORとして返される
-        assert result["error"]["code"] == "DATABASE_ERROR"
+        # FK制約違反はCONSTRAINT_VIOLATIONとして返される
+        assert result["error"]["code"] == "CONSTRAINT_VIOLATION"
 
 
 class TestGetTasks:
