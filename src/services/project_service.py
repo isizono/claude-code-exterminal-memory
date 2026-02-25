@@ -79,13 +79,6 @@ def list_projects() -> dict:
 
         return {"projects": projects}
 
-    except sqlite3.IntegrityError as e:
-        return {
-            "error": {
-                "code": "CONSTRAINT_VIOLATION",
-                "message": str(e),
-            }
-        }
     except Exception as e:
         return {
             "error": {

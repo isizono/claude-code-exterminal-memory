@@ -1,5 +1,4 @@
 """FTS5統合検索サービス"""
-import sqlite3
 from typing import Optional
 from src.db import execute_query, row_to_dict
 
@@ -95,13 +94,6 @@ def search(
 
         return {"results": results, "total_count": len(results)}
 
-    except sqlite3.IntegrityError as e:
-        return {
-            "error": {
-                "code": "CONSTRAINT_VIOLATION",
-                "message": str(e),
-            }
-        }
     except Exception as e:
         return {
             "error": {
@@ -180,13 +172,6 @@ def get_by_id(type: str, id: int) -> dict:
 
         return {"type": type, "data": _format_row(type, row_to_dict(rows[0]))}
 
-    except sqlite3.IntegrityError as e:
-        return {
-            "error": {
-                "code": "CONSTRAINT_VIOLATION",
-                "message": str(e),
-            }
-        }
     except Exception as e:
         return {
             "error": {
