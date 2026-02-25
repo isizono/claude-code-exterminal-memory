@@ -158,44 +158,50 @@ description: This skill determines implementation approach and technical decisio
 
 ## 成果物
 
-設計で決まった内容を、トピックに紐づく決定事項（decision）として記録する。
+設計で決まった内容はデシジョン（decision）として記録する。
+そのうえで、実装に必要な情報を実装タスク（`[実装]` プレフィックス付き）として作成する。
+実装タスクにはHow/Interface/Edge cases/Verification等の背景情報をなるべく詳しく書くこと。
+実装は別のAIが担う可能性が高く、原則としてタスクの情報だけを見て仕事をする。
 
 ```
 例: 「トピック検索機能」の設計完了時
 
+1. デシジョンを記録（合意内容と理由）
 add_decision(
     topic_id=85,
-    decision="""【How】
+    decision="トピック検索はSQLiteのLIKE句で実装する。検索対象はtitle/description、大文字小文字区別なし。全文検索（FTS5等）はスコープ外。",
+    reason="LIKE句はシンプルで十分な性能。現時点のトピック数では全文検索エンジンは過剰。"
+)
+
+2. 実装タスクを作成（背景情報を詳しく）
+add_task(
+    project_id=2,
+    title="[実装] トピック検索機能",
+    description="""
+## 背景
+- 関連topic: id:85, decisions: id:XXX
+
+## 仕様
+【How】
 - SQLiteのLIKE句を使用（%keyword%形式）
 - 検索対象カラム: title, description
-- 大文字小文字: SQLiteデフォルトのCOLLATE NOCASEで区別しない
-- 検索ロジック: titleまたはdescriptionのいずれかにマッチすればヒット
-- 結果の並び順: created_at DESC（新しい順）
+- 大文字小文字: COLLATE NOCASEで区別しない
+- 結果の並び順: created_at DESC
 
 【Interface】
 - MCPツール: search_topics(project_id: int, keyword: str, limit: int = 30)
 - 戻り値: { topics: [{ id, title, description, parent_topic_id, created_at }, ...] }
-- エラー時: MCPの標準エラー形式で返す
 
 【Edge cases】
-- keywordが空文字 → エラーを返す（全件取得はget_topicsを使う）
-- keywordが1文字 → 許可する（ただし結果が多くなる可能性あり）
-- 該当なし → 空配列を返す（エラーではない）
-- keywordに%や_が含まれる → エスケープしてリテラル検索する
-- project_idが存在しない → 空配列を返す（エラーではない）
+- keywordが空文字 → エラー
+- 該当なし → 空配列
+- %や_を含む → エスケープしてリテラル検索
 
 【Verification】
-- 正常系
-  - 「hook」で検索 → 「Stopフック実装」「PostToolUseフック」等がヒット
-  - 「HOOK」で検索 → 同じ結果（大文字小文字無視の確認）
-  - descriptionに「自動記録」を含むトピック → 「自動記録」で検索してヒット
-- 異常系
-  - 空文字で検索 → エラーが返る
-  - 存在しないproject_id=9999で検索 → 空配列が返る
-- エッジケース
-  - 「%」で検索 → %を含むトピックのみヒット（ワイルドカードとして解釈されない）
-  - limit=1で検索 → 1件だけ返る""",
-    reason="SQLiteのLIKE句はシンプルで十分な性能。全文検索エンジン（FTS5等）は今回のスコープ外。大文字小文字の区別はユーザー体験として不要と判断。"
+- 「hook」で検索 → hooks関連トピックがヒット
+- 「HOOK」で検索 → 同じ結果（大文字小文字無視）
+- 空文字で検索 → エラー
+"""
 )
 ```
 
@@ -210,8 +216,8 @@ add_decision(
 - [ ] 必須項目（How/Interface/Edge cases/Verification）がすべて明確になっている
 - [ ] 該当する場合、Non-functional要件も記録されている
 - [ ] ユーザーの承認を得ている
-- [ ] add_decision()で記録済み
-- [ ] 実装フェーズに必要な情報が揃っている
+- [ ] add_decision()で合意内容を記録済み
+- [ ] add_task()で実装タスク（`[実装]`プレフィックス付き）を作成済み
 
 ## フェーズの巻き戻し
 
