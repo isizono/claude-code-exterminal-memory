@@ -1,2 +1,3 @@
 fastmcp
 pytest>=7.4.0
+yoyo-migrations
