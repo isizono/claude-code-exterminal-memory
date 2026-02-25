@@ -5,7 +5,7 @@ from src.db import execute_insert, execute_query, row_to_dict
 
 
 def add_topic(
-    project_id: int,
+    subject_id: int,
     title: str,
     description: str,
     parent_topic_id: Optional[int] = None,
@@ -14,7 +14,7 @@ def add_topic(
     新しい議論トピックを追加する。
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         title: トピックのタイトル
         description: トピックの説明（必須）
         parent_topic_id: 親トピックのID（未指定なら最上位トピック）
@@ -24,8 +24,8 @@ def add_topic(
     """
     try:
         topic_id = execute_insert(
-            "INSERT INTO discussion_topics (project_id, title, description, parent_topic_id) VALUES (?, ?, ?, ?)",
-            (project_id, title, description, parent_topic_id),
+            "INSERT INTO discussion_topics (subject_id, title, description, parent_topic_id) VALUES (?, ?, ?, ?)",
+            (subject_id, title, description, parent_topic_id),
         )
 
         # 作成したトピックを取得
@@ -36,7 +36,7 @@ def add_topic(
             topic = row_to_dict(rows[0])
             return {
                 "topic_id": topic["id"],
-                "project_id": topic["project_id"],
+                "subject_id": topic["subject_id"],
                 "title": topic["title"],
                 "description": topic["description"],
                 "parent_topic_id": topic["parent_topic_id"],
@@ -62,14 +62,14 @@ def add_topic(
 
 
 def get_topics(
-    project_id: int,
+    subject_id: int,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
     """
     指定した親トピックの直下の子トピックを取得する（1階層・全件）。
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         parent_topic_id: 親トピックのID（未指定なら最上位トピックのみ取得）
 
     Returns:
@@ -80,19 +80,19 @@ def get_topics(
             rows = execute_query(
                 """
                 SELECT * FROM discussion_topics
-                WHERE project_id = ? AND parent_topic_id IS NULL
+                WHERE subject_id = ? AND parent_topic_id IS NULL
                 ORDER BY created_at ASC, id ASC
                 """,
-                (project_id,),
+                (subject_id,),
             )
         else:
             rows = execute_query(
                 """
                 SELECT * FROM discussion_topics
-                WHERE project_id = ? AND parent_topic_id = ?
+                WHERE subject_id = ? AND parent_topic_id = ?
                 ORDER BY created_at ASC, id ASC
                 """,
-                (project_id, parent_topic_id),
+                (subject_id, parent_topic_id),
             )
 
         topics = []
@@ -100,7 +100,7 @@ def get_topics(
             topic = row_to_dict(row)
             topics.append({
                 "id": topic["id"],
-                "project_id": topic["project_id"],
+                "subject_id": topic["subject_id"],
                 "title": topic["title"],
                 "description": topic["description"],
                 "parent_topic_id": topic["parent_topic_id"],
@@ -123,5 +123,3 @@ def get_topics(
                 "message": str(e),
             }
         }
-
-
