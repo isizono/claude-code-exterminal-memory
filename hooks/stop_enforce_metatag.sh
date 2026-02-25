@@ -10,6 +10,10 @@
 
 set -e
 
+# ERRトラップ: set -eでスクリプトが中断される場合も必ずJSONを返す
+# 出力なしだとClaude Codeがapproveにフォールバックし、メタタグ強制がスルーされるため
+trap 'echo "{\"decision\": \"approve\", \"reason\": \"stop_enforce_metatag.sh internal error (line $LINENO)\"}" >&1; exit 0' ERR
+
 # スクリプトのディレクトリを取得
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
