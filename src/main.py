@@ -134,10 +134,19 @@ Splitting topics later is far harder than splitting them upfront.
 When the conversation shifts to a different subject, create a new topic instead of overloading the existing one.
 Pay close attention to whether the conversation has shifted to a different subject. Always!
 
+If no existing topic fits, proactively create a new one using `add_topic`.
+This includes one-off or transient conversations — every response needs a valid topic,
+so create one even for short-lived discussions.
+
 The stop hook detects meta tags to track the current topic.
 If you don't output a meta tag, or output one with a wrong ID, your response will be blocked.
-So don't be lazy — review the current topic and output the correct meta tag.
-If no existing topic fits, proactively create a new one.
+
+**Procedure for outputting a meta tag:**
+1. Determine which topic this response belongs to.
+2. If no existing topic fits, call `add_topic` FIRST and obtain the returned topic ID.
+3. Output the meta tag at the end of your response using the confirmed (existing or newly created) topic ID.
+
+Never guess or predict a topic ID — only use IDs that already exist or that `add_topic` has just returned.
 
 Meta tag format: `<!-- [meta] subject: <name> (id: <N>) | topic: <name> (id: <M>) -->`
 
