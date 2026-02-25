@@ -1,6 +1,6 @@
 ---
 name: discussion
-description: This skill clarifies user requirements and removes ambiguity before design/implementation phases. This skill should be used when the user asks to "discuss requirements", "clarify what we're building", "talk about this feature", "decide on the scope", "要件を整理したい", "話し合いたい", "何を作るか決めたい", "仕様を固めたい", "implement X", "build X feature", "こういう機能がほしい", "〇〇を実装したい", "こう考えてるんだけど", "こういう事があるんだけど", "相談なんだけど", or when What/Why/Scope are not yet defined.
+description: This skill clarifies user requirements and removes ambiguity before design/implementation phases. Use when What/Why/Scope are not yet defined, or when working on a cc-memory task with [議論] prefix.
 ---
 
 # Discussion Skill

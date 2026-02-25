@@ -1,6 +1,6 @@
 ---
 name: implementation
-description: This skill writes code following the design decisions. This skill should be used when design decisions (How/Interface/Edge cases) are already recorded and the user asks "let's implement this", "コード書こう", "実装しよう", "作って", or when transitioning from design phase to coding.
+description: This skill writes code following the design decisions. Use when design decisions are already recorded and code needs to be written, or when working on a cc-memory task with [実装] prefix.
 ---
 
 # 実装フェーズ Skill
