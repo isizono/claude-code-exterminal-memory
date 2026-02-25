@@ -6,7 +6,7 @@ Usage:
     python parse_meta_tag.py <transcript_path>
 
 Output (JSON):
-    {"found": true, "project_id": 2, "topic_id": 55}
+    {"found": true, "subject_id": 2, "topic_id": 55}
     or
     {"found": false}
 """
@@ -74,16 +74,16 @@ def parse_meta_tag(text: str) -> dict | None:
     テキストからメタタグをパースする。
 
     フォーマット:
-    <!-- [meta] project: xxx (id: 2) | topic: yyy (id: 55) -->
+    <!-- [meta] subject: xxx (id: 2) | topic: yyy (id: 55) -->
     """
     # HTMLコメント形式のメタタグを探す
-    pattern = r'<!--\s*\[meta\]\s*project:\s*[^(]+\(id:\s*(\d+)\)\s*\|\s*topic:\s*[^(]+\(id:\s*(\d+)\)\s*-->'
+    pattern = r'<!--\s*\[meta\]\s*subject:\s*[^(]+\(id:\s*(\d+)\)\s*\|\s*topic:\s*[^(]+\(id:\s*(\d+)\)\s*-->'
     match = re.search(pattern, text)
 
     if match:
         return {
             "found": True,
-            "project_id": int(match.group(1)),
+            "subject_id": int(match.group(1)),
             "topic_id": int(match.group(2)),
         }
 
