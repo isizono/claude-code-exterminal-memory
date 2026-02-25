@@ -3,9 +3,12 @@ import sqlite3
 import os
 import logging
 from pathlib import Path
-from typing import Optional
+
+from yoyo import get_backend, read_migrations
 
 logger = logging.getLogger(__name__)
+
+MIGRATIONS_DIR = Path(__file__).parent.parent / "migrations"
 
 
 def get_db_path() -> str:
@@ -30,21 +33,22 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _apply_migrations() -> None:
+    """yoyoマイグレーションを適用する"""
+    db_path = get_db_path()
+    backend = get_backend(f"sqlite:///{db_path}")
+    migrations = read_migrations(str(MIGRATIONS_DIR))
+
+    with backend.lock():
+        backend.apply_migrations(backend.to_apply(migrations))
+
+
 def init_database() -> None:
-    """データベースを初期化する（スキーマ適用と初期データ投入）"""
-    schema_path = Path(__file__).parent.parent / "schema.sql"
-
-    if not schema_path.exists():
-        raise FileNotFoundError(f"Schema file not found: {schema_path}")
-
-    with open(schema_path, "r", encoding="utf-8") as f:
-        schema_sql = f.read()
+    """データベースを初期化する（マイグレーション適用と初期データ投入）"""
+    _apply_migrations()
 
     conn = get_connection()
     try:
-        conn.executescript(schema_sql)
-        conn.commit()
-
         # 初期データの投入（既存データがある場合は挿入しない）
         # nameのUNIQUE制約を活用してIDハードコードを避ける
         conn.execute(
