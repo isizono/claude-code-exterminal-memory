@@ -1,6 +1,6 @@
 ---
 name: design
-description: This skill determines implementation approach and technical decisions. This skill should be used when design decisions (How/Interface/Edge cases) are missing before implementation, when the user asks "how should we build this?", "どう実装する？", "方針決めよう", or after discussion phase is complete but before coding starts.
+description: This skill determines implementation approach and technical decisions. Use when How/Interface/Edge cases need decisions, or when working on a cc-memory task with [設計] prefix.
 ---
 
 # 設計フェーズ Skill

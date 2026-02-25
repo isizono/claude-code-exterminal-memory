@@ -134,6 +134,11 @@ Work proceeds through three distinct phases: **discussion**, **design**, and **i
 Do not mix phases — complete the current phase and get user confirmation before moving to the next.
 Task names should reflect their phase with a prefix: `[議論]`, `[設計]`, `[実装]`.
 
+When working on a task listed under "進行中タスク", use the corresponding skill based on the prefix:
+- `[議論]` → use the `discussion` skill
+- `[設計]` → use the `design` skill
+- `[実装]` → use the `implementation` skill
+
 ## Meta Tag
 
 You must output a meta tag at the end of every response. This tag is used by the stop hook
