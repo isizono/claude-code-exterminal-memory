@@ -13,6 +13,7 @@ Conventional Commits形式（scopeなし）。typeは英語、subjectは日本�
 ## ブランチ戦略
 
 - main直push禁止（pre-pushフックで防止）
-- ブランチは必ずorigin/mainの最新から切る
+- ブランチ作業は必ずgit worktreeで行うこと（作業ディレクトリで直接checkoutしない）
 - worktreeは`.trees/`配下に作成する
+- ブランチは必ずorigin/mainの最新から切る
 - 命名: `feature/<要約>`, `fix/<要約>`, `docs/<要約>`（英語ケバブケース）
