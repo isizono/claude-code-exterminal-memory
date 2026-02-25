@@ -8,4 +8,7 @@
 
 set -e
 
+# ERRトラップ: エラー時も必ずJSONを返す
+trap 'echo "{\"decision\": \"approve\"}" >&1; exit 0' ERR
+
 echo '{"decision": "approve", "message": "決定事項を記録しました。関連するタスクの追加はありますか？（add_taskで追加できます）"}'
