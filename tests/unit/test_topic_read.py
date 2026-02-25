@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.services.project_service import add_project
+from src.services.subject_service import add_subject
 from src.services.topic_service import (
     add_topic,
     get_topics,
@@ -26,10 +26,10 @@ def temp_db():
 
 
 @pytest.fixture
-def test_project(temp_db):
-    """テスト用プロジェクトを作成する"""
-    result = add_project(name="test-project", description="Test project")
-    return result["project_id"]
+def test_subject(temp_db):
+    """テスト用サブジェクトを作成する"""
+    result = add_subject(name="test-subject", description="Test subject")
+    return result["subject_id"]
 
 
 # ========================================
@@ -37,22 +37,22 @@ def test_project(temp_db):
 # ========================================
 
 
-def test_get_topics_empty(test_project):
+def test_get_topics_empty(test_subject):
     """トピックが存在しない場合、空の配列が返る"""
-    result = get_topics(project_id=test_project)
+    result = get_topics(subject_id=test_subject)
 
     assert "error" not in result
     assert result["topics"] == []
 
 
-def test_get_topics_root_level(test_project):
+def test_get_topics_root_level(test_subject):
     """最上位トピックを取得できる"""
     # 最上位トピックを3つ作成
-    topic1 = add_topic(project_id=test_project, title="Topic 1", description="Test description")
-    topic2 = add_topic(project_id=test_project, title="Topic 2", description="Test description")
-    topic3 = add_topic(project_id=test_project, title="Topic 3", description="Test description")
+    topic1 = add_topic(subject_id=test_subject, title="Topic 1", description="Test description")
+    topic2 = add_topic(subject_id=test_subject, title="Topic 2", description="Test description")
+    topic3 = add_topic(subject_id=test_subject, title="Topic 3", description="Test description")
 
-    result = get_topics(project_id=test_project)
+    result = get_topics(subject_id=test_subject)
 
     assert "error" not in result
     assert len(result["topics"]) == 3
@@ -61,26 +61,26 @@ def test_get_topics_root_level(test_project):
     assert result["topics"][2]["id"] == topic3["topic_id"]
 
 
-def test_get_topics_child_level(test_project):
+def test_get_topics_child_level(test_subject):
     """子トピックを取得できる"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="Parent", description="Test description")
+    parent = add_topic(subject_id=test_subject, title="Parent", description="Test description")
 
     # 子トピックを2つ作成
     child1 = add_topic(
-        project_id=test_project,
+        subject_id=test_subject,
         title="Child 1",
         description="Test description",
         parent_topic_id=parent["topic_id"],
     )
     child2 = add_topic(
-        project_id=test_project,
+        subject_id=test_subject,
         title="Child 2",
         description="Test description",
         parent_topic_id=parent["topic_id"],
     )
 
-    result = get_topics(project_id=test_project, parent_topic_id=parent["topic_id"])
+    result = get_topics(subject_id=test_subject, parent_topic_id=parent["topic_id"])
 
     assert "error" not in result
     assert len(result["topics"]) == 2
@@ -94,18 +94,18 @@ def test_get_topics_child_level(test_project):
 # ========================================
 
 
-def test_get_logs_empty(test_project):
+def test_get_logs_empty(test_subject):
     """ログが存在しない場合、空の配列が返る"""
-    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="Topic", description="Test description")
     result = get_logs(topic_id=topic["topic_id"])
 
     assert "error" not in result
     assert result["logs"] == []
 
 
-def test_get_logs_multiple(test_project):
+def test_get_logs_multiple(test_subject):
     """複数のログを取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="Topic", description="Test description")
 
     # 3つのログを追加
     log1 = add_log(topic_id=topic["topic_id"], content="Log 1")
@@ -122,9 +122,9 @@ def test_get_logs_multiple(test_project):
     assert result["logs"][2]["id"] == log3["log_id"]
 
 
-def test_get_logs_with_pagination(test_project):
+def test_get_logs_with_pagination(test_subject):
     """ページネーションで取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="Topic", description="Test description")
 
     # 5つのログを追加
     logs = []
@@ -151,18 +151,18 @@ def test_get_logs_with_pagination(test_project):
 # ========================================
 
 
-def test_get_decisions_empty(test_project):
+def test_get_decisions_empty(test_subject):
     """決定事項が存在しない場合、空の配列が返る"""
-    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="Topic", description="Test description")
     result = get_decisions(topic_id=topic["topic_id"])
 
     assert "error" not in result
     assert result["decisions"] == []
 
 
-def test_get_decisions_multiple(test_project):
+def test_get_decisions_multiple(test_subject):
     """複数の決定事項を取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="Topic", description="Test description")
 
     # 3つの決定事項を追加
     dec1 = add_decision(
@@ -191,9 +191,9 @@ def test_get_decisions_multiple(test_project):
     assert result["decisions"][2]["id"] == dec3["decision_id"]
 
 
-def test_get_decisions_with_pagination(test_project):
+def test_get_decisions_with_pagination(test_subject):
     """ページネーションで取得できる"""
-    topic = add_topic(project_id=test_project, title="Topic", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="Topic", description="Test description")
 
     # 5つの決定事項を追加
     decisions = []

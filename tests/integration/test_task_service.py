@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from src.db import init_database, execute_query
-from src.services.project_service import add_project
+from src.services.subject_service import add_subject
 from src.services.task_service import add_task, get_tasks, update_task_status
 
 
@@ -20,15 +20,15 @@ def temp_db():
 
 
 @pytest.fixture
-def project_with_task(temp_db):
-    """プロジェクトとタスクを作成するフィクスチャ"""
-    project = add_project(name="test-project", description="Test Project")
+def subject_with_task(temp_db):
+    """サブジェクトとタスクを作成するフィクスチャ"""
+    subject = add_subject(name="test-subject", description="Test Subject")
     task = add_task(
-        project_id=project["project_id"],
+        subject_id=subject["subject_id"],
         title="Test Task",
         description="This is a test task"
     )
-    return {"project": project, "task": task}
+    return {"subject": subject, "task": task}
 
 
 class TestAddTask:
@@ -36,9 +36,9 @@ class TestAddTask:
 
     def test_add_task_success(self, temp_db):
         """タスクの追加が成功する"""
-        project = add_project(name="test-project", description="Test")
+        subject = add_subject(name="test-subject", description="Test")
         result = add_task(
-            project_id=project["project_id"],
+            subject_id=subject["subject_id"],
             title="New Task",
             description="Task description"
         )
@@ -50,10 +50,10 @@ class TestAddTask:
         assert result["status"] == "pending"
         assert result["topic_id"] is None
 
-    def test_add_task_invalid_project(self, temp_db):
-        """存在しないプロジェクトIDでエラーになる"""
+    def test_add_task_invalid_subject(self, temp_db):
+        """存在しないサブジェクトIDでエラーになる"""
         result = add_task(
-            project_id=9999,
+            subject_id=9999,
             title="Task",
             description="Description"
         )
@@ -68,8 +68,8 @@ class TestGetTasks:
 
     def test_get_tasks_empty(self, temp_db):
         """タスクが存在しない場合、空のリストが返る"""
-        project = add_project(name="test-project", description="Test")
-        result = get_tasks(project_id=project["project_id"], status="pending")
+        subject = add_subject(name="test-subject", description="Test")
+        result = get_tasks(subject_id=subject["subject_id"], status="pending")
 
         assert "error" not in result
         assert result["tasks"] == []
@@ -77,18 +77,18 @@ class TestGetTasks:
 
     def test_get_tasks_with_status_filter(self, temp_db):
         """ステータスでフィルタできる"""
-        project = add_project(name="test-project", description="Test")
-        pid = project["project_id"]
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
 
-        add_task(project_id=pid, title="Task 1", description="Desc 1")
-        task2 = add_task(project_id=pid, title="Task 2", description="Desc 2")
-        add_task(project_id=pid, title="Task 3", description="Desc 3")
+        add_task(subject_id=sid, title="Task 1", description="Desc 1")
+        task2 = add_task(subject_id=sid, title="Task 2", description="Desc 2")
+        add_task(subject_id=sid, title="Task 3", description="Desc 3")
 
         # Task 2をin_progressに変更
         update_task_status(task2["task_id"], "in_progress")
 
         # in_progressでフィルタ
-        result = get_tasks(project_id=pid, status="in_progress")
+        result = get_tasks(subject_id=sid, status="in_progress")
 
         assert len(result["tasks"]) == 1
         assert result["tasks"][0]["title"] == "Task 2"
@@ -96,18 +96,18 @@ class TestGetTasks:
 
     def test_get_tasks_default_status_is_in_progress(self, temp_db):
         """statusなしで呼んだらin_progressのみ返る"""
-        project = add_project(name="test-project", description="Test")
-        pid = project["project_id"]
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
 
         # pending x2, in_progress x1 を作成
-        add_task(project_id=pid, title="Pending 1", description="Desc")
-        task_ip = add_task(project_id=pid, title="In Progress 1", description="Desc")
-        add_task(project_id=pid, title="Pending 2", description="Desc")
+        add_task(subject_id=sid, title="Pending 1", description="Desc")
+        task_ip = add_task(subject_id=sid, title="In Progress 1", description="Desc")
+        add_task(subject_id=sid, title="Pending 2", description="Desc")
 
         update_task_status(task_ip["task_id"], "in_progress")
 
         # statusを指定せずに呼び出し → デフォルトでin_progressのみ
-        result = get_tasks(project_id=pid)
+        result = get_tasks(subject_id=sid)
 
         assert "error" not in result
         assert len(result["tasks"]) == 1
@@ -116,28 +116,28 @@ class TestGetTasks:
 
     def test_get_tasks_limit(self, temp_db):
         """limitが正しく動作する（タスク10件作成、limit=3で3件のみ返る）"""
-        project = add_project(name="test-project", description="Test")
-        pid = project["project_id"]
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
 
         # pending状態のタスクを10件作成
         for i in range(10):
-            add_task(project_id=pid, title=f"Task {i}", description=f"Desc {i}")
+            add_task(subject_id=sid, title=f"Task {i}", description=f"Desc {i}")
 
-        result = get_tasks(project_id=pid, status="pending", limit=3)
+        result = get_tasks(subject_id=sid, status="pending", limit=3)
 
         assert "error" not in result
         assert len(result["tasks"]) == 3
 
     def test_get_tasks_total_count(self, temp_db):
         """total_countが正しい全件数を返す"""
-        project = add_project(name="test-project", description="Test")
-        pid = project["project_id"]
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
 
         # pending状態のタスクを5件作成
         for i in range(5):
-            add_task(project_id=pid, title=f"Task {i}", description=f"Desc {i}")
+            add_task(subject_id=sid, title=f"Task {i}", description=f"Desc {i}")
 
-        result = get_tasks(project_id=pid, status="pending")
+        result = get_tasks(subject_id=sid, status="pending")
 
         assert "error" not in result
         assert result["total_count"] == 5
@@ -145,14 +145,14 @@ class TestGetTasks:
 
     def test_get_tasks_total_count_exceeds_limit(self, temp_db):
         """limit超過時にtotal_countは全件数、tasksはlimit分のみ"""
-        project = add_project(name="test-project", description="Test")
-        pid = project["project_id"]
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
 
         # pending状態のタスクを8件作成
         for i in range(8):
-            add_task(project_id=pid, title=f"Task {i}", description=f"Desc {i}")
+            add_task(subject_id=sid, title=f"Task {i}", description=f"Desc {i}")
 
-        result = get_tasks(project_id=pid, status="pending", limit=3)
+        result = get_tasks(subject_id=sid, status="pending", limit=3)
 
         assert "error" not in result
         assert result["total_count"] == 8  # 全件数
@@ -161,24 +161,24 @@ class TestGetTasks:
 
     def test_get_tasks_invalid_limit_zero(self, temp_db):
         """limit=0でINVALID_PARAMETERエラーになる"""
-        project = add_project(name="test-project", description="Test")
-        result = get_tasks(project_id=project["project_id"], status="pending", limit=0)
+        subject = add_subject(name="test-subject", description="Test")
+        result = get_tasks(subject_id=subject["subject_id"], status="pending", limit=0)
 
         assert "error" in result
         assert result["error"]["code"] == "INVALID_PARAMETER"
 
     def test_get_tasks_invalid_limit_negative(self, temp_db):
         """limit=-1でINVALID_PARAMETERエラーになる"""
-        project = add_project(name="test-project", description="Test")
-        result = get_tasks(project_id=project["project_id"], status="pending", limit=-1)
+        subject = add_subject(name="test-subject", description="Test")
+        result = get_tasks(subject_id=subject["subject_id"], status="pending", limit=-1)
 
         assert "error" in result
         assert result["error"]["code"] == "INVALID_PARAMETER"
 
     def test_get_tasks_invalid_status(self, temp_db):
         """無効なstatusでINVALID_STATUSエラーになる"""
-        project = add_project(name="test-project", description="Test")
-        result = get_tasks(project_id=project["project_id"], status="invalid_status")
+        subject = add_subject(name="test-subject", description="Test")
+        result = get_tasks(subject_id=subject["subject_id"], status="invalid_status")
 
         assert "error" in result
         assert result["error"]["code"] == "INVALID_STATUS"
@@ -187,26 +187,26 @@ class TestGetTasks:
 class TestUpdateTaskStatus:
     """update_task_statusの統合テスト"""
 
-    def test_update_status_to_in_progress(self, project_with_task):
+    def test_update_status_to_in_progress(self, subject_with_task):
         """ステータスをin_progressに更新できる"""
-        task = project_with_task["task"]
+        task = subject_with_task["task"]
         result = update_task_status(task["task_id"], "in_progress")
 
         assert "error" not in result
         assert result["status"] == "in_progress"
         assert result["topic_id"] is None  # blockedじゃないのでtopic_idはNoneのまま
 
-    def test_update_status_to_completed(self, project_with_task):
+    def test_update_status_to_completed(self, subject_with_task):
         """ステータスをcompletedに更新できる"""
-        task = project_with_task["task"]
+        task = subject_with_task["task"]
         result = update_task_status(task["task_id"], "completed")
 
         assert "error" not in result
         assert result["status"] == "completed"
 
-    def test_update_status_invalid(self, project_with_task):
+    def test_update_status_invalid(self, subject_with_task):
         """無効なステータスでエラーになる"""
-        task = project_with_task["task"]
+        task = subject_with_task["task"]
         result = update_task_status(task["task_id"], "invalid_status")
 
         assert "error" in result
@@ -223,18 +223,18 @@ class TestUpdateTaskStatus:
 class TestBlockedStatusWithTopicCreation:
     """blockedステータス変更時のトピック自動作成の統合テスト"""
 
-    def test_blocked_creates_topic(self, project_with_task):
+    def test_blocked_creates_topic(self, subject_with_task):
         """blockedに変更するとトピックが自動作成される"""
-        task = project_with_task["task"]
+        task = subject_with_task["task"]
         result = update_task_status(task["task_id"], "blocked")
 
         assert "error" not in result
         assert result["status"] == "blocked"
         assert result["topic_id"] is not None
 
-    def test_blocked_topic_has_correct_title(self, project_with_task):
+    def test_blocked_topic_has_correct_title(self, subject_with_task):
         """作成されたトピックのタイトルが正しい形式になる"""
-        task = project_with_task["task"]
+        task = subject_with_task["task"]
         result = update_task_status(task["task_id"], "blocked")
 
         # DBから直接トピックを確認
@@ -248,10 +248,10 @@ class TestBlockedStatusWithTopicCreation:
         assert topic["title"] == f"[BLOCKED] {task['title']}"
         assert topic["description"] == task["description"]
 
-    def test_blocked_topic_linked_to_correct_project(self, project_with_task):
-        """作成されたトピックが正しいプロジェクトに紐づく"""
-        project = project_with_task["project"]
-        task = project_with_task["task"]
+    def test_blocked_topic_linked_to_correct_subject(self, subject_with_task):
+        """作成されたトピックが正しいサブジェクトに紐づく"""
+        subject = subject_with_task["subject"]
+        task = subject_with_task["task"]
         result = update_task_status(task["task_id"], "blocked")
 
         rows = execute_query(
@@ -259,11 +259,11 @@ class TestBlockedStatusWithTopicCreation:
             (result["topic_id"],)
         )
         topic = dict(rows[0])
-        assert topic["project_id"] == project["project_id"]
+        assert topic["subject_id"] == subject["subject_id"]
 
-    def test_blocked_then_unblocked_keeps_topic_id(self, project_with_task):
+    def test_blocked_then_unblocked_keeps_topic_id(self, subject_with_task):
         """blockedからin_progressに戻してもtopic_idは維持される"""
-        task = project_with_task["task"]
+        task = subject_with_task["task"]
 
         # blocked に変更
         blocked_result = update_task_status(task["task_id"], "blocked")
@@ -277,11 +277,11 @@ class TestBlockedStatusWithTopicCreation:
 
     def test_multiple_tasks_blocked_create_separate_topics(self, temp_db):
         """複数のタスクをblockedにするとそれぞれ別のトピックが作成される"""
-        project = add_project(name="test-project", description="Test")
-        pid = project["project_id"]
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
 
-        task1 = add_task(project_id=pid, title="Task 1", description="Desc 1")
-        task2 = add_task(project_id=pid, title="Task 2", description="Desc 2")
+        task1 = add_task(subject_id=sid, title="Task 1", description="Desc 1")
+        task2 = add_task(subject_id=sid, title="Task 2", description="Desc 2")
 
         result1 = update_task_status(task1["task_id"], "blocked")
         result2 = update_task_status(task2["task_id"], "blocked")
