@@ -171,13 +171,6 @@ def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> d
 
         return {"tasks": tasks, "total_count": total_count}
 
-    except sqlite3.IntegrityError as e:
-        return {
-            "error": {
-                "code": "CONSTRAINT_VIOLATION",
-                "message": str(e),
-            }
-        }
     except Exception as e:
         return {
             "error": {

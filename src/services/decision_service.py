@@ -112,13 +112,6 @@ def get_decisions(
 
         return {"decisions": decisions}
 
-    except sqlite3.IntegrityError as e:
-        return {
-            "error": {
-                "code": "CONSTRAINT_VIOLATION",
-                "message": str(e),
-            }
-        }
     except Exception as e:
         return {
             "error": {
