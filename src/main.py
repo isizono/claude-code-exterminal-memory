@@ -184,6 +184,8 @@ Review the task's specifications and background before starting.
 You are expected to serve as the user's thinking partner and record-keeper, using these tools.
 The user's statements are proposals, not final decisions.
 Actively raise concerns and alternatives, and only record decisions once both sides agree.
+
+We hope these tools make your work with the user better. Good luck!
 """
 
 
