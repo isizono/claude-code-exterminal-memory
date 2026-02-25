@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.services.project_service import add_project
+from src.services.subject_service import add_subject
 from src.services.topic_service import add_topic
 from src.services.discussion_log_service import add_log
 from src.services.decision_service import add_decision
@@ -23,37 +23,37 @@ def temp_db():
 
 
 @pytest.fixture
-def test_project(temp_db):
-    """テスト用プロジェクトを作成する"""
-    result = add_project(name="test-project", description="Test project")
-    return result["project_id"]
+def test_subject(temp_db):
+    """テスト用サブジェクトを作成する"""
+    result = add_subject(name="test-subject", description="Test subject")
+    return result["subject_id"]
 
 
-def test_add_topic_success(test_project):
+def test_add_topic_success(test_subject):
     """トピックの追加が成功する"""
     result = add_topic(
-        project_id=test_project,
+        subject_id=test_subject,
         title="開発フローの詳細",
         description="プランモードの使い方、タスク分解の粒度を決定する",
     )
 
     assert "error" not in result
     assert result["topic_id"] > 0
-    assert result["project_id"] == test_project
+    assert result["subject_id"] == test_subject
     assert result["title"] == "開発フローの詳細"
     assert result["description"] == "プランモードの使い方、タスク分解の粒度を決定する"
     assert result["parent_topic_id"] is None
     assert "created_at" in result
 
 
-def test_add_topic_with_parent(test_project):
+def test_add_topic_with_parent(test_subject):
     """親トピックを指定してトピックを追加できる"""
     # 親トピックを作成
-    parent = add_topic(project_id=test_project, title="親トピック", description="Test description")
+    parent = add_topic(subject_id=test_subject, title="親トピック", description="Test description")
 
     # 子トピックを作成
     result = add_topic(
-        project_id=test_project,
+        subject_id=test_subject,
         title="子トピック",
         description="Test description",
         parent_topic_id=parent["topic_id"],
@@ -63,10 +63,10 @@ def test_add_topic_with_parent(test_project):
     assert result["parent_topic_id"] == parent["topic_id"]
 
 
-def test_add_log_success(test_project):
+def test_add_log_success(test_subject):
     """議論ログの追加が成功する"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="テストトピック", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="テストトピック", description="Test description")
 
     # ログを追加
     result = add_log(
@@ -81,9 +81,9 @@ def test_add_log_success(test_project):
     assert "created_at" in result
 
 
-def test_add_log_multiple(test_project):
+def test_add_log_multiple(test_subject):
     """同じトピックに複数のログを追加できる"""
-    topic = add_topic(project_id=test_project, title="テストトピック", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="テストトピック", description="Test description")
 
     # 3つのログを追加
     log1 = add_log(topic_id=topic["topic_id"], content="ログ1")
@@ -96,7 +96,7 @@ def test_add_log_multiple(test_project):
     assert log1["log_id"] != log2["log_id"] != log3["log_id"]
 
 
-def test_add_log_invalid_topic(test_project):
+def test_add_log_invalid_topic(test_subject):
     """存在しないトピックIDでエラーになる"""
     result = add_log(topic_id=99999, content="test")
 
@@ -104,10 +104,10 @@ def test_add_log_invalid_topic(test_project):
     assert result["error"]["code"] == "DATABASE_ERROR"
 
 
-def test_add_decision_success(test_project):
+def test_add_decision_success(test_subject):
     """決定事項の追加が成功する"""
     # トピックを作成
-    topic = add_topic(project_id=test_project, title="テストトピック", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="テストトピック", description="Test description")
 
     # 決定事項を追加
     result = add_decision(
@@ -128,7 +128,7 @@ def test_add_decision_without_topic(temp_db):
     """トピックIDなしで決定事項を追加できる"""
     result = add_decision(
         decision="グローバルな決定事項",
-        reason="プロジェクト全体に関わる",
+        reason="サブジェクト全体に関わる",
     )
 
     assert "error" not in result
@@ -136,9 +136,9 @@ def test_add_decision_without_topic(temp_db):
     assert result["topic_id"] is None
 
 
-def test_add_decision_multiple(test_project):
+def test_add_decision_multiple(test_subject):
     """複数の決定事項を追加できる"""
-    topic = add_topic(project_id=test_project, title="テストトピック", description="Test description")
+    topic = add_topic(subject_id=test_subject, title="テストトピック", description="Test description")
 
     dec1 = add_decision(
         topic_id=topic["topic_id"],
