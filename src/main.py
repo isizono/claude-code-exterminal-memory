@@ -4,7 +4,7 @@ from fastmcp import FastMCP
 from typing import Literal, Optional
 from src.db import execute_query
 from src.services import (
-    project_service,
+    subject_service,
     topic_service,
     discussion_log_service,
     decision_service,
@@ -20,32 +20,32 @@ RECENT_TOPICS_LIMIT = 3
 DESC_MAX_LEN = 30
 
 
-def _get_active_projects() -> list[dict]:
-    """直近7日以内にトピック更新があったプロジェクトを取得する"""
+def _get_active_subjects() -> list[dict]:
+    """直近7日以内にトピック更新があったサブジェクトを取得する"""
     rows = execute_query(
         """
-        SELECT DISTINCT p.id, p.name
-        FROM projects p
-        JOIN discussion_topics t ON p.id = t.project_id
+        SELECT DISTINCT s.id, s.name
+        FROM subjects s
+        JOIN discussion_topics t ON s.id = t.subject_id
         WHERE t.created_at > datetime('now', ? || ' days')
-        ORDER BY p.id
+        ORDER BY s.id
         """,
         (f"-{ACTIVE_PROJECT_DAYS}",),
     )
     return [{"id": row["id"], "name": row["name"]} for row in rows]
 
 
-def _get_recent_topics(project_id: int) -> list[dict]:
-    """プロジェクトの最新トピック3件を取得する"""
+def _get_recent_topics(subject_id: int) -> list[dict]:
+    """サブジェクトの最新トピック3件を取得する"""
     rows = execute_query(
         """
         SELECT id, title, description
         FROM discussion_topics
-        WHERE project_id = ?
+        WHERE subject_id = ?
         ORDER BY created_at DESC
         LIMIT ?
         """,
-        (project_id, RECENT_TOPICS_LIMIT),
+        (subject_id, RECENT_TOPICS_LIMIT),
     )
     results = []
     for row in rows:
@@ -56,38 +56,38 @@ def _get_recent_topics(project_id: int) -> list[dict]:
     return results
 
 
-def _get_in_progress_tasks(project_id: int) -> list[dict]:
-    """プロジェクトのin_progressタスクを取得する"""
+def _get_in_progress_tasks(subject_id: int) -> list[dict]:
+    """サブジェクトのin_progressタスクを取得する"""
     rows = execute_query(
         """
         SELECT id, title
         FROM tasks
-        WHERE project_id = ? AND status = 'in_progress'
+        WHERE subject_id = ? AND status = 'in_progress'
         ORDER BY updated_at DESC
         """,
-        (project_id,),
+        (subject_id,),
     )
     return [{"id": row["id"], "title": row["title"]} for row in rows]
 
 
 def _build_active_context() -> str:
-    """アクティブプロジェクトのコンテキスト文字列を組み立てる"""
+    """アクティブサブジェクトのコンテキスト文字列を組み立てる"""
     try:
-        projects = _get_active_projects()
-        if not projects:
+        subjects = _get_active_subjects()
+        if not subjects:
             return ""
 
-        lines = ["# アクティブプロジェクト（直近7日）\n"]
-        for p in projects:
-            lines.append(f"## {p['name']} (id: {p['id']})")
+        lines = ["# アクティブサブジェクト（直近7日）\n"]
+        for s in subjects:
+            lines.append(f"## {s['name']} (id: {s['id']})")
 
-            topics = _get_recent_topics(p["id"])
+            topics = _get_recent_topics(s["id"])
             if topics:
                 lines.append("最新トピック:")
                 for t in topics:
                     lines.append(f"- [{t['id']}] {t['title']}: {t['description']}")
 
-            tasks = _get_in_progress_tasks(p["id"])
+            tasks = _get_in_progress_tasks(s["id"])
             if tasks:
                 lines.append("進行中タスク:")
                 for task in tasks:
@@ -139,7 +139,7 @@ If you don't output a meta tag, or output one with a wrong ID, your response wil
 So don't be lazy — review the current topic and output the correct meta tag.
 If no existing topic fits, proactively create a new one.
 
-Meta tag format: `<!-- [meta] project: <name> (id: <N>) | topic: <name> (id: <M>) -->`
+Meta tag format: `<!-- [meta] subject: <name> (id: <N>) | topic: <name> (id: <M>) -->`
 
 ## Recording Decisions
 
@@ -203,44 +203,43 @@ mcp = FastMCP("cc-memory", instructions=build_instructions())
 
 # MCPツール定義
 @mcp.tool()
-def add_project(
+def add_subject(
     name: str,
     description: str,
-    asana_url: Optional[str] = None,
 ) -> dict:
     """
-    新しいプロジェクトを追加する。
+    新しいサブジェクトを追加する。
 
-    Projectとは「独立した関心事・取り組み」の単位。リポジトリではなく「何について話すか」で区切る。
+    Subjectとは「独立した関心事・取り組み」の単位。リポジトリではなく「何について話すか」で区切る。
 
     新規作成すべきとき:
-    - 既存Projectのどれとも関係ない話題が始まった
+    - 既存Subjectのどれとも関係ない話題が始まった
     - 別プロダクト・サービスの話になった
-    - 新しいAsanaタスクに取り組む
+    - 新しい取り組みに着手する
 
-    既存Projectを使うとき:
-    - 既存Projectの関心事の「中」の話（→ add_topicで新規Topic）
+    既存Subjectを使うとき:
+    - 既存Subjectの関心事の「中」の話（→ add_topicで新規Topic）
 
-    判断に迷ったらユーザーに「どのProjectで進める？」と確認すること。
+    判断に迷ったらユーザーに「どのSubjectで進める？」と確認すること。
     """
-    return project_service.add_project(name, description, asana_url)
+    return subject_service.add_subject(name, description)
 
 
 @mcp.tool()
-def list_projects() -> dict:
-    """プロジェクト一覧を取得する。id + name のみ返す軽量版。"""
-    return project_service.list_projects()
+def list_subjects() -> dict:
+    """サブジェクト一覧を取得する。id + name のみ返す軽量版。"""
+    return subject_service.list_subjects()
 
 
 @mcp.tool()
 def add_topic(
-    project_id: int,
+    subject_id: int,
     title: str,
     description: str,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
     """新しい議論トピックを追加する。"""
-    return topic_service.add_topic(project_id, title, description, parent_topic_id)
+    return topic_service.add_topic(subject_id, title, description, parent_topic_id)
 
 
 @mcp.tool()
@@ -261,11 +260,11 @@ def add_decision(
 
 @mcp.tool()
 def get_topics(
-    project_id: int,
+    subject_id: int,
     parent_topic_id: Optional[int] = None,
 ) -> dict:
     """指定した親トピックの直下の子トピックを取得する。"""
-    return topic_service.get_topics(project_id, parent_topic_id)
+    return topic_service.get_topics(subject_id, parent_topic_id)
 
 
 @mcp.tool()
@@ -290,20 +289,20 @@ def get_decisions(
 
 @mcp.tool()
 def search(
-    project_id: int,
+    subject_id: int,
     keyword: str,
     type_filter: Optional[str] = None,
     limit: int = 10,
 ) -> dict:
     """
-    プロジェクト内をキーワードで横断検索する。
+    サブジェクト内をキーワードで横断検索する。
 
     FTS5 trigramトークナイザによる部分文字列マッチ。3文字以上のキーワードを指定する。
     結果はBM25スコア順でランキングされる。
     詳細情報が必要な場合は get_by_id(type, id) で取得する。
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         keyword: 検索キーワード（3文字以上）
         type_filter: 検索対象の絞り込み（'topic', 'decision', 'task'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
@@ -311,7 +310,7 @@ def search(
     Returns:
         検索結果一覧（type, id, title, score）
     """
-    return search_service.search(project_id, keyword, type_filter, limit)
+    return search_service.search(subject_id, keyword, type_filter, limit)
 
 
 @mcp.tool()
@@ -337,7 +336,7 @@ def get_by_id(
 
 @mcp.tool()
 def add_task(
-    project_id: int,
+    subject_id: int,
     title: str,
     description: str,
 ) -> dict:
@@ -345,24 +344,24 @@ def add_task(
     新しいタスクを追加する。
 
     典型的な使い方:
-    - 実装タスクを作成: add_task(project_id, "○○機能を実装", "詳細説明...")
+    - 実装タスクを作成: add_task(subject_id, "○○機能を実装", "詳細説明...")
 
     ワークフロー位置: 実装タスクの整理・管理開始時
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         title: タスクのタイトル
         description: タスクの詳細説明（必須）
 
     Returns:
         作成されたタスク情報
     """
-    return task_service.add_task(project_id, title, description)
+    return task_service.add_task(subject_id, title, description)
 
 
 @mcp.tool()
 def get_tasks(
-    project_id: int,
+    subject_id: int,
     status: str = "in_progress",
     limit: int = 5,
 ) -> dict:
@@ -370,21 +369,21 @@ def get_tasks(
     タスク一覧を取得する（statusでフィルタリング可能）。
 
     典型的な使い方:
-    - 進行中のタスク確認: get_tasks(project_id)
-    - 未着手のタスク確認: get_tasks(project_id, status="pending")
-    - ブロック中のタスク確認: get_tasks(project_id, status="blocked")
+    - 進行中のタスク確認: get_tasks(subject_id)
+    - 未着手のタスク確認: get_tasks(subject_id, status="pending")
+    - ブロック中のタスク確認: get_tasks(subject_id, status="blocked")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         status: フィルタするステータス（pending/in_progress/blocked/completed、デフォルト: in_progress）
         limit: 取得件数上限（デフォルト: 5）
 
     Returns:
         タスク一覧（total_countで該当ステータスの全件数を確認可能）
     """
-    return task_service.get_tasks(project_id, status, limit)
+    return task_service.get_tasks(subject_id, status, limit)
 
 
 @mcp.tool()
