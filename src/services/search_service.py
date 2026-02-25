@@ -20,20 +20,20 @@ def _escape_fts5_query(keyword: str) -> str:
 
 
 def search(
-    project_id: int,
+    subject_id: int,
     keyword: str,
     type_filter: Optional[str] = None,
     limit: int = 10,
 ) -> dict:
     """
-    プロジェクト内をキーワードで横断検索する。
+    サブジェクト内をキーワードで横断検索する。
 
     FTS5 trigramトークナイザによる部分文字列マッチ。3文字以上のキーワードを指定する。
     結果はBM25スコア順でランキングされる。
     詳細情報が必要な場合は get_by_id(type, id) で取得する。
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         keyword: 検索キーワード（3文字以上）
         type_filter: 検索対象の絞り込み（'topic', 'decision', 'task'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
@@ -74,12 +74,12 @@ def search(
             FROM search_index_fts
             JOIN search_index si ON si.id = search_index_fts.rowid
             WHERE search_index_fts MATCH ?
-              AND si.project_id = ?
+              AND si.subject_id = ?
               AND (? IS NULL OR si.source_type = ?)
             ORDER BY score
             LIMIT ?
             """,
-            (escaped_keyword, project_id, type_filter, type_filter, limit),
+            (escaped_keyword, subject_id, type_filter, type_filter, limit),
         )
 
         results = []
@@ -108,7 +108,7 @@ def _format_row(type_name: str, data: dict) -> dict:
     if type_name == 'topic':
         return {
             "id": data["id"],
-            "project_id": data["project_id"],
+            "subject_id": data["subject_id"],
             "title": data["title"],
             "description": data["description"],
             "parent_topic_id": data["parent_topic_id"],
@@ -125,7 +125,7 @@ def _format_row(type_name: str, data: dict) -> dict:
     elif type_name == 'task':
         return {
             "id": data["id"],
-            "project_id": data["project_id"],
+            "subject_id": data["subject_id"],
             "title": data["title"],
             "description": data["description"],
             "status": data["status"],

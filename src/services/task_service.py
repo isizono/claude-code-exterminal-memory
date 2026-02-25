@@ -53,7 +53,7 @@ def _task_to_response(task: dict) -> dict:
     """タスクデータをAPIレスポンス形式に変換"""
     return {
         "task_id": task["id"],
-        "project_id": task["project_id"],
+        "subject_id": task["subject_id"],
         "title": task["title"],
         "description": task["description"],
         "status": task["status"],
@@ -63,12 +63,12 @@ def _task_to_response(task: dict) -> dict:
     }
 
 
-def add_task(project_id: int, title: str, description: str) -> dict:
+def add_task(subject_id: int, title: str, description: str) -> dict:
     """
     タスクを作成してIDを返す
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         title: タスクのタイトル
         description: タスクの説明
 
@@ -77,7 +77,7 @@ def add_task(project_id: int, title: str, description: str) -> dict:
     """
     try:
         task_id = _task_db._execute_insert({
-            'project_id': project_id,
+            'subject_id': subject_id,
             'title': title,
             'description': description,
             'status': 'pending'
@@ -108,12 +108,12 @@ def add_task(project_id: int, title: str, description: str) -> dict:
 VALID_TASK_STATUSES = {"pending", "in_progress", "blocked", "completed"}
 
 
-def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> dict:
+def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> dict:
     """
     タスク一覧を取得（statusでフィルタリング）
 
     Args:
-        project_id: プロジェクトID
+        subject_id: サブジェクトID
         status: フィルタするステータス（デフォルト: in_progress）
         limit: 取得件数上限（デフォルト: 5）
 
@@ -139,8 +139,8 @@ def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> d
     try:
         # 1. total_count取得（LIMITなし）
         count_rows = execute_query(
-            "SELECT COUNT(*) as count FROM tasks WHERE project_id = ? AND status = ?",
-            (project_id, status),
+            "SELECT COUNT(*) as count FROM tasks WHERE subject_id = ? AND status = ?",
+            (subject_id, status),
         )
         total_count = count_rows[0]["count"]
 
@@ -148,11 +148,11 @@ def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> d
         rows = execute_query(
             """
             SELECT * FROM tasks
-            WHERE project_id = ? AND status = ?
+            WHERE subject_id = ? AND status = ?
             ORDER BY created_at ASC, id ASC
             LIMIT ?
             """,
-            (project_id, status, limit),
+            (subject_id, status, limit),
         )
 
         tasks = []
@@ -160,7 +160,7 @@ def get_tasks(project_id: int, status: str = "in_progress", limit: int = 5) -> d
             task = row_to_dict(row)
             tasks.append({
                 "id": task["id"],
-                "project_id": task["project_id"],
+                "subject_id": task["subject_id"],
                 "title": task["title"],
                 "description": task["description"],
                 "status": task["status"],
@@ -232,8 +232,8 @@ def update_task_status(task_id: int, new_status: str) -> dict:
 
             # トピックを作成
             cursor = conn.execute(
-                "INSERT INTO discussion_topics (project_id, title, description) VALUES (?, ?, ?)",
-                (task["project_id"], topic_title, topic_description),
+                "INSERT INTO discussion_topics (subject_id, title, description) VALUES (?, ?, ?)",
+                (task["subject_id"], topic_title, topic_description),
             )
             topic_id = cursor.lastrowid
 

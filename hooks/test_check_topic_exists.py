@@ -21,21 +21,21 @@ def temp_db():
         os.environ["DISCUSSION_DB_PATH"] = db_path
         init_database()
 
-        # init_databaseで作成されたfirst_projectのIDを取得
+        # init_databaseで作成されたfirst_subjectのIDを取得
         conn = get_connection()
         try:
-            cursor = conn.execute("SELECT id FROM projects WHERE name = 'first_project'")
+            cursor = conn.execute("SELECT id FROM subjects WHERE name = 'first_subject'")
             row = cursor.fetchone()
-            project_id = row[0] if row else 1
+            subject_id = row[0] if row else 1
 
             # テスト用のトピックを追加作成
             conn.execute(
-                "INSERT INTO discussion_topics (id, project_id, title, description) VALUES (100, ?, 'Test Topic', 'Description')",
-                (project_id,)
+                "INSERT INTO discussion_topics (id, subject_id, title, description) VALUES (100, ?, 'Test Topic', 'Description')",
+                (subject_id,)
             )
             conn.execute(
-                "INSERT INTO discussion_topics (id, project_id, title, description) VALUES (200, ?, 'Another Topic', 'Description')",
-                (project_id,)
+                "INSERT INTO discussion_topics (id, subject_id, title, description) VALUES (200, ?, 'Another Topic', 'Description')",
+                (subject_id,)
             )
             conn.commit()
         finally:

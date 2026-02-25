@@ -48,7 +48,7 @@ def test_init_database(temp_db):
         )
         tables = [row[0] for row in cursor.fetchall()]
 
-        assert "projects" in tables
+        assert "subjects" in tables
         assert "discussion_topics" in tables
         assert "discussion_logs" in tables
         assert "decisions" in tables
@@ -58,54 +58,54 @@ def test_init_database(temp_db):
 
 def test_execute_insert_and_query(temp_db):
     """INSERT と SELECT が正しく動作する"""
-    # プロジェクトを追加
-    project_id = execute_insert(
-        "INSERT INTO projects (name, description) VALUES (?, ?)",
-        ("test-project", "テストプロジェクト"),
+    # サブジェクトを追加
+    subject_id = execute_insert(
+        "INSERT INTO subjects (name, description) VALUES (?, ?)",
+        ("test-subject", "テストサブジェクト"),
     )
-    assert project_id > 0
+    assert subject_id > 0
 
-    # 追加したプロジェクトを取得
-    rows = execute_query("SELECT * FROM projects WHERE id = ?", (project_id,))
+    # 追加したサブジェクトを取得
+    rows = execute_query("SELECT * FROM subjects WHERE id = ?", (subject_id,))
     assert len(rows) == 1
-    assert rows[0]["name"] == "test-project"
-    assert rows[0]["description"] == "テストプロジェクト"
+    assert rows[0]["name"] == "test-subject"
+    assert rows[0]["description"] == "テストサブジェクト"
 
 
 def test_get_connection_returns_row_factory(temp_db):
     """接続が Row factory を使用している"""
     conn = get_connection()
     try:
-        # プロジェクトを追加
+        # サブジェクトを追加
         conn.execute(
-            "INSERT INTO projects (name, description) VALUES (?, ?)", ("test-project", "Test description")
+            "INSERT INTO subjects (name, description) VALUES (?, ?)", ("test-subject", "Test description")
         )
         conn.commit()
 
-        # Row として取得できることを確認（追加したプロジェクトを名前で検索）
-        cursor = conn.execute("SELECT * FROM projects WHERE name = 'test-project'")
+        # Row として取得できることを確認（追加したサブジェクトを名前で検索）
+        cursor = conn.execute("SELECT * FROM subjects WHERE name = 'test-subject'")
         row = cursor.fetchone()
-        assert row["name"] == "test-project"  # 辞書ライクなアクセス
+        assert row["name"] == "test-subject"  # 辞書ライクなアクセス
     finally:
         conn.close()
 
 
 def test_init_database_seeds_initial_data(temp_db):
-    """init_database()で初期データ（first_project, first_topic）が投入される"""
+    """init_database()で初期データ（first_subject, first_topic）が投入される"""
     conn = get_connection()
     try:
-        # first_projectが存在することを確認
-        cursor = conn.execute("SELECT * FROM projects WHERE name = 'first_project'")
-        project = cursor.fetchone()
-        assert project is not None
-        assert "サンプルのプロジェクト" in project["description"]
-        assert "取り組み・関心事" in project["description"]
+        # first_subjectが存在することを確認
+        cursor = conn.execute("SELECT * FROM subjects WHERE name = 'first_subject'")
+        subject = cursor.fetchone()
+        assert subject is not None
+        assert "サンプルのサブジェクト" in subject["description"]
+        assert "取り組み・関心事" in subject["description"]
 
         # first_topicが存在することを確認
         cursor = conn.execute("SELECT * FROM discussion_topics WHERE title = 'first_topic'")
         topic = cursor.fetchone()
         assert topic is not None
-        assert topic["project_id"] == project["id"]
+        assert topic["subject_id"] == subject["id"]
         assert "サンプルのトピック" in topic["description"]
         assert "一言で表すと" in topic["description"]
     finally:
@@ -124,8 +124,8 @@ def test_init_database_multiple_calls_no_duplicate(temp_db):
 
     conn = get_connection()
     try:
-        # first_projectが1件のみであることを確認
-        cursor = conn.execute("SELECT COUNT(*) as cnt FROM projects WHERE name = 'first_project'")
+        # first_subjectが1件のみであることを確認
+        cursor = conn.execute("SELECT COUNT(*) as cnt FROM subjects WHERE name = 'first_subject'")
         row = cursor.fetchone()
         assert row["cnt"] == 1
 

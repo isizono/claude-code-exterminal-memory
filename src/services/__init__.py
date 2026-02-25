@@ -1,6 +1,6 @@
 """サービス層パッケージ"""
 from . import (
-    project_service,
+    subject_service,
     topic_service,
     discussion_log_service,
     decision_service,
@@ -10,7 +10,7 @@ from . import (
 )
 
 __all__ = [
-    "project_service",
+    "subject_service",
     "topic_service",
     "discussion_log_service",
     "decision_service",

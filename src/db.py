@@ -53,30 +53,30 @@ def init_database() -> None:
         # nameのUNIQUE制約を活用してIDハードコードを避ける
         conn.execute(
             """
-            INSERT OR IGNORE INTO projects (name, description)
-            VALUES ('first_project', 'これはサンプルのプロジェクトです。プロジェクトは1つの取り組み・関心事を表す単位で、関連するトピックを束ねるグループです。新しい取り組みや関心事が出てきたら、新しいプロジェクトを作成してください。')
+            INSERT OR IGNORE INTO subjects (name, description)
+            VALUES ('first_subject', 'これはサンプルのサブジェクトです。サブジェクトは1つの取り組み・関心事を表す単位で、関連するトピックを束ねるグループです。新しい取り組みや関心事が出てきたら、新しいサブジェクトを作成してください。')
             """
         )
 
-        # first_projectのIDを取得してdiscussion_topicsに使用
+        # first_subjectのIDを取得してdiscussion_topicsに使用
         cursor = conn.execute(
-            "SELECT id FROM projects WHERE name = 'first_project'"
+            "SELECT id FROM subjects WHERE name = 'first_subject'"
         )
         row = cursor.fetchone()
         if row:
-            project_id = row[0]
+            subject_id = row[0]
             # discussion_topicsにはtitleのUNIQUE制約がないため、存在確認してから挿入
             cursor = conn.execute(
-                "SELECT id FROM discussion_topics WHERE project_id = ? AND title = 'first_topic'",
-                (project_id,)
+                "SELECT id FROM discussion_topics WHERE subject_id = ? AND title = 'first_topic'",
+                (subject_id,)
             )
             if cursor.fetchone() is None:
                 conn.execute(
                     """
-                    INSERT INTO discussion_topics (project_id, title, description)
-                    VALUES (?, 'first_topic', 'これはサンプルのトピックです。トピックは「この会話を一言で表すと？」に答えられる粒度が目安です。例：「[議論] ユーザー認証に使う外部サービスの選定」「[設計] エラーAPIのレスポンス形式」「[実装] 商品詳細→カート画面遷移時のクラッシュ」など。新しい話題が出てきたら、新しいトピックを作成してください。話題がプロジェクトの範囲を超えたら、プロジェクトの変更も検討してください。')
+                    INSERT INTO discussion_topics (subject_id, title, description)
+                    VALUES (?, 'first_topic', 'これはサンプルのトピックです。トピックは「この会話を一言で表すと？」に答えられる粒度が目安です。例：「[議論] ユーザー認証に使う外部サービスの選定」「[設計] エラーAPIのレスポンス形式」「[実装] 商品詳細→カート画面遷移時のクラッシュ」など。新しい話題が出てきたら、新しいトピックを作成してください。話題がサブジェクトの範囲を超えたら、サブジェクトの変更も検討してください。')
                     """,
-                    (project_id,)
+                    (subject_id,)
                 )
         # FTS5初期マイグレーション
         _migrate_fts5_search_index(conn)
@@ -109,23 +109,23 @@ def _migrate_fts5_search_index(conn: sqlite3.Connection) -> None:
 
     # topics
     conn.execute("""
-        INSERT OR IGNORE INTO search_index (source_type, source_id, project_id, title)
-        SELECT 'topic', id, project_id, title
+        INSERT OR IGNORE INTO search_index (source_type, source_id, subject_id, title)
+        SELECT 'topic', id, subject_id, title
         FROM discussion_topics
     """)
 
     # decisions（topic_id IS NOT NULLのもののみ）
     conn.execute("""
-        INSERT OR IGNORE INTO search_index (source_type, source_id, project_id, title)
-        SELECT 'decision', d.id, dt.project_id, d.decision
+        INSERT OR IGNORE INTO search_index (source_type, source_id, subject_id, title)
+        SELECT 'decision', d.id, dt.subject_id, d.decision
         FROM decisions d
         JOIN discussion_topics dt ON d.topic_id = dt.id
     """)
 
     # tasks
     conn.execute("""
-        INSERT OR IGNORE INTO search_index (source_type, source_id, project_id, title)
-        SELECT 'task', id, project_id, title
+        INSERT OR IGNORE INTO search_index (source_type, source_id, subject_id, title)
+        SELECT 'task', id, subject_id, title
         FROM tasks
     """)
 
@@ -164,6 +164,9 @@ def execute_insert(query: str, params: tuple = ()) -> int:
         cursor = conn.execute(query, params)
         conn.commit()
         return cursor.lastrowid
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        raise
     except sqlite3.Error as e:
         conn.rollback()
         raise sqlite3.Error(f"INSERT実行エラー: {e}") from e
