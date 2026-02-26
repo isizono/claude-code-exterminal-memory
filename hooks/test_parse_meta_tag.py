@@ -59,6 +59,12 @@ class TestParseMetaTag:
         result = parse_meta_tag(text)
         assert result == {"found": True, "subject_id": 999999, "topic_id": 888888}
 
+    def test_name_with_parentheses(self):
+        """名前に括弧が含まれていてもパースできる"""
+        text = '<!-- [meta] subject: テスト(仮) (id: 2) | topic: 機能追加(v2) (id: 55) -->'
+        result = parse_meta_tag(text)
+        assert result == {"found": True, "subject_id": 2, "topic_id": 55}
+
     def test_old_project_format_not_matched(self):
         """旧フォーマット（project:）はマッチしない"""
         text = '<!-- [meta] project: old-format (id: 1) | topic: some topic (id: 2) -->'
