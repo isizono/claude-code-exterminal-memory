@@ -114,7 +114,7 @@ def _migrate_fts5_search_index(conn: sqlite3.Connection) -> None:
         FROM discussion_topics
     """)
 
-    # decisions（topic_id IS NOT NULLのもののみ）
+    # decisions（topic_idは常にNOT NULL、JOINでsubject_idを取得）
     conn.execute("""
         INSERT OR IGNORE INTO search_index (source_type, source_id, subject_id, title)
         SELECT 'decision', d.id, dt.subject_id, d.decision
