@@ -201,30 +201,45 @@ Agent: 了解。記録対象を3つに整理した。(1)議論の経緯 (2)ユ�
 
 ## Task Phases
 
-When a conversation goes beyond casual chat and implementation is foreseeable, record a task.
-`[議論]` tasks are lightweight — when in doubt, just create one.
-Opening a topic and discussing with the user itself counts as a discussion task.
+雑談を超えて実装が見えてきたら、タスクを記録する。
+`[議論]` タスクは軽量 — 迷ったら作っていい。
+トピックを開いてユーザーと話すこと自体が議論タスクにあたる。
 
-Work proceeds through three phases: **discussion (議論)**, **design (設計)**, and **implementation (実装)**.
-Do not mix phases — complete the current phase and get user confirmation before moving to the next.
-Prefix task names with the phase: `[議論]`, `[設計]`, `[実装]`.
-When working on a task, use the corresponding skill:
-`[議論]` → `discussion`, `[設計]` → `design`, `[実装]` → `implementation`.
+作業は3つのフェーズで進む: **議論**、**設計**、**実装**。
+フェーズを混ぜない — 現フェーズを完了し、ユーザーの確認を得てから次へ進む。
+タスク名にはフェーズプレフィックスを付ける: `[議論]`、`[設計]`、`[実装]`。
+タスクに取り組むときは対応するスキルを使う:
+`[議論]` → `discussion`、`[設計]` → `design`、`[実装]` → `implementation`。
 
-**Discussion phase**: Work with the user to articulate What they want, Why they want it,
-and the Scope/Acceptance criteria.
+フェーズプレフィックスはタスクだけに付ける。トピックには付けない。
+タスクが目的を定義し、トピックはその目的に向かう議論の場になる。
+タスクとトピックの紐付けは、descriptionで相互参照する:
 
-**Design phase**: The goal is to reach agreement with the user on how to implement,
-and to create the tasks needed for the implementation phase.
-Based on what emerged from discussion, verify assumptions and present options.
-Support the user patiently until they reach a satisfying decision.
-This is a critical phase — never rush the user toward a conclusion.
-Once agreed, record decisions and create implementation tasks.
-Write detailed background information in implementation tasks —
-a different AI will likely handle implementation, working solely from the task description.
+```
+1. add_task(subject_id=2, title="[議論] 検索機能の要件整理", description="...")
+   → task id: 50
 
-**Implementation phase**: Write code following the recorded tasks and decisions.
-Review the task's specifications and background before starting.
+2. add_topic(subject_id=2, title="検索機能の要件整理", description="task id:50 の議論用")
+   → topic id: 85
+
+3. 議論が派生したら、topic 85 の子トピックとして作成する。
+   タスク (id:50) が目的の源泉であり続ける。
+```
+
+**議論フェーズ**: ユーザーと一緒に、What（何をしたいか）、Why（なぜ必要か）、
+Scope/Acceptance（範囲と受け入れ基準）を言語化する。
+
+**設計フェーズ**: ユーザーとどう実装するかを合意し、
+実装フェーズに必要なタスクを作成するのがゴール。
+議論で出てきた内容をもとに、前提を確認し、選択肢を提示する。
+ユーザーが納得する結論に至るまで辛抱強く付き合う。
+ここは重要なフェーズ — 結論を急がない。
+合意したら、決定事項を記録し、実装タスクを作成する。
+実装タスクには背景情報を詳しく書くこと —
+別のAIが実装を担う可能性が高く、タスクの情報だけを見て仕事をする。
+
+**実装フェーズ**: 記録されたタスクと決定事項に従ってコードを書く。
+着手前にタスクの仕様と背景を確認する。
 
 ---
 
