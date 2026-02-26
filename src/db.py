@@ -4,7 +4,11 @@ import os
 import logging
 from pathlib import Path
 
-from yoyo import get_backend, read_migrations
+import sqlite_vec
+from yoyo import read_migrations
+from yoyo import default_migration_table
+from yoyo.backends import SQLiteBackend
+from yoyo.connections import parse_uri
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +34,32 @@ def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row  # 辞書ライクなアクセスを可能にする
     conn.execute("PRAGMA foreign_keys = ON")  # 外部キー制約を有効化
+    _load_sqlite_vec(conn)
     return conn
+
+
+def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
+    """sqlite-vec拡張をコネクションにロードする"""
+    conn.enable_load_extension(True)
+    sqlite_vec.load(conn)
+    conn.enable_load_extension(False)
+
+
+class _VecSQLiteBackend(SQLiteBackend):
+    """sqlite-vec拡張をロードするSQLiteBackend"""
+
+    def connect(self, dburi) -> sqlite3.Connection:
+        conn = super().connect(dburi)
+        _load_sqlite_vec(conn)
+        return conn
 
 
 def _apply_migrations() -> None:
     """yoyoマイグレーションを適用する"""
     db_path = get_db_path()
-    backend = get_backend(f"sqlite:///{db_path}")
+    parsed = parse_uri(f"sqlite:///{db_path}")
+    backend = _VecSQLiteBackend(parsed, default_migration_table)
+    backend.init_database()
     migrations = read_migrations(str(MIGRATIONS_DIR))
 
     with backend.lock():
