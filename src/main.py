@@ -125,6 +125,11 @@ you can pull its decisions directly.
 Otherwise, use `search` to find related topics and decisions by keyword.
 Once you find relevant records, understand past agreements and context before composing your first response.
 
+When you need to understand the background or reasoning behind a topic,
+also check `get_logs` — especially useful for topics with complex discussions
+or where the path to a decision matters.
+Retrieval flow: `search` → `get_decisions` → `get_logs`.
+
 ## Topic Management
 
 A topic represents a single concern, problem, or feature.
@@ -161,6 +166,44 @@ Be specific. This information is critically important for future AI sessions tha
 Avoid vague language like "as appropriate" or "as needed" — use concrete conditions and values.
 Always include the reasoning behind the decision, not just the outcome.
 
+## Recording Logs
+
+Decisions capture conclusions. Logs capture the journey.
+
+When a future AI session picks up a topic, decisions tell it *what* was agreed —
+but not *how* the conversation got there. Logs fill that gap.
+Use `add_log` to record the discussion process so the next session can join mid-conversation
+without asking the user to repeat themselves.
+
+**What to record:**
+- Discussion flow — key arguments, counterpoints, and turning points
+- User's intentions and needs — what they want and why, in their own framing
+- Facts and constraints surfaced during discussion
+
+**What NOT to record:**
+- Execution steps (git commits, PR creation, file edits — git history covers these)
+- Greetings, acknowledgments, or filler
+
+Granularity is your call, but at minimum a log should satisfy these criteria:
+- A future AI can understand *why* a conclusion was reached
+- Options considered and whether they were adopted or rejected are clear
+- Conditions and constraints the user emphasized are captured
+You don't need to log every turn — focus on turning points and moments of agreement.
+
+Format: capture the flow as User/Agent exchanges.
+Include options that were considered but NOT chosen —
+understanding rejected alternatives is as valuable as knowing the final choice.
+
+Example:
+```
+User: record_logとsync_memoryのhookを廃止したい。RULESにadd_logの使い方を書いた方がいい？
+Agent: 賛成。ただし毎ターン強制だと負荷が高い。エージェント判断で必要な時だけ記録する方式を提案。
+User: それでいい。粒度は任せる。ただし議論の経緯は最低限追えるように。
+Agent: 了解。記録対象を3つに整理した。(1)議論の経緯 (2)ユーザーの意図 (3)事実・制約。
+  作業実行記録は不要（git履歴で追える）。stop hookでの強制もしない方針。
+  [選ばれなかった案: 毎ターン自動要約 → 負荷が高く品質も低いため却下]
+```
+
 ## Task Phases
 
 When a conversation goes beyond casual chat and implementation is foreseeable, record a task.
@@ -172,6 +215,21 @@ Do not mix phases — complete the current phase and get user confirmation befor
 Prefix task names with the phase: `[議論]`, `[設計]`, `[実装]`.
 When working on a task, use the corresponding skill:
 `[議論]` → `discussion`, `[設計]` → `design`, `[実装]` → `implementation`.
+
+Phase prefixes belong on **tasks only** — never on topics.
+Tasks define the purpose; topics are the discussion spaces that serve that purpose.
+Link tasks and topics by cross-referencing IDs in their descriptions:
+
+```
+1. add_task(subject_id=2, title="[議論] 検索機能の要件整理", description="...")
+   → task id: 50
+
+2. add_topic(subject_id=2, title="検索機能の要件整理", description="task id:50 の議論用")
+   → topic id: 85
+
+3. As discussion branches off, create child topics under topic 85.
+   The task (id:50) remains the single source of purpose.
+```
 
 **Discussion phase**: Work with the user to articulate What they want, Why they want it,
 and the Scope/Acceptance criteria.

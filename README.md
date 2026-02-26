@@ -8,7 +8,7 @@ Claude Codeの記憶を外部DBに保存し、セッション間で知識・決�
 - **決定事項記録**: 合意形成した内容を記録・検索
 - **タスク管理**: 実装タスクのステータス管理
 - **ナレッジ保存**: 調査結果をマークダウンファイルとして保存
-- **自動ログ記録**: 会話を自動でトピックに紐づけて記録
+- **横断検索**: トピック・決定事項・タスクをキーワードで一括検索
 
 ## インストール
 
@@ -42,10 +42,11 @@ claude --plugin-dir /path/to/claude-code-memory
 | カテゴリ | ツール | 説明 |
 |---------|--------|------|
 | サブジェクト | `add_subject`, `list_subjects` | サブジェクト管理 |
-| トピック | `add_topic`, `get_topics`, `get_decided_topics`, `get_undecided_topics`, `get_topic_tree`, `search_topics` | 議論トピック管理 |
+| トピック | `add_topic`, `get_topics` | 議論トピック管理 |
 | ログ | `add_log`, `get_logs` | 議論ログ記録 |
-| 決定 | `add_decision`, `get_decisions`, `search_decisions` | 決定事項管理 |
+| 決定 | `add_decision`, `get_decisions` | 決定事項管理 |
 | タスク | `add_task`, `get_tasks`, `update_task_status` | タスク管理 |
+| 検索 | `search`, `get_by_id` | FTS5横断検索 |
 | ナレッジ | `add_knowledge` | ナレッジファイル保存 |
 
 ## 提供されるスキル
