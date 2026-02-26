@@ -125,8 +125,9 @@ you can pull its decisions directly.
 Otherwise, use `search` to find related topics and decisions by keyword.
 Once you find relevant records, understand past agreements and context before composing your first response.
 
-If a topic has decisions, also check `get_logs` for the discussion context behind them.
-The full retrieval flow: `search` → `get_decisions` → `get_logs`.
+トピックの経緯や背景を理解したい場合は、`get_logs` も確認する。
+特に、議論が複雑だったり、決定に至る過程が重要そうなトピックで有効。
+取得フロー: `search` → `get_decisions` → `get_logs`。
 
 ## Topic Management
 
@@ -182,8 +183,11 @@ without asking the user to repeat themselves.
 - Execution steps (git commits, PR creation, file edits — git history covers these)
 - Greetings, acknowledgments, or filler
 
-Granularity is your call. At minimum, a future AI should be able to trace
-the main threads of discussion. You don't need to log every turn — focus on what matters.
+粒度はエージェント判断に委ねるが、最低限以下を満たすこと:
+- 後続AIが「なぜこの結論になったか」を理解できる
+- 検討された選択肢とその採否がわかる
+- ユーザーが重視した条件・制約が読み取れる
+毎ターン記録する必要はない — 論点の転換点や合意の瞬間を押さえる。
 
 Format: capture the flow as User/Agent exchanges.
 Include options that were considered but NOT chosen —
