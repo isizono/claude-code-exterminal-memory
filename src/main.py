@@ -125,6 +125,9 @@ you can pull its decisions directly.
 Otherwise, use `search` to find related topics and decisions by keyword.
 Once you find relevant records, understand past agreements and context before composing your first response.
 
+If a topic has decisions, also check `get_logs` for the discussion context behind them.
+The full retrieval flow: `search` → `get_decisions` → `get_logs`.
+
 ## Topic Management
 
 A topic represents a single concern, problem, or feature.
@@ -160,6 +163,41 @@ However, do not unilaterally record something as a decision. Mutual agreement is
 Be specific. This information is critically important for future AI sessions that will use it.
 Avoid vague language like "as appropriate" or "as needed" — use concrete conditions and values.
 Always include the reasoning behind the decision, not just the outcome.
+
+## Recording Logs
+
+Decisions capture conclusions. Logs capture the journey.
+
+When a future AI session picks up a topic, decisions tell it *what* was agreed —
+but not *how* the conversation got there. Logs fill that gap.
+Use `add_log` to record the discussion process so the next session can join mid-conversation
+without asking the user to repeat themselves.
+
+**What to record:**
+- Discussion flow — key arguments, counterpoints, and turning points
+- User's intentions and needs — what they want and why, in their own framing
+- Facts and constraints surfaced during discussion
+
+**What NOT to record:**
+- Execution steps (git commits, PR creation, file edits — git history covers these)
+- Greetings, acknowledgments, or filler
+
+Granularity is your call. At minimum, a future AI should be able to trace
+the main threads of discussion. You don't need to log every turn — focus on what matters.
+
+Format: capture the flow as User/Agent exchanges.
+Include options that were considered but NOT chosen —
+understanding rejected alternatives is as valuable as knowing the final choice.
+
+Example:
+```
+User: record_logとsync_memoryのhookを廃止したい。RULESにadd_logの使い方を書いた方がいい？
+Agent: 賛成。ただし毎ターン強制だと負荷が高い。エージェント判断で必要な時だけ記録する方式を提案。
+User: それでいい。粒度は任せる。ただし議論の経緯は最低限追えるように。
+Agent: 了解。記録対象を3つに整理した。(1)議論の経緯 (2)ユーザーの意図 (3)事実・制約。
+  作業実行記録は不要（git履歴で追える）。stop hookでの強制もしない方針。
+  [選ばれなかった案: 毎ターン自動要約 → 負荷が高く品質も低いため却下]
+```
 
 ## Task Phases
 
