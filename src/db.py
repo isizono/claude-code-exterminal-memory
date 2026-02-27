@@ -41,8 +41,10 @@ def get_connection() -> sqlite3.Connection:
 def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
     """sqlite-vec拡張をコネクションにロードする"""
     conn.enable_load_extension(True)
-    sqlite_vec.load(conn)
-    conn.enable_load_extension(False)
+    try:
+        sqlite_vec.load(conn)
+    finally:
+        conn.enable_load_extension(False)
 
 
 class _VecSQLiteBackend(SQLiteBackend):
