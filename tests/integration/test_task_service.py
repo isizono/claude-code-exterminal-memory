@@ -183,6 +183,28 @@ class TestGetTasks:
         assert "error" in result
         assert result["error"]["code"] == "INVALID_STATUS"
 
+    def test_get_tasks_description_truncated(self, temp_db):
+        """descriptionが100文字に切り詰められる"""
+        subject = add_subject(name="test-subject", description="Test")
+        long_desc = "あ" * 200
+        add_task(subject_id=subject["subject_id"], title="Task", description=long_desc)
+
+        result = get_tasks(subject_id=subject["subject_id"], status="pending")
+
+        assert "error" not in result
+        assert len(result["tasks"][0]["description"]) == 100
+        assert result["tasks"][0]["description"] == "あ" * 100
+
+    def test_get_tasks_description_short_not_truncated(self, temp_db):
+        """100文字以下のdescriptionはそのまま返る"""
+        subject = add_subject(name="test-subject", description="Test")
+        short_desc = "短い説明"
+        add_task(subject_id=subject["subject_id"], title="Task", description=short_desc)
+
+        result = get_tasks(subject_id=subject["subject_id"], status="pending")
+
+        assert result["tasks"][0]["description"] == short_desc
+
 
 class TestUpdateTask:
     """update_taskの統合テスト"""

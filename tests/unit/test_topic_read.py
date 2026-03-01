@@ -227,6 +227,31 @@ def test_get_decisions_empty(test_subject):
     result = get_decisions(topic_id=topic["topic_id"])
 
     assert "error" not in result
+    assert result["topic_id"] == topic["topic_id"]
+    assert result["topic_name"] == "Topic"
+    assert result["decisions"] == []
+
+
+def test_get_decisions_topic_name_included(test_subject):
+    """topic_nameがトップレベルに含まれる"""
+    topic = add_topic(subject_id=test_subject, title="テスト用トピック", description="Test")
+    add_decision(topic_id=topic["topic_id"], decision="Dec 1", reason="Reason 1")
+
+    result = get_decisions(topic_id=topic["topic_id"])
+
+    assert result["topic_id"] == topic["topic_id"]
+    assert result["topic_name"] == "テスト用トピック"
+    assert len(result["decisions"]) == 1
+    assert "topic_id" not in result["decisions"][0]
+
+
+def test_get_decisions_nonexistent_topic(test_subject):
+    """存在しないtopic_idの場合、topic_name=nullで空配列"""
+    result = get_decisions(topic_id=999999)
+
+    assert "error" not in result
+    assert result["topic_id"] == 999999
+    assert result["topic_name"] is None
     assert result["decisions"] == []
 
 
