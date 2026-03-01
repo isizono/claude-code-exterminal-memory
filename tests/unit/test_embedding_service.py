@@ -169,10 +169,10 @@ def test_ensure_server_starts_server(monkeypatch):
 
     def fake_urlopen(req, timeout=None):
         call_count[0] += 1
-        if call_count[0] == 1:
-            # 最初のhealthチェックは失敗
+        if call_count[0] <= 2:
+            # ロック前とロック内のhealthチェックは失敗
             raise urllib.error.URLError("Connection refused")
-        # 起動後のhealthチェックは成功
+        # Popen後のポーリングで成功
         return FakeResponse()
 
     monkeypatch.setattr(emb.urllib.request, 'urlopen', fake_urlopen)

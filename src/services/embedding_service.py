@@ -4,6 +4,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 import urllib.request
 import urllib.error
@@ -22,77 +23,87 @@ EMBEDDING_SERVER_URL = f"http://{EMBEDDING_SERVER_HOST}:{EMBEDDING_SERVER_PORT}"
 
 # グローバル状態
 _backfill_done = False
+_server_lock = threading.Lock()
 
 
-def _ensure_server() -> bool:
-    """embeddingサーバーの起動を保証する。"""
-    # 1. healthチェック
+def _health_check() -> bool:
+    """embeddingサーバーのhealthチェック。"""
     try:
         req = urllib.request.Request(f"{EMBEDDING_SERVER_URL}/health")
         with urllib.request.urlopen(req, timeout=2) as resp:
-            if resp.status == 200:
-                return True
+            return resp.status == 200
     except Exception:
-        pass
+        return False
 
-    # 2. サーバー起動
-    logger.info("Starting embedding server...")
-    log_dir = os.path.expanduser("~/.cache/cc-memory")
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, "embedding-server.log")
 
-    server_module = os.path.join(os.path.dirname(__file__), "embedding_server.py")
-    log_file = open(log_path, "a")
-    try:
-        subprocess.Popen(
-            [sys.executable, server_module],
-            stdout=log_file,
-            stderr=log_file,
-            start_new_session=True,
-        )
-    finally:
-        log_file.close()
+def _ensure_server() -> bool:
+    """embeddingサーバーの起動を保証する。排他制御により同時起動を防ぐ。"""
+    if _health_check():
+        return True
 
-    # 3. 起動待ち（最大30秒）
-    for _ in range(60):
-        time.sleep(0.5)
-        try:
-            req = urllib.request.Request(f"{EMBEDDING_SERVER_URL}/health")
-            with urllib.request.urlopen(req, timeout=2) as resp:
-                if resp.status == 200:
-                    logger.info("Embedding server is ready")
-                    return True
-        except Exception:
-            continue
+    with _server_lock:
+        # ロック取得後に再チェック（別スレッドが起動済みの場合）
+        if _health_check():
+            return True
 
-    logger.warning("Embedding server startup timed out (30s)")
-    return False
+        logger.info("Starting embedding server...")
+        log_dir = os.path.expanduser("~/.cache/cc-memory")
+        os.makedirs(log_dir, exist_ok=True)
+        log_path = os.path.join(log_dir, "embedding-server.log")
+
+        server_module = os.path.join(os.path.dirname(__file__), "embedding_server.py")
+        with open(log_path, "a") as log_file:
+            subprocess.Popen(
+                [sys.executable, server_module],
+                stdout=log_file,
+                stderr=log_file,
+                start_new_session=True,
+            )
+
+        # 起動待ち（最大30秒）
+        for _ in range(60):
+            time.sleep(0.5)
+            if _health_check():
+                logger.info("Embedding server is ready")
+                return True
+
+        logger.warning("Embedding server startup timed out (30s)")
+        return False
 
 
 def _request_encode(texts: list[str], prefix: str) -> Optional[list[list[float]]]:
-    """embeddingサーバーにencode要求を送信する。"""
+    """embeddingサーバーにencode要求を送信する。接続失敗時は1回リトライ。"""
     payload = json.dumps({"texts": texts, "prefix": prefix}).encode("utf-8")
-    req = urllib.request.Request(
-        f"{EMBEDDING_SERVER_URL}/encode",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-    )
 
-    for attempt in range(2):
-        try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                data = json.loads(resp.read())
-                return data["embeddings"]
-        except urllib.error.URLError as e:
-            if attempt == 0:
-                logger.info(f"Encode request failed, retrying: {e}")
-                if _ensure_server():
-                    continue
-            logger.info(f"Encode request failed after retry: {e}")
-            return None
-        except Exception as e:
-            logger.warning(f"Encode response parse error: {e}")
-            return None
+    def _do_request() -> Optional[list[list[float]]]:
+        req = urllib.request.Request(
+            f"{EMBEDDING_SERVER_URL}/encode",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            return data["embeddings"]
+
+    # 1回目
+    try:
+        return _do_request()
+    except urllib.error.URLError as e:
+        logger.info(f"Encode request failed, retrying: {e}")
+    except Exception as e:
+        logger.warning(f"Encode response parse error: {e}")
+        return None
+
+    # サーバー再起動を試みてリトライ
+    if not _ensure_server():
+        logger.info("Encode request failed: server restart failed")
+        return None
+
+    try:
+        return _do_request()
+    except Exception as e:
+        logger.info(f"Encode request failed after retry: {e}")
+        return None
 
 
 def build_embedding_text(*fields: Optional[str]) -> str:
