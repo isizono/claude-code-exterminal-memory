@@ -83,15 +83,20 @@ def generate_and_store_embedding(source_type: str, source_id: int, text: str) ->
         logger.warning(f"Failed to generate embedding for {source_type} {source_id}: {e}")
 
 
+def _insert_embedding_row(conn, search_index_id: int, embedding: list[float]) -> None:
+    """vec_indexに1行INSERTする（コミットは呼び出し側の責任）。"""
+    blob = serialize_float32(embedding)
+    conn.execute(
+        "INSERT INTO vec_index(rowid, embedding) VALUES (?, ?)",
+        (search_index_id, blob),
+    )
+
+
 def insert_embedding(search_index_id: int, embedding: list[float]) -> None:
     """vec_indexにembeddingをINSERTする。"""
     conn = get_connection()
     try:
-        blob = serialize_float32(embedding)
-        conn.execute(
-            "INSERT INTO vec_index(rowid, embedding) VALUES (?, ?)",
-            (search_index_id, blob),
-        )
+        _insert_embedding_row(conn, search_index_id, embedding)
         conn.commit()
     except Exception as e:
         logger.warning(f"Failed to insert embedding for search_index_id={search_index_id}: {e}")
@@ -190,11 +195,7 @@ def backfill_embeddings() -> int:
             try:
                 prefixed = DOC_PREFIX + text
                 embedding = model.encode(prefixed).tolist()
-                blob = serialize_float32(embedding)
-                conn.execute(
-                    "INSERT INTO vec_index(rowid, embedding) VALUES (?, ?)",
-                    (search_index_id, blob),
-                )
+                _insert_embedding_row(conn, search_index_id, embedding)
                 count += 1
             except Exception as e:
                 logger.warning(f"Failed to backfill embedding for search_index_id={search_index_id}: {e}")
