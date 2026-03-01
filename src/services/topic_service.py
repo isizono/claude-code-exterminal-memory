@@ -146,44 +146,22 @@ def get_topics(
                 tuple(parent_ids),
             )
 
-            # parent_id → ancestorsチェーンを構築
-            # depth=0が各起点（直親）、depth>0がその祖先
-            chains: dict[int, list[dict]] = {}
+            # CTE結果をlookup辞書に変換（1回の走査で完了）
+            lookup: dict[int, dict] = {}
             for arow in ancestor_rows:
                 a = row_to_dict(arow)
-                aid = a["id"]
-                if a["depth"] == 0:
-                    chains.setdefault(aid, []).insert(0, {"id": aid, "title": a["title"]})
-                else:
-                    # depth>0の祖先を、起点のチェーンに追加
-                    for start_id in list(chains.keys()):
-                        chain = chains[start_id]
-                        # このancestorの子がチェーンの末尾にいるか確認
-                        if chain and chain[-1]["id"] == a.get("_child_id", None):
-                            chain.append({"id": aid, "title": a["title"]})
+                if a["id"] not in lookup:
+                    lookup[a["id"]] = a
 
-            # 再帰CTEの結果からチェーンを再構築（よりシンプルなアプローチ）
-            # 各parent_idを起点として、parent_topic_idを辿ってチェーンを構築
+            # 各parent_idからparent_topic_idチェーンを辿って構築
             ancestors_map = {}
             for pid in parent_ids:
                 chain = []
                 current_id = pid
-                visited = set()
-                depth = 0
-                while current_id is not None and depth < 5 and current_id not in visited:
-                    visited.add(current_id)
-                    found = None
-                    for arow in ancestor_rows:
-                        a = row_to_dict(arow)
-                        if a["id"] == current_id:
-                            found = a
-                            break
-                    if found:
-                        chain.append({"id": found["id"], "title": found["title"]})
-                        current_id = found["parent_topic_id"]
-                        depth += 1
-                    else:
-                        break
+                while current_id and current_id in lookup:
+                    node = lookup[current_id]
+                    chain.append({"id": node["id"], "title": node["title"]})
+                    current_id = node["parent_topic_id"]
                 ancestors_map[pid] = chain
 
         # topicsにancestorsを付与し、parent_topic_idを除去
