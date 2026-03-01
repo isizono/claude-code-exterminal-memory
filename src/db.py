@@ -59,7 +59,10 @@ class _VecSQLiteBackend(SQLiteBackend):
 
     def connect(self, dburi) -> sqlite3.Connection:
         conn = super().connect(dburi)
-        _load_sqlite_vec(conn)
+        try:
+            _load_sqlite_vec(conn)
+        except Exception:
+            logger.warning("sqlite-vec could not be loaded. Vector search will be unavailable.")
         return conn
 
 
