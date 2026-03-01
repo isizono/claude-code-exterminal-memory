@@ -164,7 +164,11 @@ def get_topics(
             for pid in parent_ids:
                 chain = []
                 current_id = pid
+                visited: set[int] = set()
                 while current_id and current_id in lookup:
+                    if current_id in visited:
+                        break
+                    visited.add(current_id)
                     node = lookup[current_id]
                     chain.append({"id": node["id"], "title": node["title"]})
                     current_id = node["parent_topic_id"]
