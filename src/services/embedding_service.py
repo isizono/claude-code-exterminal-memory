@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlite_vec import serialize_float32
 
-from src.db import get_connection
+from src.db import execute_query, get_connection
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,22 @@ def encode_query(text: str) -> Optional[list[float]]:
     prefixed = QUERY_PREFIX + text
     embedding = model.encode(prefixed)
     return embedding.tolist()
+
+
+def generate_and_store_embedding(source_type: str, source_id: int, text: str) -> None:
+    """search_indexからIDを取得してembeddingを生成・保存する。失敗してもraiseしない。"""
+    try:
+        rows = execute_query(
+            "SELECT id FROM search_index WHERE source_type = ? AND source_id = ?",
+            (source_type, source_id),
+        )
+        if rows:
+            search_index_id = rows[0]["id"]
+            embedding = encode_document(text)
+            if embedding is not None:
+                insert_embedding(search_index_id, embedding)
+    except Exception as e:
+        logger.warning(f"Failed to generate embedding for {source_type} {source_id}: {e}")
 
 
 def insert_embedding(search_index_id: int, embedding: list[float]) -> None:
