@@ -47,6 +47,11 @@ def _ensure_initialized():
     return model
 
 
+def build_embedding_text(*fields: Optional[str]) -> str:
+    """embeddingテキストを構築する。None/空文字列は除外してスペース結合。"""
+    return " ".join(f for f in fields if f)
+
+
 def encode_document(text: str) -> Optional[list[float]]:
     """ドキュメント用embedding生成。prefix付き。"""
     model = _ensure_initialized()
@@ -109,12 +114,7 @@ def update_embedding(search_index_id: int, embedding: list[float]) -> None:
     """vec_indexのembeddingを更新する（DELETE+INSERT）。"""
     conn = get_connection()
     try:
-        blob = serialize_float32(embedding)
-        conn.execute("DELETE FROM vec_index WHERE rowid = ?", (search_index_id,))
-        conn.execute(
-            "INSERT INTO vec_index(rowid, embedding) VALUES (?, ?)",
-            (search_index_id, blob),
-        )
+        _insert_embedding_row(conn, search_index_id, embedding)
         conn.commit()
     except Exception as e:
         logger.warning(f"Failed to update embedding for search_index_id={search_index_id}: {e}")
@@ -132,23 +132,24 @@ def backfill_embeddings() -> int:
         return 0
 
     # リソースタイプごとのクエリ（バッチ推論のためにグループ化）
+    # テキスト構築はPython側のbuild_embedding_textで統一
     type_queries = {
         "topic": """
-            SELECT si.id, RTRIM(dt.title || ' ' || COALESCE(dt.description, ''))
+            SELECT si.id, dt.title, dt.description
             FROM search_index si
             INNER JOIN discussion_topics dt ON si.source_id = dt.id
             LEFT JOIN vec_index vi ON si.id = vi.rowid
             WHERE si.source_type = 'topic' AND vi.rowid IS NULL
         """,
         "decision": """
-            SELECT si.id, RTRIM(d.decision || ' ' || COALESCE(d.reason, ''))
+            SELECT si.id, d.decision, d.reason
             FROM search_index si
             INNER JOIN decisions d ON si.source_id = d.id
             LEFT JOIN vec_index vi ON si.id = vi.rowid
             WHERE si.source_type = 'decision' AND vi.rowid IS NULL
         """,
         "task": """
-            SELECT si.id, RTRIM(t.title || ' ' || COALESCE(t.description, ''))
+            SELECT si.id, t.title, t.description
             FROM search_index si
             INNER JOIN tasks t ON si.source_id = t.id
             LEFT JOIN vec_index vi ON si.id = vi.rowid
@@ -167,9 +168,10 @@ def backfill_embeddings() -> int:
             ids = []
             texts = []
             for row in rows:
-                if row[1] is not None:
+                text = build_embedding_text(row[1], row[2])
+                if text:
                     ids.append(row[0])
-                    texts.append(DOC_PREFIX + row[1])
+                    texts.append(DOC_PREFIX + text)
 
             if not texts:
                 continue

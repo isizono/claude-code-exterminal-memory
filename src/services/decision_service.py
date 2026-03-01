@@ -2,7 +2,7 @@
 import sqlite3
 from typing import Optional
 from src.db import execute_insert, execute_query, row_to_dict
-from src.services.embedding_service import generate_and_store_embedding
+from src.services.embedding_service import build_embedding_text, generate_and_store_embedding
 
 
 def add_decision(
@@ -28,7 +28,7 @@ def add_decision(
         )
 
         # embedding生成（失敗してもdecision作成には影響しない）
-        generate_and_store_embedding("decision", decision_id, " ".join(filter(None, [decision, reason])))
+        generate_and_store_embedding("decision", decision_id, build_embedding_text(decision, reason))
 
         # 作成した決定事項を取得
         rows = execute_query(
