@@ -1,7 +1,11 @@
 """決定事項管理サービス"""
+import logging
 import sqlite3
 from typing import Optional
 from src.db import execute_insert, execute_query, row_to_dict
+from src.services.embedding_service import encode_document, insert_embedding
+
+logger = logging.getLogger(__name__)
 
 
 def add_decision(
@@ -25,6 +29,22 @@ def add_decision(
             "INSERT INTO decisions (topic_id, decision, reason) VALUES (?, ?, ?)",
             (topic_id, decision, reason),
         )
+
+        # NOTE: execute_insertがcommit済みなので、トリガーで作成されたsearch_indexは
+        # 別接続のexecute_queryから参照可能。insert_embeddingの失敗はバックフィルで回復する。
+        try:
+            rows = execute_query(
+                "SELECT id FROM search_index WHERE source_type = ? AND source_id = ?",
+                ("decision", decision_id),
+            )
+            if rows:
+                search_index_id = rows[0]["id"]
+                text = decision + " " + reason
+                embedding = encode_document(text)
+                if embedding is not None:
+                    insert_embedding(search_index_id, embedding)
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for decision {decision_id}: {e}")
 
         # 作成した決定事項を取得
         rows = execute_query(

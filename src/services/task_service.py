@@ -5,6 +5,7 @@ import sqlite3
 from src.db import execute_query, get_connection, row_to_dict
 from src.db_base import BaseDBService
 from src.base import TaskStatusListener
+from src.services.embedding_service import encode_document, insert_embedding
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,22 @@ def add_task(subject_id: int, title: str, description: str) -> dict:
             'description': description,
             'status': 'pending'
         })
+
+        # NOTE: execute_insertがcommit済みなので、トリガーで作成されたsearch_indexは
+        # 別接続のexecute_queryから参照可能。insert_embeddingの失敗はバックフィルで回復する。
+        try:
+            rows = execute_query(
+                "SELECT id FROM search_index WHERE source_type = ? AND source_id = ?",
+                ("task", task_id),
+            )
+            if rows:
+                search_index_id = rows[0]["id"]
+                text = title + " " + description
+                embedding = encode_document(text)
+                if embedding is not None:
+                    insert_embedding(search_index_id, embedding)
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for task {task_id}: {e}")
 
         # 作成したタスクを取得
         task = _task_db._get_by_id(task_id)
