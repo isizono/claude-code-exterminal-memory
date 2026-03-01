@@ -84,8 +84,9 @@ def generate_and_store_embedding(source_type: str, source_id: int, text: str) ->
 
 
 def _insert_embedding_row(conn, search_index_id: int, embedding: list[float]) -> None:
-    """vec_indexに1行INSERTする（コミットは呼び出し側の責任）。"""
+    """vec_indexに1行UPSERT（DELETE+INSERT）する（コミットは呼び出し側の責任）。"""
     blob = serialize_float32(embedding)
+    conn.execute("DELETE FROM vec_index WHERE rowid = ?", (search_index_id,))
     conn.execute(
         "INSERT INTO vec_index(rowid, embedding) VALUES (?, ?)",
         (search_index_id, blob),
@@ -121,18 +122,6 @@ def update_embedding(search_index_id: int, embedding: list[float]) -> None:
         conn.close()
 
 
-def delete_embedding(search_index_id: int) -> None:
-    """vec_indexからembeddingを削除する。"""
-    conn = get_connection()
-    try:
-        conn.execute("DELETE FROM vec_index WHERE rowid = ?", (search_index_id,))
-        conn.commit()
-    except Exception as e:
-        logger.warning(f"Failed to delete embedding for search_index_id={search_index_id}: {e}")
-    finally:
-        conn.close()
-
-
 def backfill_embeddings() -> int:
     """search_indexにあってvec_indexにないレコードのembeddingを一括生成する。
 
@@ -142,46 +131,61 @@ def backfill_embeddings() -> int:
     if model is None:
         return 0
 
+    # リソースタイプごとのクエリ（バッチ推論のためにグループ化）
+    type_queries = {
+        "topic": """
+            SELECT si.id, RTRIM(dt.title || ' ' || COALESCE(dt.description, ''))
+            FROM search_index si
+            INNER JOIN discussion_topics dt ON si.source_id = dt.id
+            LEFT JOIN vec_index vi ON si.id = vi.rowid
+            WHERE si.source_type = 'topic' AND vi.rowid IS NULL
+        """,
+        "decision": """
+            SELECT si.id, RTRIM(d.decision || ' ' || COALESCE(d.reason, ''))
+            FROM search_index si
+            INNER JOIN decisions d ON si.source_id = d.id
+            LEFT JOIN vec_index vi ON si.id = vi.rowid
+            WHERE si.source_type = 'decision' AND vi.rowid IS NULL
+        """,
+        "task": """
+            SELECT si.id, RTRIM(t.title || ' ' || COALESCE(t.description, ''))
+            FROM search_index si
+            INNER JOIN tasks t ON si.source_id = t.id
+            LEFT JOIN vec_index vi ON si.id = vi.rowid
+            WHERE si.source_type = 'task' AND vi.rowid IS NULL
+        """,
+    }
+
     conn = get_connection()
     try:
-        # vec_indexに存在しないsearch_indexレコードをソーステーブルとJOINして一括取得
-        rows = conn.execute("""
-            SELECT si.id,
-                COALESCE(
-                    dt.title || ' ' || COALESCE(dt.description, ''),
-                    d.decision || ' ' || COALESCE(d.reason, ''),
-                    t.title || ' ' || COALESCE(t.description, '')
-                ) as source_text
-            FROM search_index si
-            LEFT JOIN vec_index vi ON si.id = vi.rowid
-            LEFT JOIN discussion_topics dt ON si.source_type = 'topic' AND si.source_id = dt.id
-            LEFT JOIN decisions d ON si.source_type = 'decision' AND si.source_id = d.id
-            LEFT JOIN tasks t ON si.source_type = 'task' AND si.source_id = t.id
-            WHERE vi.rowid IS NULL
-        """).fetchall()
+        total = 0
+        for source_type, query in type_queries.items():
+            rows = conn.execute(query).fetchall()
+            if not rows:
+                continue
 
-        if not rows:
-            return 0
+            ids = []
+            texts = []
+            for row in rows:
+                if row[1] is not None:
+                    ids.append(row[0])
+                    texts.append(DOC_PREFIX + row[1])
 
-        count = 0
-        for row in rows:
-            search_index_id = row[0]
-            text = row[1]
-            if text is None:
+            if not texts:
                 continue
 
             try:
-                prefixed = DOC_PREFIX + text
-                embedding = model.encode(prefixed).tolist()
-                _insert_embedding_row(conn, search_index_id, embedding)
-                count += 1
+                embeddings = model.encode(texts)
+                for search_index_id, embedding in zip(ids, embeddings):
+                    _insert_embedding_row(conn, search_index_id, embedding.tolist())
+                    total += 1
             except Exception as e:
-                logger.warning(f"Failed to backfill embedding for search_index_id={search_index_id}: {e}")
+                logger.warning(f"Failed to backfill {source_type} embeddings: {e}")
                 continue
 
         conn.commit()
-        logger.info(f"Backfilled {count} embeddings")
-        return count
+        logger.info(f"Backfilled {total} embeddings")
+        return total
     except Exception as e:
         logger.warning(f"Embedding backfill failed: {e}")
         return 0

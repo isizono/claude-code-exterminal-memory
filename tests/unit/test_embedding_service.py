@@ -34,6 +34,14 @@ def mock_embedding_model(monkeypatch):
     class MockModel:
         def encode(self, text):
             # 384次元のダミーベクトルを返す（テキストに基づいて決定論的に生成）
+            # sentence-transformersと同様にリスト入力（バッチ）にも対応
+            if isinstance(text, list):
+                return np.array([
+                    self._encode_single(t) for t in text
+                ])
+            return self._encode_single(text)
+
+        def _encode_single(self, text):
             np.random.seed(hash(text) % (2**32))
             return np.random.rand(EMBEDDING_DIM).astype(np.float32)
 
@@ -293,6 +301,13 @@ def test_backfill_fills_missing_embeddings(temp_db, monkeypatch):
 
     class MockModel:
         def encode(self, text):
+            if isinstance(text, list):
+                return np.array([
+                    self._encode_single(t) for t in text
+                ])
+            return self._encode_single(text)
+
+        def _encode_single(self, text):
             np.random.seed(42)
             return np.random.rand(EMBEDDING_DIM).astype(np.float32)
 
