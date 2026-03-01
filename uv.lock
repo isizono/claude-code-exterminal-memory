@@ -214,7 +214,7 @@ requires-dist = [
     { name = "pytest", specifier = ">=7.4.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "sentence-transformers" },
-    { name = "sqlite-vec" },
+    { name = "sqlite-vec", specifier = ">=0.1.6,<0.2" },
     { name = "yoyo-migrations", specifier = ">=9,<10" },
 ]
 
