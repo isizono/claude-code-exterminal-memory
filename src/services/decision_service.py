@@ -82,6 +82,13 @@ def get_decisions(
         # limitを30件に制限
         limit = min(limit, 30)
 
+        # topic_nameを取得
+        topic_rows = execute_query(
+            "SELECT title FROM discussion_topics WHERE id = ?",
+            (topic_id,),
+        )
+        topic_name = topic_rows[0]["title"] if topic_rows else None
+
         if start_id is None:
             rows = execute_query(
                 """
@@ -108,13 +115,16 @@ def get_decisions(
             dec = row_to_dict(row)
             decisions.append({
                 "id": dec["id"],
-                "topic_id": dec["topic_id"],
                 "decision": dec["decision"],
                 "reason": dec["reason"],
                 "created_at": dec["created_at"],
             })
 
-        return {"decisions": decisions}
+        return {
+            "topic_id": topic_id,
+            "topic_name": topic_name,
+            "decisions": decisions,
+        }
 
     except Exception as e:
         return {

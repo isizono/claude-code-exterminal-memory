@@ -136,7 +136,7 @@ def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> d
                 "id": task["id"],
                 "subject_id": task["subject_id"],
                 "title": task["title"],
-                "description": task["description"],
+                "description": (task["description"] or "")[:100],
                 "status": task["status"],
                 "topic_id": task["topic_id"],
                 "created_at": task["created_at"],
