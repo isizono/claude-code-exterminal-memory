@@ -47,13 +47,17 @@ description: This skill determines implementation approach and technical decisio
 
 開始前チェックをパスしたら：
 
-1. `[設計]` タスクを作成する
+1. 既存の `[設計]` タスクを探す（議論フェーズで作成済みの場合がある）
+   - あれば → そのタスクを引き継ぐ（新規作成しない）
+   - なければ → `[設計]` タスクを新規作成する
 2. 議論フェーズのdecisionを確認し、前提を共有する
 
 ```
 例: 「トピック検索機能」の設計を開始
 
-1. 設計タスクを作成
+1. 既存の設計タスクを探す
+   get_tasks(subject_id=2, status="pending")
+   → [設計] タスクがあればそれを使う。なければ作成:
    add_task(
        subject_id=2,
        title="[設計] トピック検索機能の方針決定",
