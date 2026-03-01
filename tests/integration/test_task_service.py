@@ -4,7 +4,7 @@ import tempfile
 import pytest
 from src.db import init_database, execute_query
 from src.services.subject_service import add_subject
-from src.services.task_service import add_task, get_tasks, update_task_status
+from src.services.task_service import add_task, get_tasks, update_task
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ class TestGetTasks:
         add_task(subject_id=sid, title="Task 3", description="Desc 3")
 
         # Task 2をin_progressに変更
-        update_task_status(task2["task_id"], "in_progress")
+        update_task(task2["task_id"], new_status="in_progress")
 
         # in_progressでフィルタ
         result = get_tasks(subject_id=sid, status="in_progress")
@@ -104,7 +104,7 @@ class TestGetTasks:
         task_ip = add_task(subject_id=sid, title="In Progress 1", description="Desc")
         add_task(subject_id=sid, title="Pending 2", description="Desc")
 
-        update_task_status(task_ip["task_id"], "in_progress")
+        update_task(task_ip["task_id"], new_status="in_progress")
 
         # statusを指定せずに呼び出し → デフォルトでin_progressのみ
         result = get_tasks(subject_id=sid)
@@ -184,22 +184,21 @@ class TestGetTasks:
         assert result["error"]["code"] == "INVALID_STATUS"
 
 
-class TestUpdateTaskStatus:
-    """update_task_statusの統合テスト"""
+class TestUpdateTask:
+    """update_taskの統合テスト"""
 
     def test_update_status_to_in_progress(self, subject_with_task):
         """ステータスをin_progressに更新できる"""
         task = subject_with_task["task"]
-        result = update_task_status(task["task_id"], "in_progress")
+        result = update_task(task["task_id"], new_status="in_progress")
 
         assert "error" not in result
         assert result["status"] == "in_progress"
-        assert result["topic_id"] is None  # blockedじゃないのでtopic_idはNoneのまま
 
     def test_update_status_to_completed(self, subject_with_task):
         """ステータスをcompletedに更新できる"""
         task = subject_with_task["task"]
-        result = update_task_status(task["task_id"], "completed")
+        result = update_task(task["task_id"], new_status="completed")
 
         assert "error" not in result
         assert result["status"] == "completed"
@@ -207,87 +206,14 @@ class TestUpdateTaskStatus:
     def test_update_status_invalid(self, subject_with_task):
         """無効なステータスでエラーになる"""
         task = subject_with_task["task"]
-        result = update_task_status(task["task_id"], "invalid_status")
+        result = update_task(task["task_id"], new_status="invalid_status")
 
         assert "error" in result
         assert result["error"]["code"] == "INVALID_STATUS"
 
-    def test_update_status_task_not_found(self, temp_db):
+    def test_update_task_not_found(self, temp_db):
         """存在しないタスクIDでエラーになる"""
-        result = update_task_status(9999, "in_progress")
+        result = update_task(9999, new_status="in_progress")
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
-
-
-class TestBlockedStatusWithTopicCreation:
-    """blockedステータス変更時のトピック自動作成の統合テスト"""
-
-    def test_blocked_creates_topic(self, subject_with_task):
-        """blockedに変更するとトピックが自動作成される"""
-        task = subject_with_task["task"]
-        result = update_task_status(task["task_id"], "blocked")
-
-        assert "error" not in result
-        assert result["status"] == "blocked"
-        assert result["topic_id"] is not None
-
-    def test_blocked_topic_has_correct_title(self, subject_with_task):
-        """作成されたトピックのタイトルが正しい形式になる"""
-        task = subject_with_task["task"]
-        result = update_task_status(task["task_id"], "blocked")
-
-        # DBから直接トピックを確認
-        rows = execute_query(
-            "SELECT * FROM discussion_topics WHERE id = ?",
-            (result["topic_id"],)
-        )
-        assert len(rows) == 1
-
-        topic = dict(rows[0])
-        assert topic["title"] == f"[BLOCKED] {task['title']}"
-        assert topic["description"] == task["description"]
-
-    def test_blocked_topic_linked_to_correct_subject(self, subject_with_task):
-        """作成されたトピックが正しいサブジェクトに紐づく"""
-        subject = subject_with_task["subject"]
-        task = subject_with_task["task"]
-        result = update_task_status(task["task_id"], "blocked")
-
-        rows = execute_query(
-            "SELECT * FROM discussion_topics WHERE id = ?",
-            (result["topic_id"],)
-        )
-        topic = dict(rows[0])
-        assert topic["subject_id"] == subject["subject_id"]
-
-    def test_blocked_then_unblocked_keeps_topic_id(self, subject_with_task):
-        """blockedからin_progressに戻してもtopic_idは維持される"""
-        task = subject_with_task["task"]
-
-        # blocked に変更
-        blocked_result = update_task_status(task["task_id"], "blocked")
-        topic_id = blocked_result["topic_id"]
-
-        # in_progress に戻す
-        unblocked_result = update_task_status(task["task_id"], "in_progress")
-
-        # topic_id は維持される（消えない）
-        assert unblocked_result["topic_id"] == topic_id
-
-    def test_multiple_tasks_blocked_create_separate_topics(self, temp_db):
-        """複数のタスクをblockedにするとそれぞれ別のトピックが作成される"""
-        subject = add_subject(name="test-subject", description="Test")
-        sid = subject["subject_id"]
-
-        task1 = add_task(subject_id=sid, title="Task 1", description="Desc 1")
-        task2 = add_task(subject_id=sid, title="Task 2", description="Desc 2")
-
-        result1 = update_task_status(task1["task_id"], "blocked")
-        result2 = update_task_status(task2["task_id"], "blocked")
-
-        assert result1["topic_id"] != result2["topic_id"]
-
-        # トピックが3つ存在（初期データ1 + 新規作成2）
-        rows = execute_query("SELECT COUNT(*) as count FROM discussion_topics", ())
-        assert rows[0]["count"] == 3

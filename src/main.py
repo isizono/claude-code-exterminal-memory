@@ -438,13 +438,13 @@ def get_tasks(
     典型的な使い方:
     - 進行中のタスク確認: get_tasks(subject_id)
     - 未着手のタスク確認: get_tasks(subject_id, status="pending")
-    - ブロック中のタスク確認: get_tasks(subject_id, status="blocked")
+    - 完了タスクの確認: get_tasks(subject_id, status="completed")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
         subject_id: サブジェクトID
-        status: フィルタするステータス（pending/in_progress/blocked/completed、デフォルト: in_progress）
+        status: フィルタするステータス（pending/in_progress/completed、デフォルト: in_progress）
         limit: 取得件数上限（デフォルト: 5）
 
     Returns:
@@ -454,31 +454,57 @@ def get_tasks(
 
 
 @mcp.tool()
-def update_task_status(
+def update_task(
     task_id: int,
-    new_status: str,
+    new_status: Optional[str] = None,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
 ) -> dict:
     """
-    タスクのステータスを更新する。
+    タスクのステータス・タイトル・説明を更新する。
 
     典型的な使い方:
-    - タスク開始: update_task_status(task_id, "in_progress")
-    - タスク完了: update_task_status(task_id, "completed")
-    - ブロック状態: update_task_status(task_id, "blocked")
+    - タスク開始: update_task(task_id, new_status="in_progress")
+    - タスク完了: update_task(task_id, new_status="completed")
+    - タイトル変更: update_task(task_id, title="新しいタイトル")
+    - 説明更新: update_task(task_id, description="新しい説明")
 
     ワークフロー位置: タスク進行状況の更新時
 
-    重要: blocked状態にした場合、自動的にトピックが作成され、topic_idが設定される。
-    これにより、ブロック理由や解決方法を議論トピックとして記録できる。
-
     Args:
         task_id: タスクID
-        new_status: 新しいステータス（pending/in_progress/blocked/completed）
+        new_status: 新しいステータス（pending/in_progress/completed）
+        title: 新しいタイトル
+        description: 新しい説明
 
     Returns:
-        更新されたタスク情報（blocked時はtopic_idも含む）
+        更新されたタスク情報
     """
-    return task_service.update_task_status(task_id, new_status)
+    return task_service.update_task(task_id, new_status, title, description)
+
+
+@mcp.tool()
+def update_subject(
+    subject_id: int,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+) -> dict:
+    """
+    サブジェクトの名前・説明を更新する。
+
+    典型的な使い方:
+    - リネーム: update_subject(subject_id, name="新しい名前")
+    - 説明更新: update_subject(subject_id, description="新しい説明")
+
+    Args:
+        subject_id: サブジェクトID
+        name: 新しいサブジェクト名
+        description: 新しい説明
+
+    Returns:
+        更新されたサブジェクト情報
+    """
+    return subject_service.update_subject(subject_id, name, description)
 
 
 @mcp.tool()
