@@ -209,7 +209,7 @@ def search(
     limit = max(1, min(limit, 50))
 
     try:
-        fetch_limit = limit * 2
+        fetch_limit = limit * 5
 
         # FTS5検索: 3文字以上の場合のみ
         fts_results = []
