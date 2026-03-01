@@ -119,4 +119,5 @@ add_decision(
 - [ ] 必須項目（What/Why/Scope/Acceptance）がすべて明確になっている
 - [ ] ユーザーの承認を得ている
 - [ ] add_decision()で記録済み
+- [ ] `[設計]` タスクを作成済み（add_task で `[設計] {テーマ}` を作成し、議論で決まったdecision IDをdescriptionに記載する）
 - [ ] 設計フェーズに必要な情報が揃っている
