@@ -250,7 +250,7 @@ a different AI will likely handle implementation, working solely from the task d
 **Implementation phase**: Before starting, confirm the [実装] task exists and review
 its specifications and related design decisions with the user.
 On completion, record any deviations from design or implementation-specific decisions
-via `add_decision`, then mark the [実装] task as completed.
+via `add_decision`. Get user approval before marking the [実装] task as completed.
 
 ---
 
