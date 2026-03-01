@@ -115,8 +115,9 @@ def encode_document(text: str) -> Optional[list[float]]:
     """ドキュメント用embedding生成。"""
     global _backfill_done
     if not _backfill_done:
-        backfill_embeddings()
-        _backfill_done = True
+        if _ensure_server():
+            backfill_embeddings()
+            _backfill_done = True
 
     result = _request_encode([text], "document")
     if result is not None:
@@ -248,6 +249,12 @@ def backfill_embeddings() -> int:
                 embeddings = _request_encode(texts, "document")
                 if embeddings is None:
                     logger.warning(f"Failed to backfill {source_type} embeddings: server returned None")
+                    continue
+                if len(embeddings) != len(ids):
+                    logger.error(
+                        f"Embedding count mismatch for {source_type}: "
+                        f"expected {len(ids)}, got {len(embeddings)}"
+                    )
                     continue
                 for search_index_id, embedding in zip(ids, embeddings):
                     _insert_embedding_row(conn, search_index_id, embedding)
