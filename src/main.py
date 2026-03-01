@@ -319,7 +319,7 @@ def add_log(topic_id: int, content: str) -> dict:
 def add_decision(
     decision: str,
     reason: str,
-    topic_id: Optional[int] = None,
+    topic_id: int,
 ) -> dict:
     """決定事項を記録する。"""
     return decision_service.add_decision(decision, reason, topic_id)

@@ -7,7 +7,7 @@ from src.db import execute_insert, execute_query, row_to_dict
 def add_decision(
     decision: str,
     reason: str,
-    topic_id: Optional[int] = None,
+    topic_id: int,
 ) -> dict:
     """
     決定事項を記録する。
@@ -15,7 +15,7 @@ def add_decision(
     Args:
         decision: 決定内容
         reason: 決定の理由
-        topic_id: 関連するトピックのID（未指定も可）
+        topic_id: 関連するトピックのID（必須）
 
     Returns:
         作成された決定事項情報

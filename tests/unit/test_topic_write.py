@@ -125,15 +125,15 @@ def test_add_decision_success(test_subject):
 
 
 def test_add_decision_without_topic(temp_db):
-    """トピックIDなしで決定事項を追加できる"""
+    """topic_id=Noneで決定事項を追加するとCONSTRAINT_VIOLATIONが返る"""
     result = add_decision(
         decision="グローバルな決定事項",
         reason="サブジェクト全体に関わる",
+        topic_id=None,
     )
 
-    assert "error" not in result
-    assert result["decision_id"] > 0
-    assert result["topic_id"] is None
+    assert "error" in result
+    assert result["error"]["code"] == "CONSTRAINT_VIOLATION"
 
 
 def test_add_decision_multiple(test_subject):
