@@ -4,7 +4,7 @@
 #
 # 処理フロー:
 # 1. メタタグチェック → なければblock
-# 2. トピック存在チェック → 存在しなければblock
+# 2. トピック存在・名前一致チェック → 存在しない or 名前不一致ならblock
 # 3. トピック変更チェック → 前topicにdecision/logなければblock
 # 4. approve
 
@@ -47,19 +47,29 @@ if [ "$META_FOUND" != "true" ]; then
 fi
 
 CURRENT_TOPIC=$(echo "$META_RESULT" | jq -r '.topic_id')
+CURRENT_TOPIC_NAME=$(echo "$META_RESULT" | jq -r '.topic_name')
 
-# 2. トピック存在チェック
-TOPIC_EXISTS=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_exists.py" "$CURRENT_TOPIC" 2>>"$LOG_DIR/uv_stderr.log")
-TOPIC_EXISTS_EXIT_CODE=$?
+# 2. トピック存在・名前一致チェック
+TOPIC_CHECK=$(cd "$PROJECT_ROOT" && uv run python "$SCRIPT_DIR/check_topic_exists.py" "$CURRENT_TOPIC" "$CURRENT_TOPIC_NAME" 2>>"$LOG_DIR/uv_stderr.log")
+TOPIC_CHECK_EXIT_CODE=$?
 
-if [ $TOPIC_EXISTS_EXIT_CODE -ne 0 ]; then
+if [ $TOPIC_CHECK_EXIT_CODE -ne 0 ]; then
   # スクリプト実行エラー
-  jq -n --arg reason "check_topic_exists.py failed: $TOPIC_EXISTS" '{decision: "block", reason: $reason}'
+  jq -n --arg reason "check_topic_exists.py failed: $TOPIC_CHECK" '{decision: "block", reason: $reason}'
   exit 0
 fi
 
+TOPIC_EXISTS=$(echo "$TOPIC_CHECK" | jq -r '.exists')
 if [ "$TOPIC_EXISTS" = "false" ]; then
   jq -n --arg topic "$CURRENT_TOPIC" '{decision: "block", reason: ("topic_id=" + $topic + " は存在しません。get_topics で正しいtopic_idを確認してください")}'
+  exit 0
+fi
+
+TOPIC_NAME_MATCH=$(echo "$TOPIC_CHECK" | jq -r '.name_match')
+if [ "$TOPIC_NAME_MATCH" = "false" ]; then
+  ACTUAL_NAME=$(echo "$TOPIC_CHECK" | jq -r '.actual_name')
+  jq -n --arg topic "$CURRENT_TOPIC" --arg expected "$CURRENT_TOPIC_NAME" --arg actual "$ACTUAL_NAME" \
+    '{decision: "block", reason: ("topic_id=" + $topic + " のトピック名が一致しません。メタタグ: \"" + $expected + "\" / DB: \"" + $actual + "\"。正しいtopic_idを確認してください")}'
   exit 0
 fi
 
