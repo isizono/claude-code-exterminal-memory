@@ -253,6 +253,15 @@ def update_task(
         row = cursor.fetchone()
         if not row:
             raise Exception("Failed to retrieve updated task")
+
+        # title/descriptionが変更された場合、embeddingを再生成
+        if title is not None or description is not None:
+            updated = row_to_dict(row)
+            generate_and_store_embedding(
+                "task", task_id,
+                " ".join(filter(None, [updated["title"], updated["description"]])),
+            )
+
         return _task_to_response(row_to_dict(row))
 
     except sqlite3.IntegrityError as e:
