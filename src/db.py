@@ -34,7 +34,10 @@ def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row  # 辞書ライクなアクセスを可能にする
     conn.execute("PRAGMA foreign_keys = ON")  # 外部キー制約を有効化
-    _load_sqlite_vec(conn)
+    try:
+        _load_sqlite_vec(conn)
+    except Exception:
+        logger.warning("sqlite-vec could not be loaded. Vector search will be unavailable.")
     return conn
 
 
