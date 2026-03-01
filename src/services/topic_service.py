@@ -30,7 +30,7 @@ def add_topic(
         )
 
         # embedding生成（失敗してもtopic作成には影響しない）
-        generate_and_store_embedding("topic", topic_id, title + " " + description)
+        generate_and_store_embedding("topic", topic_id, title + " " + (description or ""))
 
         # 作成したトピックを取得
         rows = execute_query(

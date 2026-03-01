@@ -85,7 +85,7 @@ def add_task(subject_id: int, title: str, description: str) -> dict:
         })
 
         # embedding生成（失敗してもtask作成には影響しない）
-        generate_and_store_embedding("task", task_id, title + " " + description)
+        generate_and_store_embedding("task", task_id, title + " " + (description or ""))
 
         # 作成したタスクを取得
         task = _task_db._get_by_id(task_id)

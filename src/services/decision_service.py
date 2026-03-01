@@ -28,7 +28,7 @@ def add_decision(
         )
 
         # embedding生成（失敗してもdecision作成には影響しない）
-        generate_and_store_embedding("decision", decision_id, decision + " " + reason)
+        generate_and_store_embedding("decision", decision_id, decision + " " + (reason or ""))
 
         # 作成した決定事項を取得
         rows = execute_query(
