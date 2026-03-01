@@ -133,32 +133,6 @@ def delete_embedding(search_index_id: int) -> None:
         conn.close()
 
 
-def _get_source_text(conn, source_type: str, source_id: int) -> Optional[str]:
-    """ソーステーブルからembedding対象テキストを取得する。"""
-    if source_type == "topic":
-        row = conn.execute(
-            "SELECT title, description FROM discussion_topics WHERE id = ?",
-            (source_id,)
-        ).fetchone()
-        if row:
-            return row[0] + " " + (row[1] or "")
-    elif source_type == "decision":
-        row = conn.execute(
-            "SELECT decision, reason FROM decisions WHERE id = ?",
-            (source_id,)
-        ).fetchone()
-        if row:
-            return row[0] + " " + (row[1] or "")
-    elif source_type == "task":
-        row = conn.execute(
-            "SELECT title, description FROM tasks WHERE id = ?",
-            (source_id,)
-        ).fetchone()
-        if row:
-            return row[0] + " " + (row[1] or "")
-    return None
-
-
 def backfill_embeddings() -> int:
     """search_indexにあってvec_indexにないレコードのembeddingを一括生成する。
 
@@ -170,11 +144,19 @@ def backfill_embeddings() -> int:
 
     conn = get_connection()
     try:
-        # vec_indexに存在しないsearch_indexレコードを取得
+        # vec_indexに存在しないsearch_indexレコードをソーステーブルとJOINして一括取得
         rows = conn.execute("""
-            SELECT si.id, si.source_type, si.source_id, si.title
+            SELECT si.id,
+                COALESCE(
+                    dt.title || ' ' || COALESCE(dt.description, ''),
+                    d.decision || ' ' || COALESCE(d.reason, ''),
+                    t.title || ' ' || COALESCE(t.description, '')
+                ) as source_text
             FROM search_index si
             LEFT JOIN vec_index vi ON si.id = vi.rowid
+            LEFT JOIN discussion_topics dt ON si.source_type = 'topic' AND si.source_id = dt.id
+            LEFT JOIN decisions d ON si.source_type = 'decision' AND si.source_id = d.id
+            LEFT JOIN tasks t ON si.source_type = 'task' AND si.source_id = t.id
             WHERE vi.rowid IS NULL
         """).fetchall()
 
@@ -184,11 +166,7 @@ def backfill_embeddings() -> int:
         count = 0
         for row in rows:
             search_index_id = row[0]
-            source_type = row[1]
-            source_id = row[2]
-
-            # ソーステーブルから本文テキストを取得
-            text = _get_source_text(conn, source_type, source_id)
+            text = row[1]
             if text is None:
                 continue
 

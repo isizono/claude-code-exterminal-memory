@@ -42,10 +42,6 @@ def mock_embedding_model(monkeypatch):
     monkeypatch.setattr(emb, '_model_load_failed', False)
     monkeypatch.setattr(emb, '_backfill_done', True)  # テスト中はバックフィルをスキップ
     yield
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', False)
-    monkeypatch.setattr(emb, '_backfill_done', False)
 
 
 @pytest.fixture
@@ -98,10 +94,6 @@ def test_encode_document_has_doc_prefix(temp_db, monkeypatch):
     assert len(captured_texts) == 1
     assert captured_texts[0] == "検索文書: テスト文書"
 
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_backfill_done', False)
-
 
 def test_encode_query_has_query_prefix(temp_db, monkeypatch):
     """encode_query: prefix「検索クエリ: 」が付与されている"""
@@ -121,10 +113,6 @@ def test_encode_query_has_query_prefix(temp_db, monkeypatch):
     assert len(captured_texts) == 1
     assert captured_texts[0] == "検索クエリ: テストクエリ"
 
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_backfill_done', False)
-
 
 # ========================================
 # graceful degradation のテスト
@@ -140,9 +128,6 @@ def test_graceful_degradation_model_load_failure(temp_db, monkeypatch):
     result = emb.encode_document("テスト")
 
     assert result is None
-
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model_load_failed', False)
 
 
 # ========================================
@@ -358,50 +343,24 @@ def test_backfill_fills_missing_embeddings(temp_db, monkeypatch):
     finally:
         conn.close()
 
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_backfill_done', False)
-
 
 def test_backfill_noop_when_all_filled(temp_db, mock_embedding_model):
     """backfill: 全レコードが既にある場合は何もしない"""
+    # init_database由来の未バックフィルレコードを先に処理しておく
+    emb.backfill_embeddings()
+
     subject = add_subject(name="backfill-noop-test", description="Test")
     subject_id = subject["subject_id"]
     # add_topicがembeddingも生成する（mock_embedding_modelがある）
-    topic = add_topic(
+    add_topic(
         subject_id=subject_id,
         title="全レコード存在テスト",
         description="バックフィル不要のケース",
     )
 
-    # add_topicで作成したtopicのsearch_index_idを取得
-    rows = execute_query(
-        "SELECT id FROM search_index WHERE source_type = ? AND source_id = ?",
-        ("topic", topic["topic_id"]),
-    )
-    assert len(rows) > 0
-    search_index_id = rows[0]["id"]
-
-    # add_topic時にembeddingが既に生成されていることを確認
-    conn = get_connection()
-    try:
-        cursor = conn.execute("SELECT count(*) FROM vec_index WHERE rowid = ?", (search_index_id,))
-        assert cursor.fetchone()[0] == 1
-    finally:
-        conn.close()
-
-    # バックフィル実行 - 追加したtopicのembeddingは既に存在するのでスキップされる
+    # 全レコードにembeddingがある状態でバックフィル実行
     filled = emb.backfill_embeddings()
-
-    # init_databaseのfirst_topic分が埋められる可能性はあるが、
-    # 明示的に追加したtopicは既にembeddingがあるのでバックフィル対象外
-    # vec_indexが変わっていないことを確認
-    conn = get_connection()
-    try:
-        cursor = conn.execute("SELECT count(*) FROM vec_index WHERE rowid = ?", (search_index_id,))
-        assert cursor.fetchone()[0] == 1
-    finally:
-        conn.close()
+    assert filled == 0
 
 
 # ========================================
@@ -443,9 +402,6 @@ def test_add_topic_succeeds_when_embedding_fails(temp_db, monkeypatch):
         finally:
             conn.close()
 
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model_load_failed', False)
-
 
 def test_add_decision_succeeds_when_embedding_fails(temp_db, monkeypatch):
     """embedding生成失敗時もadd_decision自体は成功する"""
@@ -470,9 +426,6 @@ def test_add_decision_succeeds_when_embedding_fails(temp_db, monkeypatch):
     assert "error" not in dec
     assert dec["decision_id"] is not None
 
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model_load_failed', False)
-
 
 def test_add_task_succeeds_when_embedding_fails(temp_db, monkeypatch):
     """embedding生成失敗時もadd_task自体は成功する"""
@@ -491,6 +444,3 @@ def test_add_task_succeeds_when_embedding_fails(temp_db, monkeypatch):
 
     assert "error" not in task
     assert task["task_id"] is not None
-
-    # クリーンアップ
-    monkeypatch.setattr(emb, '_model_load_failed', False)
