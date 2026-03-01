@@ -75,7 +75,7 @@ fi
 # 2b. トピック名一致チェック（不一致時はnudge、blockしない）
 TOPIC_NAME_MATCH=$(echo "$TOPIC_CHECK" | jq -r '.name_match // empty' 2>/dev/null)
 if [ "$TOPIC_NAME_MATCH" = "false" ]; then
-  ACTUAL_NAME=$(echo "$TOPIC_CHECK" | jq -r '.actual_name')
+  ACTUAL_NAME=$(echo "$TOPIC_CHECK" | jq -r '.actual_name' 2>/dev/null)
   # SESSION_IDのスラッシュをアンダースコアに置換（パス安全化）
   SESSION_ID_SAFE="${SESSION_ID//\//_}"
   # nudgeフラグにtopic_idと正しい名前を書く

@@ -31,11 +31,15 @@ PENDING_FILE="${STATE_DIR}/nudge_pending_${SESSION_ID_SAFE}"
 if [ -f "$TOPIC_NAME_FILE" ]; then
   TOPIC_ID=$(jq -r '.topic_id' "$TOPIC_NAME_FILE" 2>/dev/null)
   ACTUAL_NAME=$(jq -r '.actual_name' "$TOPIC_NAME_FILE" 2>/dev/null)
-  rm -f "$TOPIC_NAME_FILE"
 
-  # jqパース失敗時は空文字nudgeを避けてスキップ
+  # パース結果を検証してからフラグ削除（失敗時はフォールバック）
   if [ -n "$TOPIC_ID" ] && [ -n "$ACTUAL_NAME" ] && [ "$TOPIC_ID" != "null" ] && [ "$ACTUAL_NAME" != "null" ]; then
-    NUDGE_MSG="<system-reminder>The topic name in your meta tag does not match the database. Topic #${TOPIC_ID} is actually named \"${ACTUAL_NAME}\". Please use the correct topic name in your next meta tag, or verify the topic_id with get_topics if you intended a different topic.</system-reminder>"
+    rm -f "$TOPIC_NAME_FILE"
+
+    # <> をサニタイズ（system-reminderタグのinjection防止）
+    ACTUAL_NAME_SAFE=$(echo "$ACTUAL_NAME" | tr -d '<>')
+
+    NUDGE_MSG="<system-reminder>The topic name in your meta tag does not match the database. Topic #${TOPIC_ID} is actually named \"${ACTUAL_NAME_SAFE}\". Please use the correct topic name in your next meta tag, or verify the topic_id with get_topics if you intended a different topic.</system-reminder>"
 
     jq -n --arg ctx "$NUDGE_MSG" '{
       "hookSpecificOutput": {
@@ -45,7 +49,8 @@ if [ -f "$TOPIC_NAME_FILE" ]; then
     }'
     exit 0
   fi
-  # パース失敗時はフォールバック（nudge_pendingの処理に続行）
+  # パース失敗時はフラグを削除してフォールバック（nudge_pendingの処理に続行）
+  rm -f "$TOPIC_NAME_FILE"
 fi
 
 # 2. 記録リマインダーnudge
