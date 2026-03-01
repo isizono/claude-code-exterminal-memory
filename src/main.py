@@ -66,6 +66,7 @@ def _get_active_tasks(subject_id: int) -> list[dict]:
         ORDER BY
             CASE status WHEN 'in_progress' THEN 0 ELSE 1 END,
             updated_at DESC
+        LIMIT 20
         """,
         (subject_id,),
     )
