@@ -8,7 +8,7 @@ dependencies = [
     "pytest>=7.4.0",
     "pyyaml>=6.0",
     "sqlite-vec",
-    "yoyo-migrations",
+    "yoyo-migrations>=9,<10",
 ]
 
 [build-system]

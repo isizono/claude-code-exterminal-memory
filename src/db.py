@@ -51,7 +51,11 @@ def _load_sqlite_vec(conn: sqlite3.Connection) -> None:
 
 
 class _VecSQLiteBackend(SQLiteBackend):
-    """sqlite-vec拡張をロードするSQLiteBackend"""
+    """sqlite-vec拡張をロードするSQLiteBackend
+
+    yoyoの内部API（SQLiteBackend, parse_uri, default_migration_table）に依存。
+    pyproject.tomlでyoyo-migrationsのメジャーバージョンをピン留めすること。
+    """
 
     def connect(self, dburi) -> sqlite3.Connection:
         conn = super().connect(dburi)
