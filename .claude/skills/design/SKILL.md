@@ -56,7 +56,7 @@ description: This skill determines implementation approach and technical decisio
 例: 「トピック検索機能」の設計を開始
 
 1. 既存の設計タスクを探す
-   get_tasks(subject_id=2, status="pending")
+   get_tasks(subject_id=2, status="pending") および get_tasks(subject_id=2, status="in_progress")
    → [設計] タスクがあればそれを使う。なければ作成:
    add_task(
        subject_id=2,
