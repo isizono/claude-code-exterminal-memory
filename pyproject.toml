@@ -7,7 +7,7 @@ dependencies = [
     "fastmcp",
     "pytest>=7.4.0",
     "pyyaml>=6.0",
-    "sqlite-vec",
+    "sqlite-vec>=0.1.6,<0.2",
     "yoyo-migrations>=9,<10",
 ]
 
