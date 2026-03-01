@@ -74,6 +74,8 @@ def encode_query(text: str) -> Optional[list[float]]:
 
 def generate_and_store_embedding(source_type: str, source_id: int, text: str) -> None:
     """search_indexからIDを取得してembeddingを生成・保存する。失敗してもraiseしない。"""
+    if not text:
+        return
     try:
         rows = execute_query(
             "SELECT id FROM search_index WHERE source_type = ? AND source_id = ?",
@@ -83,7 +85,14 @@ def generate_and_store_embedding(source_type: str, source_id: int, text: str) ->
             search_index_id = rows[0]["id"]
             embedding = encode_document(text)
             if embedding is not None:
-                insert_embedding(search_index_id, embedding)
+                existing = execute_query(
+                    "SELECT rowid FROM vec_index WHERE rowid = ?",
+                    (search_index_id,),
+                )
+                if existing:
+                    update_embedding(search_index_id, embedding)
+                else:
+                    insert_embedding(search_index_id, embedding)
     except Exception as e:
         logger.warning(f"Failed to generate embedding for {source_type} {source_id}: {e}")
 
