@@ -1,43 +1,16 @@
 """タスク管理サービス"""
 import logging
 import sqlite3
+from typing import Optional
 
 from src.db import execute_query, get_connection, row_to_dict
 from src.db_base import BaseDBService
-from src.base import TaskStatusListener
 from src.services.embedding_service import generate_and_store_embedding
 
 logger = logging.getLogger(__name__)
 
 # 有効なステータス値
-VALID_STATUSES = {"pending", "in_progress", "completed", "blocked"}
-
-
-class TaskStatusManagerImpl(TaskStatusListener):
-    """タスクのステータス変更を管理する実装クラス"""
-
-    def on_status_change(self, task_id: int, new_status: str) -> None:
-        """
-        ステータス変更時のフック
-
-        Args:
-            task_id: タスクID
-            new_status: 変更後のステータス
-        """
-        logger.info(f"Task {task_id}: status changed to '{new_status}'")
-
-    def get_blocked_topic_info(self, task: dict) -> tuple[str, str]:
-        """
-        blocked状態になった時のトピック情報を生成する
-
-        Args:
-            task: タスク情報
-
-        Returns:
-            (title, description) のタプル
-        """
-        topic_title = f"[BLOCKED] {task['title']}"
-        return topic_title, task['description']
+VALID_STATUSES = {"pending", "in_progress", "completed"}
 
 
 class TaskDBService(BaseDBService):
@@ -109,9 +82,6 @@ def add_task(subject_id: int, title: str, description: str) -> dict:
         }
 
 
-VALID_TASK_STATUSES = {"pending", "in_progress", "blocked", "completed"}
-
-
 def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> dict:
     """
     タスク一覧を取得（statusでフィルタリング）
@@ -132,11 +102,11 @@ def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> d
             }
         }
 
-    if status not in VALID_TASK_STATUSES:
+    if status not in VALID_STATUSES:
         return {
             "error": {
                 "code": "INVALID_STATUS",
-                "message": f"Invalid status: {status}. Must be one of {sorted(VALID_TASK_STATUSES)}",
+                "message": f"Invalid status: {status}. Must be one of {sorted(VALID_STATUSES)}",
             }
         }
 
@@ -184,28 +154,56 @@ def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> d
         }
 
 
-def update_task_status(task_id: int, new_status: str) -> dict:
+def update_task(
+    task_id: int,
+    new_status: Optional[str] = None,
+    title: Optional[str] = None,
+    description: Optional[str] = None,
+) -> dict:
     """
-    ステータスを更新
-    blockedになった場合は自動でトピックを作成してtopic_idを設定
+    タスクを更新する（ステータス、タイトル、説明を変更可能）
 
     Args:
         task_id: タスクID
-        new_status: 新しいステータス
+        new_status: 新しいステータス（optional）
+        title: 新しいタイトル（optional）
+        description: 新しい説明（optional）
 
     Returns:
         更新されたタスク情報
-
-    Note:
-        blockedへの変更時はトピック作成とステータス更新を
-        単一トランザクションで実行し、整合性を保証する
     """
+    # 最低1つのオプショナルパラメータが必要
+    if new_status is None and title is None and description is None:
+        return {
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "At least one of new_status, title, or description must be provided",
+            }
+        }
+
     # ステータスバリデーション
-    if new_status not in VALID_STATUSES:
+    if new_status is not None and new_status not in VALID_STATUSES:
         return {
             "error": {
                 "code": "INVALID_STATUS",
-                "message": f"Invalid status: {new_status}. Must be one of {VALID_STATUSES}",
+                "message": f"Invalid status: {new_status}. Must be one of {sorted(VALID_STATUSES)}",
+            }
+        }
+
+    # 空文字バリデーション
+    if title is not None and title.strip() == "":
+        return {
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "title must not be empty",
+            }
+        }
+
+    if description is not None and description.strip() == "":
+        return {
+            "error": {
+                "code": "VALIDATION_ERROR",
+                "message": "description must not be empty",
             }
         }
 
@@ -221,37 +219,32 @@ def update_task_status(task_id: int, new_status: str) -> dict:
                     "message": f"Task with id {task_id} not found",
                 }
             }
-        task = row_to_dict(row)
 
-        # ステータスマネージャーのインスタンスを作成
-        manager = TaskStatusManagerImpl()
+        # 動的SQL構築: 指定されたフィールドのみUPDATEする
+        set_parts = []
+        values = []
 
-        # ステータス変更フックを呼び出し（ログ出力のみ）
-        manager.on_status_change(task_id, new_status)
+        if new_status is not None:
+            set_parts.append("status = ?")
+            values.append(new_status)
 
-        # blockedになった場合はトピック作成とステータス更新を同一トランザクションで実行
-        if new_status == "blocked":
-            # トピック情報を生成
-            topic_title, topic_description = manager.get_blocked_topic_info(task)
+        if title is not None:
+            set_parts.append("title = ?")
+            values.append(title)
 
-            # トピックを作成
-            cursor = conn.execute(
-                "INSERT INTO discussion_topics (subject_id, title, description) VALUES (?, ?, ?)",
-                (task["subject_id"], topic_title, topic_description),
-            )
-            topic_id = cursor.lastrowid
+        if description is not None:
+            set_parts.append("description = ?")
+            values.append(description)
 
-            # タスクのステータスとtopic_idを更新
-            conn.execute(
-                "UPDATE tasks SET status = ?, topic_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (new_status, topic_id, task_id),
-            )
-        else:
-            # blocked以外は通常のステータス更新
-            conn.execute(
-                "UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (new_status, task_id),
-            )
+        set_parts.append("updated_at = CURRENT_TIMESTAMP")
+
+        set_clause = ", ".join(set_parts)
+        values.append(task_id)
+
+        conn.execute(
+            f"UPDATE tasks SET {set_clause} WHERE id = ?",
+            tuple(values),
+        )
 
         conn.commit()
 
