@@ -1,6 +1,7 @@
 """check_topic_exists.py のユニットテスト"""
 
 import os
+import subprocess
 import sys
 import tempfile
 import pytest
@@ -97,7 +98,6 @@ class TestCheckTopicExistsScript:
 
     def test_script_with_existing_topic(self, temp_db):
         """スクリプト実行: 存在するtopic_idでtrueを出力"""
-        import subprocess
         result = subprocess.run(
             [sys.executable, "hooks/check_topic_exists.py", "100"],
             capture_output=True,
@@ -110,7 +110,6 @@ class TestCheckTopicExistsScript:
 
     def test_script_with_non_existing_topic(self, temp_db):
         """スクリプト実行: 存在しないtopic_idでfalseを出力"""
-        import subprocess
         result = subprocess.run(
             [sys.executable, "hooks/check_topic_exists.py", "99999"],
             capture_output=True,
@@ -123,7 +122,6 @@ class TestCheckTopicExistsScript:
 
     def test_script_with_invalid_topic_id(self, temp_db):
         """スクリプト実行: 不正なtopic_idでエラー"""
-        import subprocess
         result = subprocess.run(
             [sys.executable, "hooks/check_topic_exists.py", "invalid"],
             capture_output=True,
@@ -136,7 +134,6 @@ class TestCheckTopicExistsScript:
 
     def test_script_with_no_args(self, temp_db):
         """スクリプト実行: 引数なしでfalseを出力"""
-        import subprocess
         result = subprocess.run(
             [sys.executable, "hooks/check_topic_exists.py"],
             capture_output=True,
