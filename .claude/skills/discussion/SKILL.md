@@ -120,5 +120,5 @@ add_decision(
 - [ ] ユーザーの承認を得ている
 - [ ] add_decision()で記録済み
 - [ ] `[設計]` タスクを作成済み（add_task で `[設計] {テーマ}` を作成し、議論で決まったdecision IDをdescriptionに記載する）
-- [ ] `[議論]` タスクを完了済み（update_task_status で completed に更新する）
+- [ ] `[議論]` タスクを完了済み（update_task で completed に更新する）
 - [ ] 設計フェーズに必要な情報が揃っている

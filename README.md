@@ -41,11 +41,11 @@ claude --plugin-dir /path/to/claude-code-memory
 
 | カテゴリ | ツール | 説明 |
 |---------|--------|------|
-| サブジェクト | `add_subject`, `list_subjects` | サブジェクト管理 |
+| サブジェクト | `add_subject`, `list_subjects`, `update_subject` | サブジェクト管理 |
 | トピック | `add_topic`, `get_topics` | 議論トピック管理 |
 | ログ | `add_log`, `get_logs` | 議論ログ記録 |
 | 決定 | `add_decision`, `get_decisions` | 決定事項管理 |
-| タスク | `add_task`, `get_tasks`, `update_task_status` | タスク管理 |
+| タスク | `add_task`, `get_tasks`, `update_task` | タスク管理 |
 | 検索 | `search`, `get_by_id` | FTS5横断検索 |
 | ナレッジ | `add_knowledge` | ナレッジファイル保存 |
 

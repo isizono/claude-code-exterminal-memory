@@ -136,7 +136,7 @@ description: This skill writes code following the design decisions. Use when des
 
 --- ユーザーが「OK」と回答 ---
 
-update_task_status(task_id=40, new_status="completed")
+update_task(task_id=40, new_status="completed")
 ```
 
 ### 完了前チェックリスト

@@ -1,0 +1,156 @@
+"""update_taskのユニットテスト"""
+import os
+import tempfile
+import pytest
+from src.db import init_database
+from src.services.subject_service import add_subject
+from src.services.task_service import add_task, update_task
+
+
+@pytest.fixture
+def temp_db():
+    """テスト用の一時的なデータベースを作成する"""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        os.environ["DISCUSSION_DB_PATH"] = db_path
+        init_database()
+        yield db_path
+        if "DISCUSSION_DB_PATH" in os.environ:
+            del os.environ["DISCUSSION_DB_PATH"]
+
+
+@pytest.fixture
+def test_subject(temp_db):
+    """テスト用サブジェクトを作成する"""
+    result = add_subject(name="test-subject", description="Test subject")
+    return result["subject_id"]
+
+
+@pytest.fixture
+def test_task(test_subject):
+    """テスト用タスクを作成する"""
+    result = add_task(
+        subject_id=test_subject,
+        title="Original Title",
+        description="Original Description",
+    )
+    return result
+
+
+# ========================================
+# 正常系テスト
+# ========================================
+
+
+class TestUpdateTaskSuccess:
+    """update_taskの正常系テスト"""
+
+    def test_update_status(self, test_task):
+        """ステータスのみ変更できる"""
+        result = update_task(test_task["task_id"], new_status="in_progress")
+
+        assert "error" not in result
+        assert result["status"] == "in_progress"
+        assert result["title"] == "Original Title"
+        assert result["description"] == "Original Description"
+
+    def test_update_title(self, test_task):
+        """タイトルのみ変更できる"""
+        result = update_task(test_task["task_id"], title="New Title")
+
+        assert "error" not in result
+        assert result["title"] == "New Title"
+        assert result["status"] == "pending"
+        assert result["description"] == "Original Description"
+
+    def test_update_description(self, test_task):
+        """説明のみ変更できる"""
+        result = update_task(test_task["task_id"], description="New Description")
+
+        assert "error" not in result
+        assert result["description"] == "New Description"
+        assert result["title"] == "Original Title"
+        assert result["status"] == "pending"
+
+    def test_update_multiple_fields(self, test_task):
+        """複数フィールドを同時に変更できる"""
+        result = update_task(
+            test_task["task_id"],
+            new_status="in_progress",
+            title="Updated Title",
+            description="Updated Description",
+        )
+
+        assert "error" not in result
+        assert result["status"] == "in_progress"
+        assert result["title"] == "Updated Title"
+        assert result["description"] == "Updated Description"
+
+
+# ========================================
+# 異常系テスト
+# ========================================
+
+
+class TestUpdateTaskError:
+    """update_taskの異常系テスト"""
+
+    def test_all_none_returns_validation_error(self, test_task):
+        """全パラメータがNoneだとVALIDATION_ERRORになる"""
+        result = update_task(test_task["task_id"])
+
+        assert "error" in result
+        assert result["error"]["code"] == "VALIDATION_ERROR"
+
+    def test_not_found(self, temp_db):
+        """存在しないタスクIDでNOT_FOUNDになる"""
+        result = update_task(9999, new_status="in_progress")
+
+        assert "error" in result
+        assert result["error"]["code"] == "NOT_FOUND"
+
+    def test_invalid_status(self, test_task):
+        """無効なステータスでINVALID_STATUSになる"""
+        result = update_task(test_task["task_id"], new_status="invalid")
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_STATUS"
+
+    def test_empty_title(self, test_task):
+        """空文字のtitleでVALIDATION_ERRORになる"""
+        result = update_task(test_task["task_id"], title="")
+
+        assert "error" in result
+        assert result["error"]["code"] == "VALIDATION_ERROR"
+        assert "title" in result["error"]["message"]
+
+    def test_whitespace_title(self, test_task):
+        """空白のみのtitleでVALIDATION_ERRORになる"""
+        result = update_task(test_task["task_id"], title="   ")
+
+        assert "error" in result
+        assert result["error"]["code"] == "VALIDATION_ERROR"
+        assert "title" in result["error"]["message"]
+
+    def test_empty_description(self, test_task):
+        """空文字のdescriptionでVALIDATION_ERRORになる"""
+        result = update_task(test_task["task_id"], description="")
+
+        assert "error" in result
+        assert result["error"]["code"] == "VALIDATION_ERROR"
+        assert "description" in result["error"]["message"]
+
+    def test_whitespace_description(self, test_task):
+        """空白のみのdescriptionでVALIDATION_ERRORになる"""
+        result = update_task(test_task["task_id"], description="   ")
+
+        assert "error" in result
+        assert result["error"]["code"] == "VALIDATION_ERROR"
+        assert "description" in result["error"]["message"]
+
+    def test_blocked_status_rejected(self, test_task):
+        """blockedステータスがINVALID_STATUSになる"""
+        result = update_task(test_task["task_id"], new_status="blocked")
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_STATUS"
