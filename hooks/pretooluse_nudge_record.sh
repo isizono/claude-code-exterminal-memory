@@ -33,15 +33,19 @@ if [ -f "$TOPIC_NAME_FILE" ]; then
   ACTUAL_NAME=$(jq -r '.actual_name' "$TOPIC_NAME_FILE" 2>/dev/null)
   rm -f "$TOPIC_NAME_FILE"
 
-  NUDGE_MSG="<system-reminder>The topic name in your meta tag does not match the database. Topic #${TOPIC_ID} is actually named \"${ACTUAL_NAME}\". Please use the correct topic name in your next meta tag, or verify the topic_id with get_topics if you intended a different topic.</system-reminder>"
+  # jqパース失敗時は空文字nudgeを避けてスキップ
+  if [ -n "$TOPIC_ID" ] && [ -n "$ACTUAL_NAME" ] && [ "$TOPIC_ID" != "null" ] && [ "$ACTUAL_NAME" != "null" ]; then
+    NUDGE_MSG="<system-reminder>The topic name in your meta tag does not match the database. Topic #${TOPIC_ID} is actually named \"${ACTUAL_NAME}\". Please use the correct topic name in your next meta tag, or verify the topic_id with get_topics if you intended a different topic.</system-reminder>"
 
-  jq -n --arg ctx "$NUDGE_MSG" '{
-    "hookSpecificOutput": {
-      "hookEventName": "PreToolUse",
-      "additionalContext": $ctx
-    }
-  }'
-  exit 0
+    jq -n --arg ctx "$NUDGE_MSG" '{
+      "hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "additionalContext": $ctx
+      }
+    }'
+    exit 0
+  fi
+  # パース失敗時はフォールバック（nudge_pendingの処理に続行）
 fi
 
 # 2. 記録リマインダーnudge

@@ -61,7 +61,9 @@ if [ $TOPIC_CHECK_EXIT_CODE -ne 0 ]; then
 fi
 
 # jqパース失敗時はフェイルクローズ（blockで安全側に倒す）
-if ! TOPIC_EXISTS=$(echo "$TOPIC_CHECK" | jq -re '.exists' 2>/dev/null); then
+# 注意: -e フラグは値がfalse/nullの場合に非ゼロ終了するため使わない
+TOPIC_EXISTS=$(echo "$TOPIC_CHECK" | jq -r '.exists' 2>/dev/null)
+if [ $? -ne 0 ] || [ -z "$TOPIC_EXISTS" ]; then
   jq -n --arg reason "check_topic_exists.py output parse failed: $TOPIC_CHECK" '{decision: "block", reason: $reason}'
   exit 0
 fi
