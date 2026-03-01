@@ -2,11 +2,12 @@
 import os
 import tempfile
 import pytest
-from src.db import init_database
+from src.db import init_database, get_connection
 from src.services.subject_service import add_subject
 from src.services.topic_service import add_topic
 from src.services.discussion_log_service import add_log
 from src.services.decision_service import add_decision
+from src.services.search_service import search
 
 
 @pytest.fixture
@@ -154,3 +155,133 @@ def test_add_decision_multiple(test_subject):
     assert "error" not in dec1
     assert "error" not in dec2
     assert dec1["decision_id"] != dec2["decision_id"]
+
+
+# ========================================
+# ON DELETE CASCADE のテスト
+# ========================================
+
+
+def _delete_topic(topic_id: int) -> None:
+    """テスト用: トピックを直接SQLで削除するヘルパー"""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM discussion_topics WHERE id = ?", (topic_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _count_decisions(topic_id: int) -> int:
+    """テスト用: 指定トピックのdecisions件数を返すヘルパー"""
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            "SELECT COUNT(*) FROM decisions WHERE topic_id = ?", (topic_id,)
+        )
+        return cursor.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def _count_logs(topic_id: int) -> int:
+    """テスト用: 指定トピックのdiscussion_logs件数を返すヘルパー"""
+    conn = get_connection()
+    try:
+        cursor = conn.execute(
+            "SELECT COUNT(*) FROM discussion_logs WHERE topic_id = ?", (topic_id,)
+        )
+        return cursor.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def test_on_delete_cascade_decisions(test_subject):
+    """トピック削除時にdecisionsがカスケード削除される"""
+    topic = add_topic(
+        subject_id=test_subject,
+        title="カスケードテストトピック",
+        description="ON DELETE CASCADEの動作確認",
+    )
+    topic_id = topic["topic_id"]
+
+    # decisionsを2件追加
+    add_decision(
+        topic_id=topic_id,
+        decision="カスケードテスト決定1",
+        reason="テスト理由1",
+    )
+    add_decision(
+        topic_id=topic_id,
+        decision="カスケードテスト決定2",
+        reason="テスト理由2",
+    )
+
+    # 削除前に2件あることを確認
+    assert _count_decisions(topic_id) == 2
+
+    # トピックを削除
+    _delete_topic(topic_id)
+
+    # decisionsがカスケード削除されて0件になることを確認
+    assert _count_decisions(topic_id) == 0
+
+
+def test_on_delete_cascade_discussion_logs(test_subject):
+    """トピック削除時にdiscussion_logsがカスケード削除される"""
+    topic = add_topic(
+        subject_id=test_subject,
+        title="ログカスケードテストトピック",
+        description="discussion_logsのON DELETE CASCADE確認",
+    )
+    topic_id = topic["topic_id"]
+
+    # discussion_logsを3件追加
+    add_log(topic_id=topic_id, content="ログ1: カスケードテスト")
+    add_log(topic_id=topic_id, content="ログ2: カスケードテスト")
+    add_log(topic_id=topic_id, content="ログ3: カスケードテスト")
+
+    # 削除前に3件あることを確認
+    assert _count_logs(topic_id) == 3
+
+    # トピックを削除
+    _delete_topic(topic_id)
+
+    # discussion_logsがカスケード削除されて0件になることを確認
+    assert _count_logs(topic_id) == 0
+
+
+def test_on_delete_cascade_decisions_fts5_sync(test_subject):
+    """トピック削除時にdecisionsのFTS5インデックスもカスケード削除される"""
+    topic = add_topic(
+        subject_id=test_subject,
+        title="FTS5カスケードテストトピック",
+        description="FTS5インデックスのカスケード削除確認",
+    )
+    topic_id = topic["topic_id"]
+
+    # decisionを追加（FTS5トリガーでsearch_indexに登録される）
+    add_decision(
+        topic_id=topic_id,
+        decision="FTS5カスケード削除テスト決定事項",
+        reason="FTS5インデックスのカスケード削除を確認する",
+    )
+
+    # 追加直後に検索で見つかることを確認
+    result_before = search(subject_id=test_subject, keyword="FTS5カスケード削除テスト決定事項")
+    assert "error" not in result_before
+    decision_results_before = [
+        r for r in result_before["results"] if r["type"] == "decision"
+    ]
+    assert len(decision_results_before) == 1
+
+    # トピックを削除（decisionsもカスケード削除 → FTS5トリガーが発火してsearch_indexも削除）
+    _delete_topic(topic_id)
+
+    # FTS5インデックスからも削除されていることを確認
+    result_after = search(subject_id=test_subject, keyword="FTS5カスケード削除テスト決定事項")
+    assert "error" not in result_after
+    decision_results_after = [
+        r for r in result_after["results"] if r["type"] == "decision"
+    ]
+    assert len(decision_results_after) == 0
