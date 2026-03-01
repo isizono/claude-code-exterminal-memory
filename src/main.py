@@ -218,7 +218,7 @@ Work proceeds through three phases: **discussion (議論)**, **design (設計)**
 Do not mix phases — complete the current phase and get user confirmation before moving to the next.
 Prefix task names with the phase: `[議論]`, `[設計]`, `[実装]`.
 When working on a task, use the corresponding skill:
-`[議論]` → `discussion`, `[設計]` → `design`, `[実装]` → `implementation`.
+`[議論]` → `discussion`, `[設計]` → `design`.
 
 Phase prefixes belong on **tasks only** — never on topics.
 Tasks define the purpose; topics are the discussion spaces that serve that purpose.
@@ -247,8 +247,10 @@ Once agreed, record decisions and create implementation tasks.
 Write detailed background information in implementation tasks —
 a different AI will likely handle implementation, working solely from the task description.
 
-**Implementation phase**: Write code following the recorded tasks and decisions.
-Review the task's specifications and background before starting.
+**Implementation phase**: Before starting, confirm the [実装] task exists and review
+its specifications and related design decisions with the user.
+On completion, record any deviations from design or implementation-specific decisions
+via `add_decision`. Get user approval before marking the [実装] task as completed.
 
 ---
 
