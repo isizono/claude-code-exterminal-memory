@@ -31,21 +31,19 @@ def temp_db():
 
 @pytest.fixture
 def mock_embedding_model(monkeypatch):
-    """sentence-transformersのモデルをモック化"""
+    """embedding_serverへのHTTPリクエストをモック化"""
 
-    class MockModel:
-        def encode(self, text):
-            if isinstance(text, list):
-                return np.array([self._encode_single(t) for t in text])
-            return self._encode_single(text)
-
-        def _encode_single(self, text):
-            seed = int(hashlib.sha256(text.encode()).hexdigest(), 16) % (2**32)
+    def mock_encode_batch(texts, prefix):
+        embeddings = []
+        for text in texts:
+            prefix_str = "検索文書: " if prefix == "document" else "検索クエリ: "
+            seed = int(hashlib.sha256((prefix_str + text).encode()).hexdigest(), 16) % (2**32)
             np.random.seed(seed)
-            return np.random.rand(EMBEDDING_DIM).astype(np.float32)
+            embeddings.append(np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist())
+        return embeddings
 
-    monkeypatch.setattr(emb, '_model', MockModel())
-    monkeypatch.setattr(emb, '_model_load_failed', False)
+    monkeypatch.setattr(emb, '_encode_batch', mock_encode_batch)
+    monkeypatch.setattr(emb, '_server_initialized', True)
     monkeypatch.setattr(emb, '_backfill_done', True)
     yield
 
@@ -53,9 +51,9 @@ def mock_embedding_model(monkeypatch):
 @pytest.fixture
 def disable_embedding(monkeypatch):
     """embeddingサービスを無効化"""
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
 
 @pytest.fixture
