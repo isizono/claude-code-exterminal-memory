@@ -1,8 +1,4 @@
-"""hooks/hook_topic.py のユニットテスト
-
-既存 hooks/test_check_topic_exists.py から移行。
-temp_dbフィクスチャパターンを踏襲。
-"""
+"""hooks/hook_topic.py のユニットテスト"""
 import os
 import sqlite3
 import tempfile

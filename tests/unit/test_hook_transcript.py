@@ -1,11 +1,4 @@
-"""hooks/hook_transcript.py のユニットテスト
-
-既存テストから移行・統合:
-- hooks/test_parse_meta_tag.py -> TestParseMetaTag, TestExtractTextFromEntry
-- hooks/test_check_recent_recording.py -> TestHasRecentRecording
-新規:
-- TestGetLastAssistantEntry, TestGetAssistantEntries, TestFindToolCallsForTopic
-"""
+"""hooks/hook_transcript.py のユニットテスト"""
 import json
 from pathlib import Path
 
@@ -46,7 +39,7 @@ def _make_user_entry(text: str = "hello") -> dict:
     return {"type": "human", "message": {"content": [{"type": "text", "text": text}]}}
 
 
-# --- parse_meta_tag (from test_parse_meta_tag.py) ---
+# --- parse_meta_tag ---
 
 
 class TestParseMetaTag:
@@ -109,7 +102,7 @@ class TestParseMetaTag:
         assert result is None
 
 
-# --- extract_text_from_entry (from test_parse_meta_tag.py) ---
+# --- extract_text_from_entry ---
 
 
 class TestExtractTextFromEntry:
@@ -284,7 +277,7 @@ class TestFindToolCallsForTopic:
         assert find_tool_calls_for_topic(entries, 42) is False
 
 
-# --- has_recent_recording (from test_check_recent_recording.py) ---
+# --- has_recent_recording ---
 
 
 class TestHasRecentRecording:

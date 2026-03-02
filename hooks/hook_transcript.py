@@ -1,12 +1,4 @@
-"""hook共通: transcript解析ユーティリティ
-
-既存4ファイルの関数を統合:
-- parse_meta_tag.py: get_last_assistant_entry, extract_text_from_entry, parse_meta_tag
-- check_topic_recorded.py: get_all_assistant_entries, find_tool_calls_for_topic
-- check_recent_recording.py: get_recent_assistant_entries, has_recording_calls (-> has_recent_recording)
-
-標準ライブラリのみに依存。
-"""
+"""hook共通: transcript解析ユーティリティ"""
 import json
 import re
 import subprocess
@@ -159,7 +151,6 @@ def find_tool_calls_for_topic(entries: list[dict], topic_id: int) -> bool:
     return False
 
 
-# check_recent_recording.py の TARGET_TOOLS と同じ
 _RECORDING_TOOLS = [
     "mcp__plugin_claude-code-memory_cc-memory__add_decision",
     "mcp__plugin_claude-code-memory_cc-memory__add_topic",
