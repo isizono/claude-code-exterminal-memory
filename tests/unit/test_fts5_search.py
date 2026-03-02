@@ -18,9 +18,9 @@ import src.services.embedding_service as emb
 @pytest.fixture(autouse=True)
 def disable_embedding(monkeypatch):
     """FTS5テストではembeddingサービスを無効化"""
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-"""embeddingサービスのテスト"""
+"""embeddingサービスのテスト（HTTPクライアント方式）"""
 import os
 import tempfile
 import pytest
@@ -28,32 +28,26 @@ def temp_db():
 
 
 @pytest.fixture
-def mock_embedding_model(monkeypatch):
-    """sentence-transformersのモデルをモック化"""
+def mock_embedding_server(monkeypatch):
+    """embedding_serverへのHTTPリクエストをモック化"""
 
-    class MockModel:
-        def encode(self, text):
-            # 384次元のダミーベクトルを返す（テキストに基づいて決定論的に生成）
-            # sentence-transformersと同様にリスト入力（バッチ）にも対応
-            if isinstance(text, list):
-                return np.array([
-                    self._encode_single(t) for t in text
-                ])
-            return self._encode_single(text)
+    def mock_encode_batch(texts, prefix):
+        embeddings = []
+        for text in texts:
+            # prefix + textのハッシュで決定論的に生成（サーバー側でのprefix付与を模擬）
+            prefix_str = "検索文書: " if prefix == "document" else "検索クエリ: "
+            np.random.seed(hash(prefix_str + text) % (2**32))
+            embeddings.append(np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist())
+        return embeddings
 
-        def _encode_single(self, text):
-            np.random.seed(hash(text) % (2**32))
-            return np.random.rand(EMBEDDING_DIM).astype(np.float32)
-
-    # embedding_serviceのグローバル状態をリセット
-    monkeypatch.setattr(emb, '_model', MockModel())
-    monkeypatch.setattr(emb, '_model_load_failed', False)
-    monkeypatch.setattr(emb, '_backfill_done', True)  # テスト中はバックフィルをスキップ
+    monkeypatch.setattr(emb, '_encode_batch', mock_encode_batch)
+    monkeypatch.setattr(emb, '_server_initialized', True)
+    monkeypatch.setattr(emb, '_backfill_done', True)
     yield
 
 
 @pytest.fixture
-def test_subject(temp_db, mock_embedding_model):
+def test_subject(temp_db, mock_embedding_server):
     """テスト用サブジェクトを作成する"""
     result = add_subject(name="test-emb-subject", description="Embedding test subject")
     return result["subject_id"]
@@ -64,7 +58,7 @@ def test_subject(temp_db, mock_embedding_model):
 # ========================================
 
 
-def test_encode_document_returns_embedding(temp_db, mock_embedding_model):
+def test_encode_document_returns_embedding(temp_db, mock_embedding_server):
     """encode_document: 正常にembeddingが返る"""
     result = emb.encode_document("テスト文書")
 
@@ -74,7 +68,7 @@ def test_encode_document_returns_embedding(temp_db, mock_embedding_model):
     assert all(isinstance(v, float) for v in result)
 
 
-def test_encode_query_returns_embedding(temp_db, mock_embedding_model):
+def test_encode_query_returns_embedding(temp_db, mock_embedding_server):
     """encode_query: 正常にembeddingが返る"""
     result = emb.encode_query("テストクエリ")
 
@@ -84,42 +78,42 @@ def test_encode_query_returns_embedding(temp_db, mock_embedding_model):
     assert all(isinstance(v, float) for v in result)
 
 
-def test_encode_document_has_doc_prefix(temp_db, monkeypatch):
-    """encode_document: prefix「検索文書: 」が付与されている"""
-    captured_texts = []
+def test_encode_document_uses_document_prefix(temp_db, monkeypatch):
+    """encode_document: prefix "document" がサーバーに送られる"""
+    captured_calls = []
 
-    class PrefixCapturingModel:
-        def encode(self, text):
-            captured_texts.append(text)
-            return np.random.rand(EMBEDDING_DIM).astype(np.float32)
+    def capturing_encode_batch(texts, prefix):
+        captured_calls.append((texts, prefix))
+        return [np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist()]
 
-    monkeypatch.setattr(emb, '_model', PrefixCapturingModel())
-    monkeypatch.setattr(emb, '_model_load_failed', False)
+    monkeypatch.setattr(emb, '_encode_batch', capturing_encode_batch)
+    monkeypatch.setattr(emb, '_server_initialized', True)
     monkeypatch.setattr(emb, '_backfill_done', True)
 
     emb.encode_document("テスト文書")
 
-    assert len(captured_texts) == 1
-    assert captured_texts[0] == "検索文書: テスト文書"
+    assert len(captured_calls) == 1
+    assert captured_calls[0][0] == ["テスト文書"]
+    assert captured_calls[0][1] == "document"
 
 
-def test_encode_query_has_query_prefix(temp_db, monkeypatch):
-    """encode_query: prefix「検索クエリ: 」が付与されている"""
-    captured_texts = []
+def test_encode_query_uses_query_prefix(temp_db, monkeypatch):
+    """encode_query: prefix "query" がサーバーに送られる"""
+    captured_calls = []
 
-    class PrefixCapturingModel:
-        def encode(self, text):
-            captured_texts.append(text)
-            return np.random.rand(EMBEDDING_DIM).astype(np.float32)
+    def capturing_encode_batch(texts, prefix):
+        captured_calls.append((texts, prefix))
+        return [np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist()]
 
-    monkeypatch.setattr(emb, '_model', PrefixCapturingModel())
-    monkeypatch.setattr(emb, '_model_load_failed', False)
+    monkeypatch.setattr(emb, '_encode_batch', capturing_encode_batch)
+    monkeypatch.setattr(emb, '_server_initialized', True)
     monkeypatch.setattr(emb, '_backfill_done', True)
 
     emb.encode_query("テストクエリ")
 
-    assert len(captured_texts) == 1
-    assert captured_texts[0] == "検索クエリ: テストクエリ"
+    assert len(captured_calls) == 1
+    assert captured_calls[0][0] == ["テストクエリ"]
+    assert captured_calls[0][1] == "query"
 
 
 # ========================================
@@ -127,11 +121,11 @@ def test_encode_query_has_query_prefix(temp_db, monkeypatch):
 # ========================================
 
 
-def test_graceful_degradation_model_load_failure(temp_db, monkeypatch):
-    """graceful degradation: モデルロード失敗時にNoneを返す"""
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+def test_graceful_degradation_server_unavailable(temp_db, monkeypatch):
+    """graceful degradation: サーバー接続失敗時にNoneを返す"""
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', False)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
     result = emb.encode_document("テスト")
 
@@ -139,28 +133,31 @@ def test_graceful_degradation_model_load_failure(temp_db, monkeypatch):
 
 
 # ========================================
-# 遅延ロードのテスト
+# _ensure_initialized のテスト
 # ========================================
 
 
-def test_lazy_loading_no_reload(temp_db, monkeypatch):
-    """遅延ロード: 2回目の呼び出しでモデルを再ロードしない"""
+def test_ensure_initialized_only_once(temp_db, monkeypatch):
+    """_ensure_initialized: 2回目の呼び出しでサーバー起動を再試行しない"""
+    call_count = 0
 
-    class CountingModel:
-        def encode(self, text):
-            return np.random.rand(EMBEDDING_DIM).astype(np.float32)
+    def counting_ensure_server():
+        nonlocal call_count
+        call_count += 1
+        return True
 
-    model = CountingModel()
-    monkeypatch.setattr(emb, '_model', model)
-    monkeypatch.setattr(emb, '_model_load_failed', False)
+    def mock_encode_batch(texts, prefix):
+        return [np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist() for _ in texts]
+
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', counting_ensure_server)
+    monkeypatch.setattr(emb, '_encode_batch', mock_encode_batch)
 
-    # 2回呼び出す
-    emb.encode_document("テスト1")
-    emb.encode_document("テスト2")
+    emb._ensure_initialized()
+    emb._ensure_initialized()
 
-    # _modelが既にセットされているので、_load_modelはモデルをそのまま返す（再ロードしない）
-    assert emb._model is model
+    assert call_count == 1
 
 
 # ========================================
@@ -168,9 +165,8 @@ def test_lazy_loading_no_reload(temp_db, monkeypatch):
 # ========================================
 
 
-def test_insert_embedding_adds_to_vec_index(temp_db, mock_embedding_model):
+def test_insert_embedding_adds_to_vec_index(temp_db, mock_embedding_server):
     """insert_embedding: vec_indexにレコードが追加される"""
-    # まずsearch_indexにレコードを作成するためにtopicを追加
     subject = add_subject(name="insert-emb-test", description="Test")
     subject_id = subject["subject_id"]
     topic = add_topic(
@@ -299,22 +295,13 @@ def test_add_task_creates_embedding(test_subject):
 def test_backfill_fills_missing_embeddings(temp_db, monkeypatch):
     """backfill: search_indexにあってvec_indexにないレコードが埋められる"""
 
-    class MockModel:
-        def encode(self, text):
-            if isinstance(text, list):
-                return np.array([
-                    self._encode_single(t) for t in text
-                ])
-            return self._encode_single(text)
+    def mock_encode_batch(texts, prefix):
+        return [np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist() for _ in texts]
 
-        def _encode_single(self, text):
-            np.random.seed(42)
-            return np.random.rand(EMBEDDING_DIM).astype(np.float32)
-
-    # モデルなしでtopicを作成（embeddingは生成されない）
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+    # サーバーなしでtopicを作成（embeddingは生成されない）
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
     subject = add_subject(name="backfill-test", description="Test")
     subject_id = subject["subject_id"]
@@ -340,9 +327,9 @@ def test_backfill_fills_missing_embeddings(temp_db, monkeypatch):
     finally:
         conn.close()
 
-    # モデルをセットしてバックフィル実行
-    monkeypatch.setattr(emb, '_model', MockModel())
-    monkeypatch.setattr(emb, '_model_load_failed', False)
+    # サーバー稼働状態にしてバックフィル実行
+    monkeypatch.setattr(emb, '_is_server_running', lambda: True)
+    monkeypatch.setattr(emb, '_encode_batch', mock_encode_batch)
 
     filled = emb.backfill_embeddings()
 
@@ -359,14 +346,17 @@ def test_backfill_fills_missing_embeddings(temp_db, monkeypatch):
         conn.close()
 
 
-def test_backfill_noop_when_all_filled(temp_db, mock_embedding_model):
+def test_backfill_noop_when_all_filled(temp_db, mock_embedding_server, monkeypatch):
     """backfill: 全レコードが既にある場合は何もしない"""
+    # _is_server_runningをTrueにしてbackfillが動くようにする
+    monkeypatch.setattr(emb, '_is_server_running', lambda: True)
+
     # init_database由来の未バックフィルレコードを先に処理しておく
     emb.backfill_embeddings()
 
     subject = add_subject(name="backfill-noop-test", description="Test")
     subject_id = subject["subject_id"]
-    # add_topicがembeddingも生成する（mock_embedding_modelがある）
+    # add_topicがembeddingも生成する（mock_embedding_serverがある）
     add_topic(
         subject_id=subject_id,
         title="全レコード存在テスト",
@@ -385,9 +375,9 @@ def test_backfill_noop_when_all_filled(temp_db, mock_embedding_model):
 
 def test_add_topic_succeeds_when_embedding_fails(temp_db, monkeypatch):
     """embedding生成失敗時もadd_topic自体は成功する"""
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
     subject = add_subject(name="graceful-test", description="Test")
     subject_id = subject["subject_id"]
@@ -395,7 +385,7 @@ def test_add_topic_succeeds_when_embedding_fails(temp_db, monkeypatch):
     topic = add_topic(
         subject_id=subject_id,
         title="Embedding失敗テスト",
-        description="モデルロード失敗時もtopic作成は成功する",
+        description="サーバー接続失敗時もtopic作成は成功する",
     )
 
     assert "error" not in topic
@@ -420,9 +410,9 @@ def test_add_topic_succeeds_when_embedding_fails(temp_db, monkeypatch):
 
 def test_add_decision_succeeds_when_embedding_fails(temp_db, monkeypatch):
     """embedding生成失敗時もadd_decision自体は成功する"""
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
     subject = add_subject(name="graceful-dec-test", description="Test")
     subject_id = subject["subject_id"]
@@ -435,7 +425,7 @@ def test_add_decision_succeeds_when_embedding_fails(temp_db, monkeypatch):
     dec = add_decision(
         topic_id=topic["topic_id"],
         decision="Embedding失敗テスト決定",
-        reason="モデルロード失敗時もdecision作成は成功する",
+        reason="サーバー接続失敗時もdecision作成は成功する",
     )
 
     assert "error" not in dec
@@ -444,9 +434,9 @@ def test_add_decision_succeeds_when_embedding_fails(temp_db, monkeypatch):
 
 def test_add_task_succeeds_when_embedding_fails(temp_db, monkeypatch):
     """embedding生成失敗時もadd_task自体は成功する"""
-    monkeypatch.setattr(emb, '_model', None)
-    monkeypatch.setattr(emb, '_model_load_failed', True)
+    monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
     subject = add_subject(name="graceful-task-test", description="Test")
     subject_id = subject["subject_id"]
@@ -454,7 +444,7 @@ def test_add_task_succeeds_when_embedding_fails(temp_db, monkeypatch):
     task = add_task(
         subject_id=subject_id,
         title="Embedding失敗テストタスク",
-        description="モデルロード失敗時もtask作成は成功する",
+        description="サーバー接続失敗時もtask作成は成功する",
     )
 
     assert "error" not in task
