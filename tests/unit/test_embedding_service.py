@@ -1,6 +1,7 @@
 """embeddingサービスのテスト（HTTPクライアント方式）"""
 import os
 import tempfile
+import urllib.request
 import pytest
 import numpy as np
 
@@ -449,3 +450,88 @@ def test_add_task_succeeds_when_embedding_fails(temp_db, monkeypatch):
 
     assert "error" not in task
     assert task["task_id"] is not None
+
+
+# ========================================
+# サーバー障害からの回復テスト (#1)
+# ========================================
+
+
+def test_encode_batch_failure_resets_initialized_flag(temp_db, monkeypatch):
+    """_encode_batch失敗時に_server_initializedがFalseにリセットされる"""
+    monkeypatch.setattr(emb, '_server_initialized', True)
+    monkeypatch.setattr(emb, '_backfill_done', True)
+
+    # urllib.request.urlopenを失敗させて本物の_encode_batchを通す
+    def failing_urlopen(*args, **kwargs):
+        raise ConnectionError("server crashed")
+
+    monkeypatch.setattr(urllib.request, 'urlopen', failing_urlopen)
+
+    result = emb.encode_document("テスト")
+
+    assert result is None
+    assert emb._server_initialized is False
+
+
+def test_recovery_after_encode_batch_failure(temp_db, monkeypatch):
+    """_encode_batch失敗後、次回呼び出しでサーバー再起動を試みる"""
+    ensure_call_count = 0
+    real_encode_batch = emb._encode_batch
+
+    def counting_ensure_server():
+        nonlocal ensure_call_count
+        ensure_call_count += 1
+        return True
+
+    def mock_encode_batch(texts, prefix):
+        return [np.random.rand(EMBEDDING_DIM).astype(np.float32).tolist() for _ in texts]
+
+    monkeypatch.setattr(emb, '_server_initialized', False)
+    monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', counting_ensure_server)
+    monkeypatch.setattr(emb, '_encode_batch', mock_encode_batch)
+
+    # Phase 1: 初回起動 → _ensure_server_running が呼ばれる
+    emb.encode_document("テスト1")
+    assert ensure_call_count == 1
+    assert emb._server_initialized is True
+
+    # Phase 2: サーバー障害シミュレート（本物の_encode_batch + urlopen失敗）
+    monkeypatch.setattr(emb, '_encode_batch', real_encode_batch)
+    monkeypatch.setattr(urllib.request, 'urlopen', lambda *a, **kw: (_ for _ in ()).throw(ConnectionError("crash")))
+
+    emb.encode_document("テスト2")
+    assert emb._server_initialized is False  # フラグがリセットされた
+
+    # Phase 3: 復旧 → _ensure_server_running が再度呼ばれる
+    monkeypatch.setattr(emb, '_encode_batch', mock_encode_batch)
+    emb.encode_document("テスト3")
+    assert ensure_call_count == 2
+
+
+# ========================================
+# _start_server 例外処理テスト (#2)
+# ========================================
+
+
+def test_start_server_failure_returns_false(temp_db, monkeypatch):
+    """_start_server: subprocess.Popen失敗時にFalseを返す"""
+    import subprocess
+
+    def failing_popen(*args, **kwargs):
+        raise FileNotFoundError("python not found")
+
+    monkeypatch.setattr(subprocess, 'Popen', failing_popen)
+
+    result = emb._start_server()
+    assert result is False
+
+
+def test_ensure_server_running_handles_start_failure(temp_db, monkeypatch):
+    """_ensure_server_running: _start_server失敗時にFalseを返す"""
+    monkeypatch.setattr(emb, '_is_server_running', lambda: False)
+    monkeypatch.setattr(emb, '_start_server', lambda: False)
+
+    result = emb._ensure_server_running()
+    assert result is False

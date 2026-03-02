@@ -5,7 +5,6 @@ import os
 import subprocess
 import sys
 import time
-import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Optional
@@ -37,24 +36,30 @@ def _is_server_running() -> bool:
         return False
 
 
-def _start_server() -> None:
-    """embedding_server.pyをdetachedプロセスとして起動する。"""
+def _start_server() -> bool:
+    """embedding_server.pyをdetachedプロセスとして起動する。成功でTrue。"""
     server_path = os.path.join(os.path.dirname(__file__), "embedding_server.py")
-    subprocess.Popen(
-        [sys.executable, server_path],
-        start_new_session=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        cwd=_PROJECT_ROOT,
-    )
+    try:
+        subprocess.Popen(
+            [sys.executable, server_path],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=_PROJECT_ROOT,
+        )
+    except OSError as e:
+        logger.warning(f"Failed to start embedding server: {e}")
+        return False
     logger.info("Embedding server process started")
+    return True
 
 
 def _ensure_server_running() -> bool:
     """ヘルスチェック→起動→待機のフロー。成功でTrue、タイムアウトでFalse。"""
     if _is_server_running():
         return True
-    _start_server()
+    if not _start_server():
+        return False
     # 最大30秒待機（0.5秒間隔 × 60回）
     for _ in range(60):
         time.sleep(0.5)
@@ -87,6 +92,8 @@ def _encode_batch(texts: list[str], prefix: str) -> Optional[list[list[float]]]:
             return result["embeddings"]
     except Exception as e:
         logger.warning(f"encode_batch failed: {e}")
+        global _server_initialized
+        _server_initialized = False
         return None
 
 
