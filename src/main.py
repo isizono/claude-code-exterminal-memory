@@ -556,6 +556,15 @@ def add_knowledge(
 
 
 if __name__ == "__main__":
+    import signal
+    import sys
     from src.db import init_database
+
+    def _handle_signal(signum, frame):
+        sys.exit(0)
+
+    signal.signal(signal.SIGINT, _handle_signal)
+    signal.signal(signal.SIGTERM, _handle_signal)
+
     init_database()
     mcp.run()
