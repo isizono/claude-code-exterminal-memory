@@ -1,7 +1,5 @@
 """hooks/hook_topic.py のユニットテスト"""
-import os
 import sqlite3
-import tempfile
 from unittest.mock import patch
 
 import pytest
@@ -11,38 +9,33 @@ from hooks.hook_topic import check_topic_exists
 
 
 @pytest.fixture
-def temp_db():
+def temp_db(monkeypatch, tmp_path):
     """テスト用の一時的なデータベースを作成する"""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        db_path = os.path.join(tmpdir, "test.db")
-        os.environ["DISCUSSION_DB_PATH"] = db_path
-        init_database()
+    db_path = str(tmp_path / "test.db")
+    monkeypatch.setenv("DISCUSSION_DB_PATH", db_path)
+    init_database()
 
-        # init_databaseで作成されたfirst_subjectのIDを取得
-        conn = get_connection()
-        try:
-            cursor = conn.execute("SELECT id FROM subjects WHERE name = 'first_subject'")
-            row = cursor.fetchone()
-            subject_id = row[0] if row else 1
+    # init_databaseで作成されたfirst_subjectのIDを取得
+    conn = get_connection()
+    try:
+        cursor = conn.execute("SELECT id FROM subjects WHERE name = 'first_subject'")
+        row = cursor.fetchone()
+        subject_id = row[0] if row else 1
 
-            # テスト用のトピックを追加作成
-            conn.execute(
-                "INSERT INTO discussion_topics (id, subject_id, title, description) VALUES (100, ?, 'Test Topic', 'Description')",
-                (subject_id,)
-            )
-            conn.execute(
-                "INSERT INTO discussion_topics (id, subject_id, title, description) VALUES (200, ?, 'Another Topic', 'Description')",
-                (subject_id,)
-            )
-            conn.commit()
-        finally:
-            conn.close()
+        # テスト用のトピックを追加作成
+        conn.execute(
+            "INSERT INTO discussion_topics (id, subject_id, title, description) VALUES (100, ?, 'Test Topic', 'Description')",
+            (subject_id,)
+        )
+        conn.execute(
+            "INSERT INTO discussion_topics (id, subject_id, title, description) VALUES (200, ?, 'Another Topic', 'Description')",
+            (subject_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
-        yield db_path
-
-        # クリーンアップ
-        if "DISCUSSION_DB_PATH" in os.environ:
-            del os.environ["DISCUSSION_DB_PATH"]
+    yield db_path
 
 
 class TestCheckTopicExists:
@@ -71,5 +64,5 @@ class TestCheckTopicExists:
     def test_db_error_raises_exception(self):
         """DB接続エラー -> 例外raise"""
         with patch("src.db.execute_query", side_effect=sqlite3.OperationalError("mocked DB error")):
-            with pytest.raises(Exception):
+            with pytest.raises(sqlite3.OperationalError):
                 check_topic_exists(100)
