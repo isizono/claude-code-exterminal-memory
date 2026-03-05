@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/pretooluse_nudge_record.sh"
+            "command": "cd ${CLAUDE_PLUGIN_ROOT} && uv run python hooks/pretooluse_hook.py"
           }
         ]
       }
