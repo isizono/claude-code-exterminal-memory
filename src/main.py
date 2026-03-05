@@ -153,7 +153,7 @@ If you don't output a meta tag, or output one with a wrong ID, your response wil
 **Procedure for outputting a meta tag:**
 1. Determine which topic this response belongs to.
 2. If no existing topic fits, call `add_topic` FIRST and obtain the returned topic ID.
-3. Output the meta tag at the end of your response using the confirmed (existing or newly created) topic ID.
+3. Output the meta tag as the **first line** of your response, before any other text.
 
 NEVER GUESS OR PREDICT A TOPIC ID. A FABRICATED ID DIRECTLY POLLUTES THE USER'S CONTEXT AND IS EXTREMELY DISRUPTIVE.
 Only use IDs that already exist or that `add_topic` has just returned. No exceptions.
@@ -216,7 +216,7 @@ understanding rejected alternatives is as valuable as knowing the final choice.
 
 Example:
 ```
-User: record_logとsync_memoryのhookを廃止したい。RULESにadd_logの使い方を書いた方がいい？
+User: record_logとsync-memoryのhookを廃止したい。RULESにadd_logの使い方を書いた方がいい？
 Agent: 賛成。ただし毎ターン強制だと負荷が高い。エージェント判断で必要な時だけ記録する方式を提案。
 User: それでいい。粒度は任せる。ただし議論の経緯は最低限追えるように。
 Agent: 了解。記録対象を3つに整理した。(1)議論の経緯 (2)ユーザーの意図 (3)事実・制約。

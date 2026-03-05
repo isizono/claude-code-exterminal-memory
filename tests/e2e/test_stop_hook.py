@@ -169,7 +169,7 @@ class TestMetaTagWithExistingTopic:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG}"),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
             ],
             transcript,
         )
@@ -189,7 +189,7 @@ class TestTopicNotExists:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG_NONEXISTENT}"),
+                _make_assistant_entry(text=f"{META_TAG_NONEXISTENT}\nresponse"),
             ],
             transcript,
         )
@@ -211,7 +211,7 @@ class TestTopicNameMismatch:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG_WRONG_NAME}"),
+                _make_assistant_entry(text=f"{META_TAG_WRONG_NAME}\nresponse"),
             ],
             transcript,
         )
@@ -247,7 +247,7 @@ class TestTopicChangeNoRecord:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG_TOPIC_200}"),
+                _make_assistant_entry(text=f"{META_TAG_TOPIC_200}\nresponse"),
             ],
             transcript,
         )
@@ -281,7 +281,7 @@ class TestTopicChangeWithRecord:
                     tool_inputs=[{"topic_id": 100}],
                 ),
                 _make_user_entry("continue"),
-                _make_assistant_entry(text=f"response\n{META_TAG_TOPIC_200}"),
+                _make_assistant_entry(text=f"{META_TAG_TOPIC_200}\nresponse"),
             ],
             transcript,
         )
@@ -339,7 +339,7 @@ class TestExceptionFailOpen:
             [
                 _make_user_entry("hi"),
                 # DBが壊れていてもメタタグなしでblockされるので、メタタグありにする
-                _make_assistant_entry(text=f"response\n{META_TAG}"),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
             ],
             transcript,
         )
@@ -368,7 +368,7 @@ class TestFirstTopicSkip:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG}"),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
             ],
             transcript,
         )
@@ -396,7 +396,7 @@ class TestNudgeCounter:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG}"),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
             ],
             transcript,
         )
@@ -426,7 +426,7 @@ class TestNudgeCounter:
                 _make_assistant_entry(
                     tool_calls=["mcp__plugin_claude-code-memory_cc-memory__add_decision"],
                     tool_inputs=[{"topic_id": 100}],
-                    text=f"recorded\n{META_TAG}",
+                    text=f"{META_TAG}\nrecorded",
                 ),
             ],
             transcript,
@@ -482,7 +482,7 @@ class TestStateUpdatedOnApprove:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG}"),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
             ],
             transcript,
         )
@@ -508,7 +508,7 @@ class TestStateUpdatedOnApprove:
         _write_transcript(
             [
                 _make_user_entry("hi"),
-                _make_assistant_entry(text=f"response\n{META_TAG}"),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
             ],
             transcript,
         )
