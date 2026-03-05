@@ -155,7 +155,7 @@ If you don't output a meta tag, or output one with a wrong ID, your response wil
 2. If no existing topic fits, call `add_topic` FIRST and obtain the returned topic ID.
 3. Output the meta tag at the end of your response using the confirmed (existing or newly created) topic ID.
 
-NEVER guess or predict a topic ID. A fabricated ID directly pollutes the user's context and is extremely disruptive.
+NEVER GUESS OR PREDICT A TOPIC ID. A FABRICATED ID DIRECTLY POLLUTES THE USER'S CONTEXT AND IS EXTREMELY DISRUPTIVE.
 Only use IDs that already exist or that `add_topic` has just returned. No exceptions.
 
 Meta tag format: `<!-- [meta] subject: <name> (id: <N>) | topic: <name> (id: <M>) -->`
