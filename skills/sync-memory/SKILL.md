@@ -1,9 +1,9 @@
 ---
-name: sync_memory
+name: sync-memory
 description: セッション終了前にtranscriptを解析し、トピック・決定事項・タスク・仕様書を一括で記録・更新する
 ---
 
-# sync_memory
+# sync-memory
 
 このセッションの会話内容（transcript）を解析し、以下の記録・更新を**すべて実行**してください。
 
@@ -11,7 +11,7 @@ description: セッション終了前にtranscriptを解析し、トピック・
 
 ### 0. 既存データの確認（重複防止）
 
-**最初に必ず実行する。** 前回のsync_memoryやセッション中の手動記録で既に記録されている可能性があるため、既存データを確認してから記録する。
+**最初に必ず実行する。** 前回のsync-memoryやセッション中の手動記録で既に記録されている可能性があるため、既存データを確認してから記録する。
 
 **アクション:**
 - セッション中に使ったトピックの `get_decisions(topic_id=...)` を実行し、直近の決定事項を取得
@@ -115,7 +115,7 @@ transcriptを解析し、議論されたテーマを特定する。
 
 **フォーマット例:**
 ```
-title: "[未完] sync_memoryに未完タスク自動作成機能を追加"
+title: "[未完] sync-memoryに未完タスク自動作成機能を追加"
 description: "topic_id:135で議論中。ステップ4のdecision記録はそのまま残し、追加でadd_taskでも登録する方針で合意済み（decision A案）。残作業：SKILL.mdへのステップ追加と動作確認。"
 ```
 
@@ -202,7 +202,7 @@ options:
 以下の形式でサマリーを報告:
 
 ```
-## sync_memory 完了
+## sync-memory 完了
 
 ### トピック
 - 作成: X件
