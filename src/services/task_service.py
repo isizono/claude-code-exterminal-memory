@@ -9,8 +9,10 @@ from src.services.embedding_service import build_embedding_text, generate_and_st
 
 logger = logging.getLogger(__name__)
 
-# 有効なステータス値
-VALID_STATUSES = {"pending", "in_progress", "completed"}
+# DB格納可能なステータス値
+REAL_STATUSES = {"pending", "in_progress", "completed"}
+# get_tasks用（エイリアス含む）
+VALID_STATUSES = REAL_STATUSES | {"active"}
 
 
 class TaskDBService(BaseDBService):
@@ -87,13 +89,14 @@ def add_task(subject_id: int, title: str, description: str, topic_id: Optional[i
         }
 
 
-def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> dict:
+def get_tasks(subject_id: int, status: str = "active", limit: int = 5) -> dict:
     """
     タスク一覧を取得（statusでフィルタリング）
 
     Args:
         subject_id: サブジェクトID
-        status: フィルタするステータス（デフォルト: in_progress）
+        status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
+                "active"はpending+in_progressの両方を返すエイリアス
         limit: 取得件数上限（デフォルト: 5）
 
     Returns:
@@ -116,23 +119,46 @@ def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> d
         }
 
     try:
-        # 1. total_count取得（LIMITなし）
-        count_rows = execute_query(
-            "SELECT COUNT(*) as count FROM tasks WHERE subject_id = ? AND status = ?",
-            (subject_id, status),
-        )
-        total_count = count_rows[0]["count"]
+        if status == "active":
+            # "active"はpending+in_progressの両方を返すエイリアス
+            # 1. total_count取得（LIMITなし）
+            count_rows = execute_query(
+                "SELECT COUNT(*) as count FROM tasks WHERE subject_id = ? AND status IN ('in_progress', 'pending')",
+                (subject_id,),
+            )
+            total_count = count_rows[0]["count"]
 
-        # 2. LIMIT付きでデータ取得
-        rows = execute_query(
-            """
-            SELECT * FROM tasks
-            WHERE subject_id = ? AND status = ?
-            ORDER BY created_at ASC, id ASC
-            LIMIT ?
-            """,
-            (subject_id, status, limit),
-        )
+            # 2. LIMIT付きでデータ取得（in_progress優先、updated_at DESC）
+            rows = execute_query(
+                """
+                SELECT * FROM tasks
+                WHERE subject_id = ? AND status IN ('in_progress', 'pending')
+                ORDER BY
+                    CASE status WHEN 'in_progress' THEN 0 ELSE 1 END,
+                    updated_at DESC
+                LIMIT ?
+                """,
+                (subject_id, limit),
+            )
+        else:
+            # 個別ステータス指定
+            # 1. total_count取得（LIMITなし）
+            count_rows = execute_query(
+                "SELECT COUNT(*) as count FROM tasks WHERE subject_id = ? AND status = ?",
+                (subject_id, status),
+            )
+            total_count = count_rows[0]["count"]
+
+            # 2. LIMIT付きでデータ取得
+            rows = execute_query(
+                """
+                SELECT * FROM tasks
+                WHERE subject_id = ? AND status = ?
+                ORDER BY created_at ASC, id ASC
+                LIMIT ?
+                """,
+                (subject_id, status, limit),
+            )
 
         tasks = []
         for row in rows:
@@ -189,11 +215,11 @@ def update_task(
         }
 
     # ステータスバリデーション
-    if new_status is not None and new_status not in VALID_STATUSES:
+    if new_status is not None and new_status not in REAL_STATUSES:
         return {
             "error": {
                 "code": "INVALID_STATUS",
-                "message": f"Invalid status: {new_status}. Must be one of {sorted(VALID_STATUSES)}",
+                "message": f"Invalid status: {new_status}. Must be one of {sorted(REAL_STATUSES)}",
             }
         }
 
