@@ -9,8 +9,12 @@ from src.services.embedding_service import build_embedding_text, generate_and_st
 
 logger = logging.getLogger(__name__)
 
-# 有効なステータス値
-VALID_STATUSES = {"pending", "in_progress", "completed"}
+# DB格納可能なステータス値
+REAL_STATUSES = {"pending", "in_progress", "completed"}
+# "active"エイリアスが展開されるステータス
+ACTIVE_STATUSES = ("in_progress", "pending")
+# get_tasks用（エイリアス含む）
+VALID_STATUSES = REAL_STATUSES | {"active"}
 
 
 class TaskDBService(BaseDBService):
@@ -87,13 +91,14 @@ def add_task(subject_id: int, title: str, description: str, topic_id: Optional[i
         }
 
 
-def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> dict:
+def get_tasks(subject_id: int, status: str = "active", limit: int = 5) -> dict:
     """
     タスク一覧を取得（statusでフィルタリング）
 
     Args:
         subject_id: サブジェクトID
-        status: フィルタするステータス（デフォルト: in_progress）
+        status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
+                "active"はpending+in_progressの両方を返すエイリアス
         limit: 取得件数上限（デフォルト: 5）
 
     Returns:
@@ -116,22 +121,33 @@ def get_tasks(subject_id: int, status: str = "in_progress", limit: int = 5) -> d
         }
 
     try:
+        # WHERE句・ORDER BY句・パラメータをステータスに応じて組み立て
+        if status == "active":
+            placeholders = ", ".join("?" for _ in ACTIVE_STATUSES)
+            where_clause = f"status IN ({placeholders})"
+            where_params = (subject_id, *ACTIVE_STATUSES)
+            order_clause = "CASE status WHEN 'in_progress' THEN 0 ELSE 1 END, updated_at DESC"
+        else:
+            where_clause = "status = ?"
+            where_params = (subject_id, status)
+            order_clause = "created_at ASC, id ASC"
+
         # 1. total_count取得（LIMITなし）
         count_rows = execute_query(
-            "SELECT COUNT(*) as count FROM tasks WHERE subject_id = ? AND status = ?",
-            (subject_id, status),
+            f"SELECT COUNT(*) as count FROM tasks WHERE subject_id = ? AND {where_clause}",
+            where_params,
         )
         total_count = count_rows[0]["count"]
 
         # 2. LIMIT付きでデータ取得
         rows = execute_query(
-            """
+            f"""
             SELECT * FROM tasks
-            WHERE subject_id = ? AND status = ?
-            ORDER BY created_at ASC, id ASC
+            WHERE subject_id = ? AND {where_clause}
+            ORDER BY {order_clause}
             LIMIT ?
             """,
-            (subject_id, status, limit),
+            (*where_params, limit),
         )
 
         tasks = []
@@ -189,11 +205,11 @@ def update_task(
         }
 
     # ステータスバリデーション
-    if new_status is not None and new_status not in VALID_STATUSES:
+    if new_status is not None and new_status not in REAL_STATUSES:
         return {
             "error": {
                 "code": "INVALID_STATUS",
-                "message": f"Invalid status: {new_status}. Must be one of {sorted(VALID_STATUSES)}",
+                "message": f"Invalid status: {new_status}. Must be one of {sorted(REAL_STATUSES)}",
             }
         }
 

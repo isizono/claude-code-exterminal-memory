@@ -58,19 +58,12 @@ def _get_recent_topics(subject_id: int) -> list[dict]:
 
 def _get_active_tasks(subject_id: int) -> list[dict]:
     """サブジェクトのin_progress・pendingタスクを取得する"""
-    rows = execute_query(
-        """
-        SELECT id, title, status
-        FROM tasks
-        WHERE subject_id = ? AND status IN ('in_progress', 'pending')
-        ORDER BY
-            CASE status WHEN 'in_progress' THEN 0 ELSE 1 END,
-            updated_at DESC
-        LIMIT 20
-        """,
-        (subject_id,),
-    )
-    return [{"id": row["id"], "title": row["title"], "status": row["status"]} for row in rows]
+    from src.services.task_service import get_tasks
+
+    result = get_tasks(subject_id=subject_id, status="active", limit=20)
+    if "error" in result:
+        return []
+    return [{"id": t["id"], "title": t["title"], "status": t["status"]} for t in result["tasks"]]
 
 
 def _build_active_context() -> str:
@@ -456,22 +449,24 @@ def add_task(
 @mcp.tool()
 def get_tasks(
     subject_id: int,
-    status: str = "in_progress",
+    status: str = "active",
     limit: int = 5,
 ) -> dict:
     """
     タスク一覧を取得する（statusでフィルタリング可能）。
 
     典型的な使い方:
-    - 進行中のタスク確認: get_tasks(subject_id)
-    - 未着手のタスク確認: get_tasks(subject_id, status="pending")
+    - 未着手+進行中のタスク確認: get_tasks(subject_id)
+    - 進行中のみ: get_tasks(subject_id, status="in_progress")
+    - 未着手のみ: get_tasks(subject_id, status="pending")
     - 完了タスクの確認: get_tasks(subject_id, status="completed")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
         subject_id: サブジェクトID
-        status: フィルタするステータス（pending/in_progress/completed、デフォルト: in_progress）
+        status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
+                "active"はpending+in_progressの両方を返すエイリアス
         limit: 取得件数上限（デフォルト: 5）
 
     Returns:

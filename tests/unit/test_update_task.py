@@ -116,6 +116,13 @@ class TestUpdateTaskError:
         assert "error" in result
         assert result["error"]["code"] == "INVALID_STATUS"
 
+    def test_active_status_rejected(self, test_task):
+        """activeはget_tasks用エイリアスであり、update_taskでは無効"""
+        result = update_task(test_task["task_id"], new_status="active")
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_STATUS"
+
     def test_empty_title(self, test_task):
         """空文字のtitleでVALIDATION_ERRORになる"""
         result = update_task(test_task["task_id"], title="")

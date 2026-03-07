@@ -94,8 +94,8 @@ class TestGetTasks:
         assert result["tasks"][0]["title"] == "Task 2"
         assert result["total_count"] == 1
 
-    def test_get_tasks_default_status_is_in_progress(self, temp_db):
-        """statusなしで呼んだらin_progressのみ返る"""
+    def test_get_tasks_default_status_is_active(self, temp_db):
+        """statusなしで呼んだらpending+in_progressの両方が返る"""
         subject = add_subject(name="test-subject", description="Test")
         sid = subject["subject_id"]
 
@@ -106,13 +106,12 @@ class TestGetTasks:
 
         update_task(task_ip["task_id"], new_status="in_progress")
 
-        # statusを指定せずに呼び出し → デフォルトでin_progressのみ
+        # statusを指定せずに呼び出し → デフォルトでpending+in_progressの両方
         result = get_tasks(subject_id=sid)
 
         assert "error" not in result
-        assert len(result["tasks"]) == 1
-        assert result["tasks"][0]["title"] == "In Progress 1"
-        assert result["total_count"] == 1
+        assert len(result["tasks"]) == 3
+        assert result["total_count"] == 3
 
     def test_get_tasks_limit(self, temp_db):
         """limitが正しく動作する（タスク10件作成、limit=3で3件のみ返る）"""
@@ -204,6 +203,86 @@ class TestGetTasks:
         result = get_tasks(subject_id=subject["subject_id"], status="pending")
 
         assert result["tasks"][0]["description"] == short_desc
+
+    def test_get_tasks_active_returns_pending_and_in_progress(self, temp_db):
+        """"active"指定時にpending+in_progressの両方が返る"""
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
+
+        # pending x2, in_progress x1, completed x1 を作成
+        add_task(subject_id=sid, title="Pending 1", description="Desc")
+        task_ip = add_task(subject_id=sid, title="In Progress 1", description="Desc")
+        add_task(subject_id=sid, title="Pending 2", description="Desc")
+        task_done = add_task(subject_id=sid, title="Completed 1", description="Desc")
+
+        update_task(task_ip["task_id"], new_status="in_progress")
+        update_task(task_done["task_id"], new_status="completed")
+
+        result = get_tasks(subject_id=sid, status="active")
+
+        assert "error" not in result
+        assert len(result["tasks"]) == 3
+        # completedは含まれない
+        statuses = {t["status"] for t in result["tasks"]}
+        assert statuses == {"pending", "in_progress"}
+
+    def test_get_tasks_active_sort_order(self, temp_db):
+        """"active"指定時のソート順: in_progress優先→pending"""
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
+
+        # タスクを作成（全てpending状態で作成される）
+        t1 = add_task(subject_id=sid, title="Pending 1", description="Desc")
+        t2 = add_task(subject_id=sid, title="In Progress 1", description="Desc")
+        t3 = add_task(subject_id=sid, title="Pending 2", description="Desc")
+
+        # t2をin_progressに変更
+        update_task(t2["task_id"], new_status="in_progress")
+
+        result = get_tasks(subject_id=sid, status="active")
+
+        assert "error" not in result
+        titles = [t["title"] for t in result["tasks"]]
+        # in_progressが先に来る
+        assert titles[0] == "In Progress 1"
+        # pendingが後に来る（順序はupdated_at DESC）
+        assert set(titles[1:]) == {"Pending 1", "Pending 2"}
+        # ステータスの並びを検証: in_progress → pending
+        statuses = [t["status"] for t in result["tasks"]]
+        assert statuses[0] == "in_progress"
+        assert all(s == "pending" for s in statuses[1:])
+
+    def test_get_tasks_active_total_count(self, temp_db):
+        """"active"指定時のtotal_countがpending+in_progressの合計である"""
+        subject = add_subject(name="test-subject", description="Test")
+        sid = subject["subject_id"]
+
+        # pending x3, in_progress x2, completed x1 を作成
+        add_task(subject_id=sid, title="P1", description="Desc")
+        add_task(subject_id=sid, title="P2", description="Desc")
+        add_task(subject_id=sid, title="P3", description="Desc")
+        t_ip1 = add_task(subject_id=sid, title="IP1", description="Desc")
+        t_ip2 = add_task(subject_id=sid, title="IP2", description="Desc")
+        t_done = add_task(subject_id=sid, title="Done1", description="Desc")
+
+        update_task(t_ip1["task_id"], new_status="in_progress")
+        update_task(t_ip2["task_id"], new_status="in_progress")
+        update_task(t_done["task_id"], new_status="completed")
+
+        result = get_tasks(subject_id=sid, status="active", limit=2)
+
+        assert "error" not in result
+        assert result["total_count"] == 5  # pending(3) + in_progress(2)
+        assert len(result["tasks"]) == 2   # limit分のみ
+
+    def test_get_tasks_active_is_valid_status(self, temp_db):
+        """"active"がvalidなステータスとして受け付けられる"""
+        subject = add_subject(name="test-subject", description="Test")
+        result = get_tasks(subject_id=subject["subject_id"], status="active")
+
+        assert "error" not in result
+        assert result["tasks"] == []
+        assert result["total_count"] == 0
 
 
 class TestUpdateTask:
