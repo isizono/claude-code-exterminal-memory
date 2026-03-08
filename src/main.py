@@ -249,13 +249,15 @@ def add_decision(
 
 @mcp.tool()
 def get_topics(
-    subject_id: int,
+    tags: list[str],
     limit: int = 10,
     offset: int = 0,
 ) -> dict:
-    """サブジェクト内のトピックを新しい順に取得する（ページネーション付き）。
-    各トピックにancestorsフィールド（直親→祖先の順、最大5段、{id, title}のみ）を付与。"""
-    return topic_service.get_topics(subject_id, limit, offset)
+    """タグでフィルタリングしてトピックを新しい順に取得する（ページネーション付き）。
+
+    tags: タグ配列（必須、1個以上）。AND条件でフィルタ。例: ["domain:cc-memory"]
+    """
+    return topic_service.get_topics(tags, limit, offset)
 
 
 @mcp.tool()
@@ -350,23 +352,23 @@ def add_task(
 
 @mcp.tool()
 def get_tasks(
-    subject_id: int,
+    tags: list[str],
     status: str = "active",
     limit: int = 5,
 ) -> dict:
     """
-    タスク一覧を取得する（statusでフィルタリング可能）。
+    タスク一覧を取得する（tagsでフィルタリング、statusでフィルタリング可能）。
 
     典型的な使い方:
-    - 未着手+進行中のタスク確認: get_tasks(subject_id)
-    - 進行中のみ: get_tasks(subject_id, status="in_progress")
-    - 未着手のみ: get_tasks(subject_id, status="pending")
-    - 完了タスクの確認: get_tasks(subject_id, status="completed")
+    - 未着手+進行中のタスク確認: get_tasks(["domain:cc-memory"])
+    - 進行中のみ: get_tasks(["domain:cc-memory"], status="in_progress")
+    - 未着手のみ: get_tasks(["domain:cc-memory"], status="pending")
+    - 完了タスクの確認: get_tasks(["domain:cc-memory"], status="completed")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
-        subject_id: サブジェクトID
+        tags: タグ配列（必須、1個以上）。AND条件でフィルタ。例: ["domain:cc-memory"]
         status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
                 "active"はpending+in_progressの両方を返すエイリアス
         limit: 取得件数上限（デフォルト: 5）
@@ -374,7 +376,7 @@ def get_tasks(
     Returns:
         タスク一覧（total_countで該当ステータスの全件数を確認可能）
     """
-    return task_service.get_tasks(subject_id, status, limit)
+    return task_service.get_tasks(tags, status, limit)
 
 
 @mcp.tool()
@@ -383,17 +385,17 @@ def update_task(
     new_status: Optional[str] = None,
     title: Optional[str] = None,
     description: Optional[str] = None,
-    topic_id: Optional[int] = None,
+    tags: Optional[list[str]] = None,
 ) -> dict:
     """
-    タスクのステータス・タイトル・説明を更新する。
+    タスクのステータス・タイトル・説明・タグを更新する。
 
     典型的な使い方:
     - タスク開始: update_task(task_id, new_status="in_progress")
     - タスク完了: update_task(task_id, new_status="completed")
     - タイトル変更: update_task(task_id, title="新しいタイトル")
     - 説明更新: update_task(task_id, description="新しい説明")
-    - トピック紐付け: update_task(task_id, topic_id=85)
+    - タグ変更: update_task(task_id, tags=["domain:cc-memory", "scope:search"])
 
     ワークフロー位置: タスク進行状況の更新時
 
@@ -402,12 +404,12 @@ def update_task(
         new_status: 新しいステータス（pending/in_progress/completed）
         title: 新しいタイトル
         description: 新しい説明
-        topic_id: 関連トピックID
+        tags: 新しいタグ配列（指定時は全置換。1個以上必須）
 
     Returns:
         更新されたタスク情報
     """
-    return task_service.update_task(task_id, new_status, title, description, topic_id)
+    return task_service.update_task(task_id, new_status, title, description, tags)
 
 
 @mcp.tool()

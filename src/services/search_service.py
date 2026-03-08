@@ -4,8 +4,9 @@ from typing import Optional
 
 from sqlite_vec import serialize_float32
 
-from src.db import execute_query, row_to_dict
+from src.db import execute_query, get_connection, row_to_dict
 from src.services import embedding_service
+from src.services.tag_service import get_entity_tags, get_effective_tags
 
 logger = logging.getLogger(__name__)
 
@@ -257,15 +258,14 @@ def search(
         }
 
 
-def _format_row(type_name: str, data: dict) -> dict:
+def _format_row(type_name: str, data: dict, tags: list[str]) -> dict:
     """typeに応じたレスポンス整形"""
     if type_name == 'topic':
         return {
             "id": data["id"],
-            "subject_id": data["subject_id"],
             "title": data["title"],
             "description": data["description"],
-            "parent_topic_id": data["parent_topic_id"],
+            "tags": tags,
             "created_at": data["created_at"],
         }
     elif type_name == 'decision':
@@ -274,16 +274,16 @@ def _format_row(type_name: str, data: dict) -> dict:
             "topic_id": data["topic_id"],
             "decision": data["decision"],
             "reason": data["reason"],
+            "tags": tags,
             "created_at": data["created_at"],
         }
     elif type_name == 'task':
         return {
             "id": data["id"],
-            "subject_id": data["subject_id"],
             "title": data["title"],
             "description": data["description"],
             "status": data["status"],
-            "topic_id": data["topic_id"],
+            "tags": tags,
             "created_at": data["created_at"],
             "updated_at": data["updated_at"],
         }
@@ -296,6 +296,7 @@ def _format_row(type_name: str, data: dict) -> dict:
             "topic_id": data["topic_id"],
             "title": title,
             "content": data["content"],
+            "tags": tags,
             "created_at": data["created_at"],
         }
     return data
@@ -325,9 +326,10 @@ def get_by_id(type: str, id: int) -> dict:
 
     table = TYPE_TO_TABLE[type]
 
+    conn = get_connection()
     try:
-        rows = execute_query(f"SELECT * FROM {table} WHERE id = ?", (id,))
-        if not rows:
+        row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (id,)).fetchone()
+        if not row:
             return {
                 "error": {
                     "code": "NOT_FOUND",
@@ -335,7 +337,19 @@ def get_by_id(type: str, id: int) -> dict:
                 }
             }
 
-        return {"type": type, "data": _format_row(type, row_to_dict(rows[0]))}
+        # タグ取得: topic/taskはget_entity_tags、decision/logはget_effective_tags
+        if type == 'topic':
+            tags = get_entity_tags(conn, "topic_tags", "topic_id", id)
+        elif type == 'task':
+            tags = get_entity_tags(conn, "task_tags", "task_id", id)
+        elif type == 'decision':
+            tags = get_effective_tags(conn, "decision", id)
+        elif type == 'log':
+            tags = get_effective_tags(conn, "log", id)
+        else:
+            tags = []
+
+        return {"type": type, "data": _format_row(type, row_to_dict(row), tags)}
 
     except Exception as e:
         return {
@@ -344,3 +358,5 @@ def get_by_id(type: str, id: int) -> dict:
                 "message": str(e),
             }
         }
+    finally:
+        conn.close()

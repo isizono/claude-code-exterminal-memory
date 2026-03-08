@@ -153,6 +153,51 @@ def get_entity_tags(
     return format_tags(rows)
 
 
+def get_effective_tags_batch(
+    conn: sqlite3.Connection,
+    entity_type: str,
+    parent_topic_id: int,
+) -> dict[int, list[str]]:
+    """topic_id配下の全entity(decision/log)の有効タグを一括取得する。
+
+    Returns: {entity_id: ["tag1", "tag2", ...], ...}
+    """
+    entity_table = _ENTITY_TABLE[entity_type]
+    junction_table = f"{entity_type}_tags"
+    id_column = f"{entity_type}_id"
+
+    rows = conn.execute(
+        f"""
+        SELECT e.id AS entity_id, t.namespace, t.name
+        FROM {entity_table} e
+        JOIN topic_tags tt ON tt.topic_id = e.topic_id
+        JOIN tags t ON t.id = tt.tag_id
+        WHERE e.topic_id = ?
+
+        UNION
+
+        SELECT et.{id_column} AS entity_id, t.namespace, t.name
+        FROM {junction_table} et
+        JOIN tags t ON t.id = et.tag_id
+        WHERE et.{id_column} IN (
+            SELECT id FROM {entity_table} WHERE topic_id = ?
+        )
+        """,
+        (parent_topic_id, parent_topic_id),
+    ).fetchall()
+
+    # entity_idごとにグルーピング
+    groups: dict[int, list] = {}
+    for row in rows:
+        eid = row["entity_id"]
+        if eid not in groups:
+            groups[eid] = []
+        groups[eid].append(row)
+
+    # format_tagsで文字列配列に変換
+    return {eid: format_tags(tag_rows) for eid, tag_rows in groups.items()}
+
+
 def get_effective_tags(conn: sqlite3.Connection, entity_type: str, entity_id: int) -> list[str]:
     """entity(decision/log)の有効タグ（topic_tags UNION entity_tags）を取得する。"""
     entity_table = _ENTITY_TABLE[entity_type]

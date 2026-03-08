@@ -11,6 +11,7 @@ from src.services.tag_service import (
     format_tags,
     get_entity_tags,
     get_effective_tags,
+    get_effective_tags_batch,
 )
 
 
@@ -249,3 +250,93 @@ class TestFormatTags:
         """空のrows"""
         result = format_tags([])
         assert result == []
+
+
+# ========================================
+# get_effective_tags_batch テスト
+# ========================================
+
+
+class TestGetEffectiveTagsBatch:
+    """get_effective_tags_batchのテスト"""
+
+    def test_batch_returns_topic_tags(self, temp_db):
+        """topicのタグがdecisionに継承される"""
+        from src.services.topic_service import add_topic
+        from src.services.decision_service import add_decision
+
+        topic = add_topic(title="Test", description="Test", tags=["domain:test"])
+        dec = add_decision(
+            topic_id=topic["topic_id"],
+            decision="Dec 1",
+            reason="Reason 1",
+        )
+
+        conn = get_connection()
+        try:
+            result = get_effective_tags_batch(conn, "decision", topic["topic_id"])
+            assert dec["decision_id"] in result
+            assert "domain:test" in result[dec["decision_id"]]
+        finally:
+            conn.close()
+
+    def test_batch_includes_entity_tags(self, temp_db):
+        """entity個別タグも含まれる"""
+        from src.services.topic_service import add_topic
+        from src.services.decision_service import add_decision
+
+        topic = add_topic(title="Test", description="Test", tags=["domain:test"])
+        dec = add_decision(
+            topic_id=topic["topic_id"],
+            decision="Dec 1",
+            reason="Reason 1",
+            tags=["scope:search"],
+        )
+
+        conn = get_connection()
+        try:
+            result = get_effective_tags_batch(conn, "decision", topic["topic_id"])
+            assert dec["decision_id"] in result
+            tags = result[dec["decision_id"]]
+            assert "domain:test" in tags
+            assert "scope:search" in tags
+        finally:
+            conn.close()
+
+    def test_batch_empty_topic(self, temp_db):
+        """entity 0件のtopicでは空dictが返る"""
+        from src.services.topic_service import add_topic
+
+        topic = add_topic(title="Empty", description="Test", tags=["domain:test"])
+
+        conn = get_connection()
+        try:
+            result = get_effective_tags_batch(conn, "decision", topic["topic_id"])
+            assert result == {}
+        finally:
+            conn.close()
+
+    def test_batch_multiple_entities(self, temp_db):
+        """複数entityのタグを一括取得"""
+        from src.services.topic_service import add_topic
+        from src.services.discussion_log_service import add_log
+
+        topic = add_topic(title="Test", description="Test", tags=["domain:test"])
+        log1 = add_log(topic_id=topic["topic_id"], title="Log 1", content="Content 1")
+        log2 = add_log(
+            topic_id=topic["topic_id"],
+            title="Log 2",
+            content="Content 2",
+            tags=["scope:extra"],
+        )
+
+        conn = get_connection()
+        try:
+            result = get_effective_tags_batch(conn, "log", topic["topic_id"])
+            assert log1["log_id"] in result
+            assert log2["log_id"] in result
+            assert "domain:test" in result[log1["log_id"]]
+            assert "domain:test" in result[log2["log_id"]]
+            assert "scope:extra" in result[log2["log_id"]]
+        finally:
+            conn.close()
