@@ -387,6 +387,3 @@ def test_on_delete_cascade_discussion_logs(temp_db):
     assert _count_logs(topic_id) == 0
 
 
-def test_on_delete_cascade_decisions_fts5_sync(temp_db):
-    """トピック削除時にdecisionsのFTS5インデックスもカスケード削除される"""
-    pass

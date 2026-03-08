@@ -126,6 +126,17 @@ def test_get_topics_nonexistent_tag(temp_db):
     assert result["total_count"] == 0
 
 
+def test_get_topics_partial_nonexistent_tags(temp_db):
+    """存在するタグと存在しないタグの混在で空配列が返る"""
+    add_topic(title="Topic", description="Desc", tags=["domain:test"])
+
+    result = get_topics(tags=["domain:test", "domain:nonexistent"])
+
+    assert "error" not in result
+    assert result["topics"] == []
+    assert result["total_count"] == 0
+
+
 def test_get_topics_and_filter(temp_db):
     """複数タグAND条件"""
     add_topic(title="Both Tags", description="Desc", tags=["domain:test", "scope:search"])
