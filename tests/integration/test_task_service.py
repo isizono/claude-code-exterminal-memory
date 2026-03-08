@@ -77,30 +77,6 @@ class TestAddTask:
 class TestGetTasks:
     """get_tasksの統合テスト"""
 
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_empty(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_with_status_filter(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_default_status_is_active(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_limit(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_total_count(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_total_count_exceeds_limit(self, temp_db):
-        pass
-
     def test_get_tasks_invalid_limit_zero(self, temp_db):
         """limit=0でINVALID_PARAMETERエラーになる"""
         result = get_tasks(tags=DEFAULT_TAGS, status="pending", limit=0)
@@ -122,29 +98,6 @@ class TestGetTasks:
         assert "error" in result
         assert result["error"]["code"] == "INVALID_STATUS"
 
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_description_truncated(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_description_short_not_truncated(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_active_returns_pending_and_in_progress(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_active_sort_order(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_active_total_count(self, temp_db):
-        pass
-
-    @pytest.mark.skip("Pending task #405: search tag filter migration")
-    def test_get_tasks_active_is_valid_status(self, temp_db):
-        pass
 
 
 class TestUpdateTask:

@@ -7,6 +7,7 @@ from src.services.tag_service import (
     parse_tag,
     validate_and_parse_tags,
     ensure_tag_ids,
+    resolve_tag_ids,
     link_tags,
     format_tags,
     get_entity_tags,
@@ -186,6 +187,63 @@ class TestEnsureTagIds:
             # 再度呼んで同じ順序で返ることを確認
             tag_ids2 = ensure_tag_ids(conn, tags)
             assert tag_ids == tag_ids2
+        finally:
+            conn.close()
+
+
+# ========================================
+# resolve_tag_ids テスト
+# ========================================
+
+
+class TestResolveTagIds:
+    """resolve_tag_idsのテスト"""
+
+    def test_existing_tags(self, temp_db):
+        """存在するタグのIDが正しく返る"""
+        conn = get_connection()
+        try:
+            # まずタグを作成
+            ensure_tag_ids(conn, [("domain", "test"), ("", "hooks")])
+            conn.commit()
+
+            # resolve_tag_idsで取得
+            tag_ids = resolve_tag_ids(conn, [("domain", "test"), ("", "hooks")])
+            assert len(tag_ids) == 2
+            assert all(isinstance(tid, int) for tid in tag_ids)
+        finally:
+            conn.close()
+
+    def test_nonexistent_tags(self, temp_db):
+        """存在しないタグで空リストが返る"""
+        conn = get_connection()
+        try:
+            tag_ids = resolve_tag_ids(conn, [("domain", "nonexistent"), ("", "missing")])
+            assert tag_ids == []
+        finally:
+            conn.close()
+
+    def test_partial_match(self, temp_db):
+        """一部だけ存在する場合、存在するもののIDのみ返る"""
+        conn = get_connection()
+        try:
+            # 1つだけタグを作成
+            ensure_tag_ids(conn, [("domain", "test")])
+            conn.commit()
+
+            # 存在するものと存在しないものを混ぜて渡す
+            tag_ids = resolve_tag_ids(conn, [("domain", "test"), ("domain", "nonexistent")])
+            assert len(tag_ids) == 1
+            assert isinstance(tag_ids[0], int)
+        finally:
+            conn.close()
+
+    def test_empty_input(self, temp_db):
+        """空リスト入力で空リストが返る"""
+        conn = get_connection()
+        try:
+            tag_ids = resolve_tag_ids(conn, [])
+            assert tag_ids == []
         finally:
             conn.close()
 

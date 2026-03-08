@@ -78,6 +78,27 @@ def validate_and_parse_tags(
     return parsed
 
 
+def resolve_tag_ids(conn: sqlite3.Connection, parsed_tags: list[tuple[str, str]]) -> list[int]:
+    """既存タグのIDのみを返す（INSERT しない）。
+
+    存在しないタグは結果に含まれない。
+    呼び出し元で len(result) < len(parsed_tags) をチェックすることで
+    部分マッチを検出できる。
+    """
+    if not parsed_tags:
+        return []
+    placeholders = " OR ".join(
+        "(namespace = ? AND name = ?)" for _ in parsed_tags
+    )
+    flat_params = [v for pair in parsed_tags for v in pair]
+    rows = conn.execute(
+        f"SELECT id, namespace, name FROM tags WHERE {placeholders}",
+        flat_params,
+    ).fetchall()
+    id_map = {(row["namespace"], row["name"]): row["id"] for row in rows}
+    return [id_map[(ns, name)] for ns, name in parsed_tags if (ns, name) in id_map]
+
+
 def ensure_tag_ids(conn: sqlite3.Connection, parsed_tags: list[tuple[str, str]]) -> list[int]:
     """タグをINSERT OR IGNOREし、idのリストを返す。
 
@@ -99,25 +120,6 @@ def ensure_tag_ids(conn: sqlite3.Connection, parsed_tags: list[tuple[str, str]])
     ).fetchall()
     id_map = {(row["namespace"], row["name"]): row["id"] for row in rows}
     return [id_map[(ns, name)] for ns, name in parsed_tags]
-
-
-def resolve_tag_ids(conn: sqlite3.Connection, parsed_tags: list[tuple[str, str]]) -> list[int]:
-    """既存タグのidのリストを返す（読み取り専用、INSERTしない）。
-
-    存在しないタグは無視され、結果に含まれない。
-    """
-    if not parsed_tags:
-        return []
-    placeholders = " OR ".join(
-        "(namespace = ? AND name = ?)" for _ in parsed_tags
-    )
-    flat_params = [v for pair in parsed_tags for v in pair]
-    rows = conn.execute(
-        f"SELECT id, namespace, name FROM tags WHERE {placeholders}",
-        flat_params,
-    ).fetchall()
-    id_map = {(row["namespace"], row["name"]): row["id"] for row in rows}
-    return [id_map[(ns, name)] for ns, name in parsed_tags if (ns, name) in id_map]
 
 
 def link_tags(

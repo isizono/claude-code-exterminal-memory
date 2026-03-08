@@ -6,10 +6,10 @@ from src.services.embedding_service import build_embedding_text, generate_and_st
 from src.services.tag_service import (
     validate_and_parse_tags,
     ensure_tag_ids,
+    resolve_tag_ids,
     link_tags,
     get_entity_tags,
     get_entity_tags_batch,
-    resolve_tag_ids,
 )
 
 
@@ -134,7 +134,7 @@ def get_topics(
         try:
             # タグIDを取得（読み取り専用、INSERTしない）
             tag_ids = resolve_tag_ids(conn, parsed_tags)
-            if not tag_ids:
+            if not tag_ids or len(tag_ids) < len(parsed_tags):
                 return {"topics": [], "total_count": 0}
             placeholders = ",".join("?" * len(tag_ids))
 
