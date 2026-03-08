@@ -244,7 +244,7 @@ def search(
                 )
                 if rows:
                     content = rows[0]["content"]
-                    item["title"] = content[:50] if len(content) > 50 else content
+                    item["title"] = content[:50]
 
         return {"results": results, "total_count": len(results)}
 
@@ -288,10 +288,13 @@ def _format_row(type_name: str, data: dict) -> dict:
             "updated_at": data["updated_at"],
         }
     elif type_name == 'log':
+        title = data["title"]
+        if not title:
+            title = data["content"][:50]
         return {
             "id": data["id"],
             "topic_id": data["topic_id"],
-            "title": data["title"],
+            "title": title,
             "content": data["content"],
             "created_at": data["created_at"],
         }
