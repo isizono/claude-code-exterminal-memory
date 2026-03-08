@@ -1,6 +1,8 @@
 """タグ管理ユーティリティ"""
 import sqlite3
-from typing import Union
+from typing import Optional, Union
+
+from src.db import execute_query, row_to_dict
 
 
 VALID_NAMESPACES = {'', 'domain', 'scope', 'mode'}
@@ -224,3 +226,51 @@ def get_effective_tags(conn: sqlite3.Connection, entity_type: str, entity_id: in
         (entity_id, entity_id),
     ).fetchall()
     return format_tags(rows)
+
+
+def list_tags(namespace: Optional[str] = None) -> dict:
+    """タグ一覧をusage_count付きで返す。
+
+    Args:
+        namespace: namespaceでフィルタ（未指定で全タグ）。
+                   namespace=""で素タグ（namespaceなし）のみフィルタ。
+
+    Returns:
+        タグ一覧（id, namespace, name, tag, usage_count）をusage_count降順で返す
+    """
+    try:
+        rows = execute_query(
+            """
+            SELECT t.id, t.namespace, t.name,
+              (SELECT COUNT(*) FROM topic_tags WHERE tag_id = t.id) +
+              (SELECT COUNT(*) FROM task_tags WHERE tag_id = t.id) +
+              (SELECT COUNT(*) FROM decision_tags WHERE tag_id = t.id) +
+              (SELECT COUNT(*) FROM log_tags WHERE tag_id = t.id) AS usage_count
+            FROM tags t
+            WHERE (? IS NULL OR t.namespace = ?)
+            ORDER BY usage_count DESC, t.name ASC
+            """,
+            (namespace, namespace),
+        )
+        tags = []
+        for row in rows:
+            r = row_to_dict(row)
+            ns = r["namespace"]
+            name = r["name"]
+            tag_str = f"{ns}:{name}" if ns else name
+            tags.append({
+                "tag": tag_str,
+                "id": r["id"],
+                "namespace": ns,
+                "name": name,
+                "usage_count": r["usage_count"],
+            })
+        return {"tags": tags}
+
+    except Exception as e:
+        return {
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": str(e),
+            }
+        }

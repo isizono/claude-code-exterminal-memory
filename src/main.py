@@ -2,7 +2,6 @@
 import logging
 from fastmcp import FastMCP
 from typing import Literal, Optional
-from src.db import execute_query
 from src.services import (
     topic_service,
     discussion_log_service,
@@ -11,13 +10,13 @@ from src.services import (
     task_service,
     knowledge_service,
 )
+from src.services.tag_service import list_tags as _list_tags
 
 logger = logging.getLogger(__name__)
 
 
 def _build_active_context() -> str:
-    """アクティブコンテキスト文字列を組み立てる（暫定: subjectsテーブル廃止後は別タスクで再設計）"""
-    # subjects廃止後の暫定実装: 空文字列を返す
+    """アクティブコンテキスト文字列を組み立てる"""
     return ""
 
 
@@ -282,28 +281,28 @@ def get_decisions(
 
 @mcp.tool()
 def search(
-    subject_id: int,
     keyword: str,
+    tags: Optional[list[str]] = None,
     type_filter: Optional[str] = None,
     limit: int = 10,
 ) -> dict:
     """
-    サブジェクト内をキーワードで横断検索する。
+    キーワードで横断検索する。
 
-    FTS5 trigramトークナイザによる部分文字列マッチ。3文字以上のキーワードを指定する。
-    結果はBM25スコア順でランキングされる。
-    詳細情報が必要な場合は get_by_id(type, id) で取得する。
+    FTS5 trigramとベクトル検索のハイブリッド。RRFスコアで統合・ランキング。
+    2文字以上のキーワードを指定する。
+    tagsでフィルタリング可能（AND結合）。未指定で全件検索。
 
     Args:
-        subject_id: サブジェクトID
-        keyword: 検索キーワード（3文字以上）
+        keyword: 検索キーワード（2文字以上）
+        tags: タグフィルタ（AND条件。未指定=全件検索）
         type_filter: 検索対象の絞り込み（'topic', 'decision', 'task', 'log'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
 
     Returns:
         検索結果一覧（type, id, title, score）
     """
-    return search_service.search(subject_id, keyword, type_filter, limit)
+    return search_service.search(keyword, tags, type_filter, limit)
 
 
 @mcp.tool()
@@ -325,6 +324,25 @@ def get_by_id(
         指定した種別に応じた詳細情報
     """
     return search_service.get_by_id(type, id)
+
+
+@mcp.tool()
+def list_tags(
+    namespace: Optional[str] = None,
+) -> dict:
+    """
+    タグ一覧をusage_count付きで取得する。
+
+    タグの利用状況を確認するときに使う。
+    namespaceでフィルタリング可能。
+
+    Args:
+        namespace: namespaceでフィルタ（"domain", "scope", "mode", ""。未指定で全タグ）
+
+    Returns:
+        タグ一覧（tag, id, namespace, name, usage_count）をusage_count降順で返す
+    """
+    return _list_tags(namespace)
 
 
 @mcp.tool()
