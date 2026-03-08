@@ -682,6 +682,26 @@ class TestTopicToolCallCheck:
         )
         assert result["decision"] == "approve"
 
+    def test_get_by_id_call_approves(self, env_setup):
+        """get_by_id呼出済み + メタタグあり → approve"""
+        transcript = env_setup["tmp_path"] / "transcript.jsonl"
+        _write_transcript(
+            [
+                _make_user_entry("hi"),
+                _make_assistant_entry(
+                    tool_calls=["mcp__plugin_claude-code-memory_cc-memory__get_by_id"],
+                ),
+                _make_assistant_entry(text=f"{META_TAG}\nresponse"),
+            ],
+            transcript,
+        )
+
+        result = _run_stop_hook(
+            str(transcript), "test-session", env_setup["env_override"],
+            last_assistant_message=f"response\n{META_TAG}",
+        )
+        assert result["decision"] == "approve"
+
     def test_add_topic_call_approves(self, env_setup):
         """add_topic呼出済み + メタタグあり → approve"""
         transcript = env_setup["tmp_path"] / "transcript.jsonl"
