@@ -4,13 +4,13 @@ import tempfile
 import pytest
 from src.db import init_database, get_connection
 from src.services.topic_service import add_topic
-from src.services.task_service import add_task, update_task
+from src.services.activity_service import add_activity, update_activity
 import src.services.embedding_service as emb
 from src.main import (
     _build_active_context,
     _get_active_domains,
     _get_recent_topics_by_tag,
-    _get_active_tasks_by_tag,
+    _get_active_activities_by_tag,
     _get_recent_non_domain_tags,
     _truncate_desc,
     ACTIVE_DAYS,
@@ -226,55 +226,55 @@ def test_get_recent_topics_by_tag_empty(temp_db):
 
 
 # ========================================
-# _get_active_tasks_by_tag のテスト
+# _get_active_activities_by_tag のテスト
 # ========================================
 
 
-def test_get_active_tasks_by_tag_basic(temp_db):
-    """domain:タグに紐づくアクティブタスクが返る"""
-    add_task(title="Task 1", description="Desc", tags=["domain:test-proj"])
+def test_get_active_activities_by_tag_basic(temp_db):
+    """domain:タグに紐づくホットアクティビティが返る"""
+    add_activity(title="Activity 1", description="Desc", tags=["domain:test-proj"])
 
     tag_id = _get_tag_id("domain", "test-proj")
-    tasks = _get_active_tasks_by_tag(tag_id)
+    activities = _get_active_activities_by_tag(tag_id)
 
-    assert len(tasks) == 1
-    assert tasks[0]["title"] == "Task 1"
-    assert tasks[0]["status"] == "pending"
+    assert len(activities) == 1
+    assert activities[0]["title"] == "Activity 1"
+    assert activities[0]["status"] == "pending"
 
 
-def test_get_active_tasks_by_tag_excludes_completed(temp_db):
-    """completedタスクは含まれない"""
-    result = add_task(title="Done Task", description="Desc", tags=["domain:test-proj"])
-    update_task(result["task_id"], new_status="completed")
+def test_get_active_activities_by_tag_excludes_completed(temp_db):
+    """completedアクティビティは含まれない"""
+    result = add_activity(title="Done Activity", description="Desc", tags=["domain:test-proj"])
+    update_activity(result["activity_id"], new_status="completed")
 
     tag_id = _get_tag_id("domain", "test-proj")
-    tasks = _get_active_tasks_by_tag(tag_id)
+    activities = _get_active_activities_by_tag(tag_id)
 
-    assert len(tasks) == 0
+    assert len(activities) == 0
 
 
-def test_get_active_tasks_by_tag_sort_order(temp_db):
+def test_get_active_activities_by_tag_sort_order(temp_db):
     """in_progressが先、その後pending"""
-    r1 = add_task(title="Pending Task", description="Desc", tags=["domain:test-proj"])
-    r2 = add_task(title="In Progress Task", description="Desc", tags=["domain:test-proj"])
-    update_task(r2["task_id"], new_status="in_progress")
+    r1 = add_activity(title="Pending Activity", description="Desc", tags=["domain:test-proj"])
+    r2 = add_activity(title="In Progress Activity", description="Desc", tags=["domain:test-proj"])
+    update_activity(r2["activity_id"], new_status="in_progress")
 
     tag_id = _get_tag_id("domain", "test-proj")
-    tasks = _get_active_tasks_by_tag(tag_id)
+    activities = _get_active_activities_by_tag(tag_id)
 
-    assert len(tasks) == 2
-    assert tasks[0]["status"] == "in_progress"
-    assert tasks[1]["status"] == "pending"
+    assert len(activities) == 2
+    assert activities[0]["status"] == "in_progress"
+    assert activities[1]["status"] == "pending"
 
 
-def test_get_active_tasks_by_tag_empty(temp_db):
-    """紐づくタスクがなければ空リスト"""
-    add_topic(title="Topic Only", description="Desc", tags=["domain:no-tasks"])
+def test_get_active_activities_by_tag_empty(temp_db):
+    """紐づくアクティビティがなければ空リスト"""
+    add_topic(title="Topic Only", description="Desc", tags=["domain:no-activities"])
 
-    tag_id = _get_tag_id("domain", "no-tasks")
-    tasks = _get_active_tasks_by_tag(tag_id)
+    tag_id = _get_tag_id("domain", "no-activities")
+    activities = _get_active_activities_by_tag(tag_id)
 
-    assert tasks == []
+    assert activities == []
 
 
 # ========================================
@@ -366,14 +366,14 @@ def test_build_active_context_with_domain_topics(temp_db):
     assert "My Topic" in result
 
 
-def test_build_active_context_with_tasks(temp_db):
-    """タスクがある場合、アクティブタスクセクションが生成される"""
+def test_build_active_context_with_activities(temp_db):
+    """アクティビティがある場合、ホットアクティビティセクションが生成される"""
     add_topic(title="Topic", description="Desc", tags=["domain:myapp"])
-    add_task(title="[作業] 実装する", description="Desc", tags=["domain:myapp"])
+    add_activity(title="[作業] 実装する", description="Desc", tags=["domain:myapp"])
 
     result = _build_active_context()
 
-    assert "アクティブタスク:" in result
+    assert "ホットアクティビティ:" in result
     assert "[作業] 実装する" in result
     assert "(pending)" in result
 
@@ -423,15 +423,15 @@ def test_build_active_context_topic_id_in_bracket(temp_db):
     assert f"[{topic_id}]" in result
 
 
-def test_build_active_context_task_id_in_bracket(temp_db):
-    """タスクIDが[id]形式で表示される"""
+def test_build_active_context_activity_id_in_bracket(temp_db):
+    """アクティビティIDが[id]形式で表示される"""
     add_topic(title="Topic", description="Desc", tags=["domain:myapp"])
-    task = add_task(title="Task 1", description="Desc", tags=["domain:myapp"])
-    task_id = task["task_id"]
+    activity = add_activity(title="Activity 1", description="Desc", tags=["domain:myapp"])
+    activity_id = activity["activity_id"]
 
     result = _build_active_context()
 
-    assert f"[{task_id}]" in result
+    assert f"[{activity_id}]" in result
 
 
 def test_build_active_context_no_crash_on_error(temp_db):
@@ -447,18 +447,18 @@ def test_build_active_context_no_crash_on_error(temp_db):
     os.environ["DISCUSSION_DB_PATH"] = temp_db
 
 
-def test_build_active_context_completed_tasks_excluded(temp_db):
-    """completedタスクはアクティブタスクに含まれない"""
+def test_build_active_context_completed_activities_excluded(temp_db):
+    """completedアクティビティはホットアクティビティに含まれない"""
     add_topic(title="Topic", description="Desc", tags=["domain:myapp"])
-    result = add_task(title="Done Task", description="Desc", tags=["domain:myapp"])
-    update_task(result["task_id"], new_status="completed")
+    result = add_activity(title="Done Activity", description="Desc", tags=["domain:myapp"])
+    update_activity(result["activity_id"], new_status="completed")
 
     ctx = _build_active_context()
 
-    assert "Done Task" not in ctx
+    assert "Done Activity" not in ctx
 
 
-def test_build_active_context_domain_no_topics_no_tasks_skipped(temp_db):
+def test_build_active_context_domain_no_topics_no_activities_skipped(temp_db):
     """domain:タグはあるがtopic_tagsに紐付けないとdomainsに出てこない"""
     # domain:emptyタグだけ作成してトピックに紐付けない
     conn = get_connection()
