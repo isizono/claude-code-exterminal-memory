@@ -91,18 +91,14 @@ def extract_text_from_entry(entry: dict) -> str:
 def parse_meta_tag(text: str) -> dict | None:
     """テキストからメタタグをパースする。
 
-    フォーマット（新形式）:
+    フォーマット:
     <!-- [meta] topic: xxx -->
-
-    旧形式（後方互換）:
-    <!-- [meta] topic: xxx (id: N) -->  ← IDは無視
 
     Returns:
         {"found": True, "topic_name": ...}
         or None
     """
-    # HTMLコメント形式のメタタグを探す（idはオプショナル、無視）
-    pattern = r'<!--\s*\[meta\]\s*topic:\s*(.+?)\s*(?:\(id:\s*\d+\)\s*)?-->'
+    pattern = r'<!--\s*\[meta\]\s*topic:\s*(.+?)\s*-->'
     match = re.search(pattern, text)
 
     if match:
@@ -152,7 +148,6 @@ _CONTEXT_RETRIEVAL_TOOLS = [
     "mcp__plugin_claude-code-memory_cc-memory__get_decisions",
     "mcp__plugin_claude-code-memory_cc-memory__get_logs",
     "mcp__plugin_claude-code-memory_cc-memory__get_tasks",
-    "mcp__plugin_claude-code-memory_cc-memory__get_by_id",
     "mcp__plugin_claude-code-memory_cc-memory__get_by_ids",
 ]
 

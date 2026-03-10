@@ -4,12 +4,12 @@ import sys
 
 _SESSION_START_MESSAGE = (
     "<system-reminder>"
-    "セッションが開始しました。最初の応答を組み立てる前に、過去のコンテキストを取得してください。"
-    "手順: (1) get_topics でトピック一覧を確認する。"
-    "(2) 関連するトピックがあれば get_by_id で詳細を取得する。"
-    "なければ add_topic で新しいトピックを作成する。"
-    "(3) 必要に応じて get_decisions / get_logs でさらに詳細を取得する。"
-    "この手順を省略すると stop hook にブロックされます。"
+    "Session started. Before composing your first response, retrieve past context. "
+    "Steps: (1) Use get_topics to review the topic list. "
+    "(2) If a relevant topic exists, use get_by_ids to fetch details. "
+    "Otherwise, create a new topic with add_topic. "
+    "(3) Use get_decisions / get_logs as needed for further details. "
+    "Skipping this will cause the stop hook to block you."
     "</system-reminder>"
 )
 

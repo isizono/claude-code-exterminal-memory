@@ -51,12 +51,6 @@ class TestParseMetaTag:
         result = parse_meta_tag(text)
         assert result == {"found": True, "topic_name": "Stopフック実装"}
 
-    def test_valid_meta_tag_old_format(self):
-        """旧形式（id付き）のメタタグもパースできる（idは無視）"""
-        text = '<!-- [meta] topic: Stopフック実装 (id: 55) -->'
-        result = parse_meta_tag(text)
-        assert result == {"found": True, "topic_name": "Stopフック実装"}
-
     def test_meta_tag_with_surrounding_text(self):
         """前後にテキストがあってもパースできる"""
         text = """これは応答の本文です。
@@ -82,27 +76,21 @@ class TestParseMetaTag:
         result = parse_meta_tag("")
         assert result is None
 
-    def test_large_ids_ignored(self):
-        """旧形式の大きなID値もパースできる（idは無視）"""
-        text = '<!-- [meta] topic: numbers (id: 888888) -->'
-        result = parse_meta_tag(text)
-        assert result == {"found": True, "topic_name": "numbers"}
-
     def test_name_with_parentheses(self):
         """名前に括弧が含まれていてもパースできる"""
-        text = '<!-- [meta] topic: 機能追加(v2) (id: 55) -->'
+        text = '<!-- [meta] topic: 機能追加(v2) -->'
         result = parse_meta_tag(text)
         assert result == {"found": True, "topic_name": "機能追加(v2)"}
 
     def test_old_subject_format_not_matched(self):
         """旧フォーマット（subject:付き）はマッチしない"""
-        text = '<!-- [meta] subject: old-format (id: 1) | topic: some topic (id: 2) -->'
+        text = '<!-- [meta] subject: old-format | topic: some topic -->'
         result = parse_meta_tag(text)
         assert result is None
 
     def test_old_project_format_not_matched(self):
         """旧フォーマット（project:）はマッチしない"""
-        text = '<!-- [meta] project: old-format (id: 1) | topic: some topic (id: 2) -->'
+        text = '<!-- [meta] project: old-format | topic: some topic -->'
         result = parse_meta_tag(text)
         assert result is None
 
@@ -295,10 +283,6 @@ class TestHasContextRetrievalCalls:
 
     def test_search_detected(self):
         entries = [_make_assistant_entry(tool_calls=["mcp__plugin_claude-code-memory_cc-memory__search"])]
-        assert has_context_retrieval_calls(entries) is True
-
-    def test_get_by_id_detected(self):
-        entries = [_make_assistant_entry(tool_calls=["mcp__plugin_claude-code-memory_cc-memory__get_by_id"])]
         assert has_context_retrieval_calls(entries) is True
 
     def test_get_by_ids_detected(self):
