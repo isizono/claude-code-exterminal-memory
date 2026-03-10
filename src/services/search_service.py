@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 VALID_TYPES = {'topic', 'decision', 'task', 'log'}
 
+GET_BY_IDS_MAX = 20
+
 TYPE_TO_TABLE = {
     'topic': 'discussion_topics',
     'decision': 'decisions',
@@ -497,3 +499,42 @@ def get_by_id(type: str, id: int) -> dict:
         }
     finally:
         conn.close()
+
+
+def get_by_ids(items: list[dict]) -> dict:
+    """
+    複数のtype+idペアをバッチ取得する。
+
+    Args:
+        items: [{type: str, id: int}, ...] のリスト（最大20件）
+
+    Returns:
+        {"results": [get_by_idの結果, ...]}
+    """
+    if not items:
+        return {"results": []}
+
+    if len(items) > GET_BY_IDS_MAX:
+        return {
+            "error": {
+                "code": "TOO_MANY_ITEMS",
+                "message": f"Maximum {GET_BY_IDS_MAX} items allowed, got {len(items)}"
+            }
+        }
+
+    results = []
+    for item in items:
+        item_type = item.get("type")
+        item_id = item.get("id")
+        if item_type is None or item_id is None:
+            results.append({
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": "Each item must have 'type' and 'id' fields"
+                }
+            })
+            continue
+        result = get_by_id(item_type, item_id)
+        results.append(result)
+
+    return {"results": results}
