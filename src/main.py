@@ -328,7 +328,7 @@ def add_topic(
 ) -> dict:
     """新しい議論トピックを追加する。
 
-    tags: タグ配列（必須、1個以上）。例: ["domain:cc-memory", "hooks"]
+    tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/scope:(作業の塊)/mode:(作業スタンス)/素タグ(キーワード)。例: ["domain:cc-memory", "scope:search-improvement", "search", "api-design"]
     """
     return topic_service.add_topic(title, description, tags)
 
@@ -342,7 +342,7 @@ def add_log(
 ) -> dict:
     """トピックに議論ログを追加する。
 
-    tags: 追加タグ（optional）。省略時はtopicのタグを継承。
+    tags: 追加タグ（optional）。省略時はtopicのタグを継承。内容を表すタグを積極的に追加すること。namespace: domain:(プロジェクト)/scope:(作業の塊)/mode:(作業スタンス)/素タグ(キーワード)。例: ["scope:search-improvement", "search", "api-design"]
     """
     return discussion_log_service.add_log(topic_id, title, content, tags)
 
@@ -356,20 +356,20 @@ def add_decision(
 ) -> dict:
     """決定事項を記録する。
 
-    tags: 追加タグ（optional）。省略時はtopicのタグを継承。
+    tags: 追加タグ（optional）。省略時はtopicのタグを継承。内容を表すタグを積極的に追加すること。namespace: domain:(プロジェクト)/scope:(作業の塊)/mode:(作業スタンス)/素タグ(キーワード)。例: ["scope:search-improvement", "search", "api-design"]
     """
     return decision_service.add_decision(decision, reason, topic_id, tags)
 
 
 @mcp.tool()
 def get_topics(
-    tags: list[str],
+    tags: list[str] | None = None,
     limit: int = 10,
     offset: int = 0,
 ) -> dict:
-    """タグでフィルタリングしてトピックを新しい順に取得する（ページネーション付き）。
+    """トピックを新しい順に取得する（ページネーション付き）。
 
-    tags: タグ配列（必須、1個以上）。AND条件でフィルタ。例: ["domain:cc-memory"]
+    tags: タグ配列（optional）。指定時はAND条件でフィルタ。未指定時は全件返す。例: ["domain:cc-memory"]
     """
     return topic_service.get_topics(tags, limit, offset)
 
@@ -396,7 +396,7 @@ def get_decisions(
 
 @mcp.tool()
 def search(
-    keyword: str,
+    keyword: str | list[str],
     tags: Optional[list[str]] = None,
     type_filter: Optional[str] = None,
     limit: int = 10,
@@ -406,10 +406,11 @@ def search(
 
     FTS5 trigramとベクトル検索のハイブリッド。RRFスコアで統合・ランキング。
     2文字以上のキーワードを指定する。
+    配列で複数キーワードを渡すとAND検索（すべてを含む結果のみ返す）。
     tagsでフィルタリング可能（AND結合）。未指定で全件検索。
 
     Args:
-        keyword: 検索キーワード（2文字以上）
+        keyword: 検索キーワード（2文字以上）。配列で複数指定時はAND検索
         tags: タグフィルタ（AND条件。未指定=全件検索）
         type_filter: 検索対象の絞り込み（'topic', 'decision', 'task', 'log'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
@@ -443,6 +444,27 @@ def get_by_id(
 
 
 @mcp.tool()
+def get_by_ids(
+    items: list[dict],
+) -> dict:
+    """
+    複数のsearch結果の詳細情報を一括取得する。
+
+    searchツールで得られた複数のtype + idペアを1回で取得し、
+    各アイテムの全文を返す。
+
+    Args:
+        items: 取得対象のリスト。各要素は {type: str, id: int}（最大20件）
+               type: データ種別（'topic', 'decision', 'task', 'log'）
+               id: データのID
+
+    Returns:
+        一括取得結果（各アイテムはget_by_idと同じ形式）
+    """
+    return search_service.get_by_ids(items)
+
+
+@mcp.tool()
 def list_tags(
     namespace: Optional[str] = None,
 ) -> dict:
@@ -471,12 +493,12 @@ def add_task(
     新しいタスクを追加する。
 
     典型的な使い方:
-    - 作業タスクを作成: add_task("○○機能を実装", "詳細説明...", ["domain:cc-memory"])
+    - 作業タスクを作成: add_task("○○機能を実装", "詳細説明...", ["domain:cc-memory", "mode:implementation", "scope:api-design"])
 
     Args:
         title: タスクのタイトル
         description: タスクの詳細説明（必須）
-        tags: タグ配列（必須、1個以上）。例: ["domain:cc-memory", "hooks"]
+        tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/scope:(作業の塊)/mode:(作業スタンス)/素タグ(キーワード)。例: ["domain:cc-memory", "scope:search-improvement", "mode:discuss", "search"]
 
     Returns:
         作成されたタスク情報
@@ -486,7 +508,7 @@ def add_task(
 
 @mcp.tool()
 def get_tasks(
-    tags: list[str],
+    tags: list[str] | None = None,
     status: str = "active",
     limit: int = 5,
 ) -> dict:
@@ -494,15 +516,15 @@ def get_tasks(
     タスク一覧を取得する（tagsでフィルタリング、statusでフィルタリング可能）。
 
     典型的な使い方:
-    - 未着手+進行中のタスク確認: get_tasks(["domain:cc-memory"])
+    - 全タスク確認: get_tasks()
+    - ドメイン指定: get_tasks(["domain:cc-memory"])
     - 進行中のみ: get_tasks(["domain:cc-memory"], status="in_progress")
-    - 未着手のみ: get_tasks(["domain:cc-memory"], status="pending")
-    - 完了タスクの確認: get_tasks(["domain:cc-memory"], status="completed")
+    - 完了タスクの確認: get_tasks(status="completed")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
-        tags: タグ配列（必須、1個以上）。AND条件でフィルタ。例: ["domain:cc-memory"]
+        tags: タグ配列（optional）。指定時はAND条件でフィルタ。未指定時は全件返す。例: ["domain:cc-memory"]
         status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
                 "active"はpending+in_progressの両方を返すエイリアス
         limit: 取得件数上限（デフォルト: 5）
