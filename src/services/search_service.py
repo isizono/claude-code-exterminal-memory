@@ -59,12 +59,16 @@ def _attach_snippets(results: list[dict]) -> None:
         by_type.setdefault(item["type"], []).append(item)
 
     for type_name, items in by_type.items():
+        if type_name not in SNIPPET_SOURCE:
+            for item in items:
+                item["snippet"] = ""
+            continue
         table, column = SNIPPET_SOURCE[type_name]
         ids = [item["id"] for item in items]
         placeholders = ",".join("?" * len(ids))
         rows = execute_query(
             f"SELECT id, {column} FROM {table} WHERE id IN ({placeholders})",
-            ids,
+            tuple(ids),
         )
         snippet_map = {r["id"]: (r[column] or "")[:SNIPPET_MAX_LEN] for r in rows}
         for item in items:

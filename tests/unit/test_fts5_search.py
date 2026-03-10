@@ -61,6 +61,7 @@ def test_search_response_format(temp_db):
         assert "id" in item
         assert "title" in item
         assert "score" in item
+        assert "snippet" in item
 
 
 def test_search_bm25_ranking(temp_db):
