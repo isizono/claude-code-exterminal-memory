@@ -47,6 +47,14 @@ if grep -q 'claude-code-memory:sync-memory' "$TRANSCRIPT_PATH" 2>/dev/null; then
     exit 0
 fi
 
+# ターン数チェック: assistantメッセージが2件以下の短いセッションはスキップ
+ASSISTANT_COUNT=$(grep -c '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null || echo "0")
+if [ "$ASSISTANT_COUNT" -le 2 ]; then
+    log "Short session (assistant_count=$ASSISTANT_COUNT). Skipping auto-sync."
+    echo '{"decision": "approve"}'
+    exit 0
+fi
+
 log "sync-memory not found in transcript. Launching claude -p for auto-sync."
 
 # claude -p をnohup &でバックグラウンド起動
