@@ -91,22 +91,24 @@ def extract_text_from_entry(entry: dict) -> str:
 def parse_meta_tag(text: str) -> dict | None:
     """テキストからメタタグをパースする。
 
-    フォーマット:
-    <!-- [meta] topic: xxx (id: N) -->
+    フォーマット（新形式）:
+    <!-- [meta] topic: xxx -->
+
+    旧形式（後方互換）:
+    <!-- [meta] topic: xxx (id: N) -->  ← IDは無視
 
     Returns:
-        {"found": True, "topic_name": ..., "topic_id": ...}
+        {"found": True, "topic_name": ...}
         or None
     """
-    # HTMLコメント形式のメタタグを探す
-    pattern = r'<!--\s*\[meta\]\s*topic:\s*(.+?)\s*\(id:\s*(\d+)\)\s*-->'
+    # HTMLコメント形式のメタタグを探す（idはオプショナル、無視）
+    pattern = r'<!--\s*\[meta\]\s*topic:\s*(.+?)\s*(?:\(id:\s*\d+\)\s*)?-->'
     match = re.search(pattern, text)
 
     if match:
         return {
             "found": True,
             "topic_name": match.group(1).strip(),
-            "topic_id": int(match.group(2)),
         }
 
     return None
@@ -194,3 +196,17 @@ def has_recent_recording(entries: list[dict]) -> bool:
 def has_topic_tool_calls(entries: list[dict]) -> bool:
     """entriesにtopic_idを返すツールの呼び出しがあるかチェック。"""
     return _has_tool_calls(entries, _TOPIC_TOOLS)
+
+
+_CONTEXT_RETRIEVAL_TOOLS = [
+    "mcp__plugin_claude-code-memory_cc-memory__search",
+    "mcp__plugin_claude-code-memory_cc-memory__get_topics",
+    "mcp__plugin_claude-code-memory_cc-memory__get_decisions",
+    "mcp__plugin_claude-code-memory_cc-memory__get_logs",
+    "mcp__plugin_claude-code-memory_cc-memory__get_tasks",
+]
+
+
+def has_context_retrieval_calls(entries: list[dict]) -> bool:
+    """entriesにget系APIの呼び出しがあるかチェック。"""
+    return _has_tool_calls(entries, _CONTEXT_RETRIEVAL_TOOLS)
