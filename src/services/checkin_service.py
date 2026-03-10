@@ -88,6 +88,13 @@ def check_in(activity_id: int) -> dict:
     関連情報（tag_notes, materials, decisions）を集約取得し、
     status自動更新とsummary生成を行う。
 
+    statusがin_progress以外（pending, completed含む）の場合はin_progressに自動更新する。
+    completedのアクティビティも再オープンされる（追加作業が発生したケースに対応）。
+
+    tag_notesはセッション内初回遭遇時のみ注入される（_injected_tags管理）。
+    同一セッションで同じタグを持つアクティビティに2回check-inすると、
+    2回目のtag_notesは空になる。これはtag_service側の設計による意図的な動作。
+
     Args:
         activity_id: アクティビティID
 
@@ -128,7 +135,13 @@ def check_in(activity_id: int) -> dict:
         recent_decisions = []
         if topic_id is not None:
             decisions_result = decision_service.get_decisions(topic_id)
-            if "error" not in decisions_result:
+            if "error" in decisions_result:
+                logger.warning(
+                    "Failed to get decisions for topic %d: %s",
+                    topic_id,
+                    decisions_result["error"],
+                )
+            else:
                 recent_decisions = [
                     {"id": d["id"], "title": d["decision"]}
                     for d in decisions_result.get("decisions", [])
@@ -138,8 +151,15 @@ def check_in(activity_id: int) -> dict:
         # NOTE: update_activityは内部で別コネクションを使用する（既存APIの制約）。
         # check_inのトランザクションとは独立してコミットされる。
         if activity["status"] != "in_progress":
-            activity_service.update_activity(activity_id, new_status="in_progress")
-            activity["status"] = "in_progress"
+            update_result = activity_service.update_activity(activity_id, new_status="in_progress")
+            if "error" in update_result:
+                logger.warning(
+                    "Failed to update activity %d status: %s",
+                    activity_id,
+                    update_result["error"],
+                )
+            else:
+                activity["status"] = "in_progress"
 
         # 7. summary生成
         summary = _build_summary(activity, tags, tag_notes, materials)
