@@ -363,13 +363,13 @@ def add_decision(
 
 @mcp.tool()
 def get_topics(
-    tags: list[str],
+    tags: list[str] | None = None,
     limit: int = 10,
     offset: int = 0,
 ) -> dict:
-    """タグでフィルタリングしてトピックを新しい順に取得する（ページネーション付き）。
+    """トピックを新しい順に取得する（ページネーション付き）。
 
-    tags: タグ配列（必須、1個以上）。AND条件でフィルタ。例: ["domain:cc-memory"]
+    tags: タグ配列（optional）。指定時はAND条件でフィルタ。未指定時は全件返す。例: ["domain:cc-memory"]
     """
     return topic_service.get_topics(tags, limit, offset)
 
@@ -396,7 +396,7 @@ def get_decisions(
 
 @mcp.tool()
 def search(
-    keyword: str,
+    keyword: str | list[str],
     tags: Optional[list[str]] = None,
     type_filter: Optional[str] = None,
     limit: int = 10,
@@ -406,10 +406,11 @@ def search(
 
     FTS5 trigramとベクトル検索のハイブリッド。RRFスコアで統合・ランキング。
     2文字以上のキーワードを指定する。
+    配列で複数キーワードを渡すとAND検索（すべてを含む結果のみ返す）。
     tagsでフィルタリング可能（AND結合）。未指定で全件検索。
 
     Args:
-        keyword: 検索キーワード（2文字以上）
+        keyword: 検索キーワード（2文字以上）。配列で複数指定時はAND検索
         tags: タグフィルタ（AND条件。未指定=全件検索）
         type_filter: 検索対象の絞り込み（'topic', 'decision', 'task', 'log'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
@@ -506,7 +507,7 @@ def add_task(
 
 @mcp.tool()
 def get_tasks(
-    tags: list[str],
+    tags: list[str] | None = None,
     status: str = "active",
     limit: int = 5,
 ) -> dict:
@@ -514,15 +515,15 @@ def get_tasks(
     タスク一覧を取得する（tagsでフィルタリング、statusでフィルタリング可能）。
 
     典型的な使い方:
-    - 未着手+進行中のタスク確認: get_tasks(["domain:cc-memory"])
+    - 全タスク確認: get_tasks()
+    - ドメイン指定: get_tasks(["domain:cc-memory"])
     - 進行中のみ: get_tasks(["domain:cc-memory"], status="in_progress")
-    - 未着手のみ: get_tasks(["domain:cc-memory"], status="pending")
-    - 完了タスクの確認: get_tasks(["domain:cc-memory"], status="completed")
+    - 完了タスクの確認: get_tasks(status="completed")
 
     ワークフロー位置: タスク状況の確認時
 
     Args:
-        tags: タグ配列（必須、1個以上）。AND条件でフィルタ。例: ["domain:cc-memory"]
+        tags: タグ配列（optional）。指定時はAND条件でフィルタ。未指定時は全件返す。例: ["domain:cc-memory"]
         status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
                 "active"はpending+in_progressの両方を返すエイリアス
         limit: 取得件数上限（デフォルト: 5）
