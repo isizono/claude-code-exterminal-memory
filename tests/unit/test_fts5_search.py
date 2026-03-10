@@ -381,6 +381,7 @@ def test_add_log_empty_title_error(temp_db):
     assert "title must not be empty" in result["error"]["message"]
 
 
+
 # ========================================
 # keyword配列（AND検索）のテスト
 # ========================================
@@ -430,3 +431,97 @@ def test_search_keyword_array_with_2char_fts_skipped(temp_db):
     assert "error" in result
     assert result["error"]["code"] == "KEYWORD_TOO_SHORT"
     assert "vector search is unavailable" in result["error"]["message"]
+
+
+# ========================================
+# get_by_ids バッチ取得のテスト
+# ========================================
+
+
+def test_get_by_ids_batch(temp_db):
+    """複数アイテムのバッチ取得"""
+    add_topic(title="トピック1", description="説明1", tags=DEFAULT_TAGS)
+    add_task(title="タスク1", description="説明1", tags=DEFAULT_TAGS)
+    result = search_service.get_by_ids([
+        {"type": "topic", "id": 1},
+        {"type": "task", "id": 1},
+    ])
+    assert "results" in result
+    assert len(result["results"]) == 2
+    assert result["results"][0]["type"] == "topic"
+    assert result["results"][1]["type"] == "task"
+
+
+def test_get_by_ids_empty(temp_db):
+    """空リストの場合"""
+    result = search_service.get_by_ids([])
+    assert result == {"results": []}
+
+
+def test_get_by_ids_too_many(temp_db):
+    """件数上限超過"""
+    items = [{"type": "topic", "id": i} for i in range(21)]
+    result = search_service.get_by_ids(items)
+    assert "error" in result
+    assert result["error"]["code"] == "TOO_MANY_ITEMS"
+
+
+def test_get_by_ids_not_found(temp_db):
+    """存在しないidを含む場合（エラーは個別結果に含まれる）"""
+    result = search_service.get_by_ids([
+        {"type": "topic", "id": 99999},
+    ])
+    assert len(result["results"]) == 1
+    assert "error" in result["results"][0]
+    assert result["results"][0]["error"]["code"] == "NOT_FOUND"
+
+
+def test_get_by_ids_mixed_types(temp_db):
+    """全4種類のtype混在でのバッチ取得"""
+    topic = add_topic(title="混在テストトピック", description="テスト", tags=DEFAULT_TAGS)
+    add_decision(topic_id=topic["topic_id"], decision="混在テスト決定", reason="テスト")
+    add_task(title="混在テストタスク", description="テスト", tags=DEFAULT_TAGS)
+    add_log_entry(topic_id=topic["topic_id"], title="混在テストログ", content="テスト内容")
+    result = search_service.get_by_ids([
+        {"type": "topic", "id": 1},
+        {"type": "decision", "id": 1},
+        {"type": "task", "id": 1},
+        {"type": "log", "id": 1},
+    ])
+    assert "results" in result
+    assert len(result["results"]) == 4
+    types = [r["type"] for r in result["results"]]
+    assert types == ["topic", "decision", "task", "log"]
+
+
+def test_get_by_ids_at_limit(temp_db):
+    """ちょうど20件（上限ぴったり）は成功する"""
+    items = [{"type": "topic", "id": i} for i in range(20)]
+    result = search_service.get_by_ids(items)
+    assert "error" not in result
+    assert "results" in result
+    assert len(result["results"]) == 20
+
+
+def test_get_by_ids_invalid_type(temp_db):
+    """不正なtypeを含む場合（get_by_idのINVALID_TYPEエラーが個別結果に含まれる）"""
+    result = search_service.get_by_ids([
+        {"type": "invalid", "id": 1},
+    ])
+    assert "results" in result
+    assert len(result["results"]) == 1
+    assert "error" in result["results"][0]
+    assert result["results"][0]["error"]["code"] == "INVALID_TYPE"
+
+
+def test_get_by_ids_missing_fields(temp_db):
+    """type/idフィールドが欠落した場合"""
+    result = search_service.get_by_ids([
+        {"type": "topic"},
+        {"id": 1},
+        {},
+    ])
+    assert len(result["results"]) == 3
+    for r in result["results"]:
+        assert "error" in r
+        assert r["error"]["code"] == "VALIDATION_ERROR"

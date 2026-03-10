@@ -443,6 +443,27 @@ def get_by_id(
 
 
 @mcp.tool()
+def get_by_ids(
+    items: list[dict],
+) -> dict:
+    """
+    複数のsearch結果の詳細情報を一括取得する。
+
+    searchツールで得られた複数のtype + idペアを1回で取得し、
+    各アイテムの全文を返す。
+
+    Args:
+        items: 取得対象のリスト。各要素は {type: str, id: int}（最大20件）
+               type: データ種別（'topic', 'decision', 'task', 'log'）
+               id: データのID
+
+    Returns:
+        一括取得結果（各アイテムはget_by_idと同じ形式）
+    """
+    return search_service.get_by_ids(items)
+
+
+@mcp.tool()
 def list_tags(
     namespace: Optional[str] = None,
 ) -> dict:

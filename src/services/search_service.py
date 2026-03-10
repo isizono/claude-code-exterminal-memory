@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 VALID_TYPES = {'topic', 'decision', 'task', 'log'}
 
+GET_BY_IDS_MAX = 20
+
 TYPE_TO_TABLE = {
     'topic': 'discussion_topics',
     'decision': 'decisions',
@@ -460,7 +462,7 @@ def _format_row(type_name: str, data: dict, tags: list[str]) -> dict:
     return data
 
 
-def get_by_id(type: str, id: int) -> dict:
+def get_by_id(type: str, id: int, conn=None) -> dict:
     """
     search結果の詳細情報を取得する。
 
@@ -470,6 +472,7 @@ def get_by_id(type: str, id: int) -> dict:
     Args:
         type: データ種別（'topic', 'decision', 'task', 'log'）
         id: データのID
+        conn: 既存のDB接続（省略時は内部で新規作成・クローズ）
 
     Returns:
         指定した種別に応じた詳細情報
@@ -484,7 +487,9 @@ def get_by_id(type: str, id: int) -> dict:
 
     table = TYPE_TO_TABLE[type]
 
-    conn = get_connection()
+    own_conn = conn is None
+    if own_conn:
+        conn = get_connection()
     try:
         row = conn.execute(f"SELECT * FROM {table} WHERE id = ?", (id,)).fetchone()
         if not row:
@@ -516,5 +521,49 @@ def get_by_id(type: str, id: int) -> dict:
                 "message": str(e),
             }
         }
+    finally:
+        if own_conn:
+            conn.close()
+
+
+def get_by_ids(items: list[dict]) -> dict:
+    """
+    複数のtype+idペアをバッチ取得する。
+
+    Args:
+        items: [{type: str, id: int}, ...] のリスト（最大20件）
+
+    Returns:
+        {"results": [get_by_idの結果, ...]}
+    """
+    if not items:
+        return {"results": []}
+
+    if len(items) > GET_BY_IDS_MAX:
+        return {
+            "error": {
+                "code": "TOO_MANY_ITEMS",
+                "message": f"Maximum {GET_BY_IDS_MAX} items allowed, got {len(items)}"
+            }
+        }
+
+    conn = get_connection()
+    try:
+        results = []
+        for item in items:
+            item_type = item.get("type")
+            item_id = item.get("id")
+            if item_type is None or item_id is None:
+                results.append({
+                    "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Each item must have 'type' and 'id' fields"
+                    }
+                })
+                continue
+            result = get_by_id(item_type, item_id, conn=conn)
+            results.append(result)
+
+        return {"results": results}
     finally:
         conn.close()
