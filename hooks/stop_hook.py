@@ -2,7 +2,7 @@
 
 処理フロー:
 1. stdin読み込み → JSON parse
-2. ブロック上限チェック（3回で強制approve）
+2. ブロック上限チェック（2回で強制approve）
 3. メタタグparse（一次ソース: stdinのlast_assistant_message、フォールバック: transcript）
    → なければblock
 4. get系API呼び出しチェック（セッション中1回以上）
@@ -31,7 +31,7 @@ from hooks.hook_transcript import (
     parse_meta_tag,
 )
 
-_BLOCK_LIMIT = 3
+_BLOCK_LIMIT = 2
 _NUDGE_INTERVAL = 2
 
 
@@ -63,7 +63,7 @@ def main() -> None:
         # 2. ブロック上限チェック
         if state.get_block_count() >= _BLOCK_LIMIT:
             state.reset_block_count()
-            _output("approve", "ブロック上限（3回）に達しました。強制的に通します。")
+            _output("approve", "ブロック上限（2回）に達しました。強制的に通します。")
             return
 
         # 3. メタタグparse
@@ -110,7 +110,7 @@ def main() -> None:
         # 5. トピック変更チェック → 記録がなければblock
         prev_topic = state.get_prev_topic()
         if prev_topic is not None and prev_topic != current_topic_name:
-            recent_entries = all_entries[-10:] if all_entries else []
+            recent_entries = all_entries[-5:] if all_entries else []
             if not has_recent_recording(recent_entries):
                 state.increment_block_count()
                 _output(
