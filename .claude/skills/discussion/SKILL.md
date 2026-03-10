@@ -11,8 +11,8 @@ description: This skill clarifies user requirements and removes ambiguity before
 
 ## 開始時のアクション
 
-1. mode:discussion タグ付きタスクで起動された場合、そのタスクを対象とする
-2. それ以外の場合、関連する `[議論]` タスクがなければ作成する（titleには `[議論]` プレフィックスをつける）
+1. mode:discussion タグ付きアクティビティで起動された場合、そのアクティビティを対象とする
+2. それ以外の場合、関連する `[議論]` アクティビティがなければ作成する（titleには `[議論]` プレフィックスをつける）
 
 ```
 例: [議論] 「トピック検索機能」の要件整理
@@ -120,6 +120,6 @@ add_decision(
 - [ ] 必須項目（What/Why/Scope/Acceptance）がすべて明確になっている
 - [ ] ユーザーの承認を得ている
 - [ ] add_decision()で記録済み
-- [ ] `[設計]` タスクを作成済み（add_task で `[設計] {テーマ}` を作成し、議論で決まったdecision IDをdescriptionに記載する）
-- [ ] `[議論]` タスクを完了済み（update_task で completed に更新する）
+- [ ] `[設計]` アクティビティを作成済み（add_activity で `[設計] {テーマ}` を作成し、議論で決まったdecision IDをdescriptionに記載する）
+- [ ] `[議論]` アクティビティを完了済み（update_activity で completed に更新する）
 - [ ] 設計フェーズに必要な情報が揃っている

@@ -13,8 +13,8 @@ description: This skill determines implementation approach and technical decisio
 
 **このSkillを実行する前に、必ず以下を確認する：**
 
-1. 関連する `[議論]` タスクを探す
-2. そのタスクに紐づくdecision（What/Why/Scope）があるか確認
+1. 関連する `[議論]` アクティビティを探す
+2. そのアクティビティに紐づくdecision（What/Why/Scope）があるか確認
 3. **What/Why/Scopeを確認できるdecisionがない場合**:
    - ユーザーに「まず議論が必要」と伝える
    - 議論フェーズへ誘導する
@@ -23,11 +23,11 @@ description: This skill determines implementation approach and technical decisio
 ```
 例: 「トピック検索機能」の設計を始める場合
 
-1. タスク一覧から [議論] タスクを探す
-   get_tasks(subject_id=2)
-   → { tasks: [{ id: 38, title: "[議論] トピック検索機能の要件整理", topic_id: 85, ... }] }
+1. アクティビティ一覧から [議論] アクティビティを探す
+   get_activities(subject_id=2)
+   → { activities: [{ id: 38, title: "[議論] トピック検索機能の要件整理", topic_id: 85, ... }] }
 
-2. そのタスクに紐づくトピックの決定事項を確認
+2. そのアクティビティに紐づくトピックの決定事項を確認
    get_decisions(topic_id=85)
    → {
        decisions: [{
@@ -47,19 +47,19 @@ description: This skill determines implementation approach and technical decisio
 
 開始前チェックをパスしたら：
 
-1. mode:design タグ付きタスクで起動された場合、そのタスクを対象とする
-2. それ以外の場合、既存の `[設計]` タスクを探す（議論フェーズで作成済みの場合がある）
-   - あれば → そのタスクを引き継ぐ（新規作成しない）
-   - なければ → `[設計]` タスクを新規作成する
+1. mode:design タグ付きアクティビティで起動された場合、そのアクティビティを対象とする
+2. それ以外の場合、既存の `[設計]` アクティビティを探す（議論フェーズで作成済みの場合がある）
+   - あれば → そのアクティビティを引き継ぐ（新規作成しない）
+   - なければ → `[設計]` アクティビティを新規作成する
 3. 議論フェーズのdecisionを確認し、前提を共有する
 
 ```
 例: 「トピック検索機能」の設計を開始
 
-1. 既存の設計タスクを探す
-   get_tasks(subject_id=2, status="pending") および get_tasks(subject_id=2, status="in_progress")
-   → [設計] タスクがあればそれを使う。なければ作成:
-   add_task(
+1. 既存の設計アクティビティを探す
+   get_activities(subject_id=2, status="pending") および get_activities(subject_id=2, status="in_progress")
+   → [設計] アクティビティがあればそれを使う。なければ作成:
+   add_activity(
        subject_id=2,
        title="[設計] トピック検索機能の方針決定",
        description="議論フェーズで決まったWhat/Why/Scope/Acceptanceをもとに、How/Interface/Edge cases/Verificationを決める"
@@ -164,10 +164,10 @@ description: This skill determines implementation approach and technical decisio
 ## 成果物
 
 設計で決まった内容はデシジョン（decision）として記録する。
-そのうえで、作業に必要な情報を作業タスク（`[作業]` プレフィックス付き）として作成する。
-作業タスクにはHow/Interface/Edge cases/Verification等の背景情報をなるべく詳しく書くこと。
+そのうえで、作業に必要な情報を作業アクティビティ（`[作業]` プレフィックス付き）として作成する。
+作業アクティビティにはHow/Interface/Edge cases/Verification等の背景情報をなるべく詳しく書くこと。
 特にEdge casesは網羅的に記載すること（実装者が判断に迷わないレベルまで）。
-作業は別のAIが担う可能性が高く、原則としてタスクの情報だけを見て仕事をする。
+作業は別のAIが担う可能性が高く、原則としてアクティビティの情報だけを見て仕事をする。
 
 ```
 例: 「トピック検索機能」の設計完了時
@@ -179,8 +179,8 @@ add_decision(
     reason="LIKE句はシンプルで十分な性能。現時点のトピック数では全文検索エンジンは過剰。"
 )
 
-2. 作業タスクを作成（背景情報を詳しく）
-add_task(
+2. 作業アクティビティを作成（背景情報を詳しく）
+add_activity(
     subject_id=<該当サブジェクトID>,
     title="[作業] トピック検索機能",
     description="""
@@ -226,13 +226,13 @@ add_task(
 - [ ] 該当する場合、Non-functional要件も記録されている
 - [ ] ユーザーの承認を得ている
 - [ ] add_decision()で合意内容を記録済み
-- [ ] add_task()で作業タスク（`[作業]`プレフィックス付き）を作成済み
+- [ ] add_activity()で作業アクティビティ（`[作業]`プレフィックス付き）を作成済み
 
 ## フェーズの巻き戻し
 
 設計中に議論で重要な要件が漏れていたことが判明した場合：
 
-1. 設計タスクをブロック状態にする
-2. 議論タスクを再開する（または新規作成）
+1. 設計アクティビティをブロック状態にする
+2. 議論アクティビティを再開する（または新規作成）
 3. 問題を解決してから設計に戻る
 4. 巻き戻しの経緯をdecisionに記録する

@@ -53,7 +53,7 @@ def test_init_database(temp_db):
         assert "decisions" in tables
         assert "tags" in tables
         assert "topic_tags" in tables
-        assert "task_tags" in tables
+        assert "activity_tags" in tables
         assert "decision_tags" in tables
         assert "log_tags" in tables
     finally:

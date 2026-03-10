@@ -14,14 +14,14 @@ from src.services.tag_service import (
 
 logger = logging.getLogger(__name__)
 
-VALID_TYPES = {'topic', 'decision', 'task', 'log'}
+VALID_TYPES = {'topic', 'decision', 'activity', 'log'}
 
 GET_BY_IDS_MAX = 20
 
 TYPE_TO_TABLE = {
     'topic': 'discussion_topics',
     'decision': 'decisions',
-    'task': 'tasks',
+    'activity': 'activities',
     'log': 'discussion_logs',
 }
 
@@ -29,7 +29,7 @@ TYPE_TO_TABLE = {
 SNIPPET_SOURCE = {
     'topic': ('discussion_topics', 'description'),
     'decision': ('decisions', 'decision'),
-    'task': ('tasks', 'description'),
+    'activity': ('activities', 'description'),
     'log': ('discussion_logs', 'content'),
 }
 
@@ -120,12 +120,12 @@ def _build_tag_filter_cte(tag_ids: list[int]) -> tuple[str, list]:
         ) GROUP BY topic_id HAVING COUNT(DISTINCT tag_id) = ?
 
         UNION ALL
-        -- task (直接タグ)
-        SELECT 'task', task_id FROM (
-            SELECT tkt.task_id, tkt.tag_id
-            FROM task_tags tkt
-            WHERE tkt.tag_id IN ({placeholders})
-        ) GROUP BY task_id HAVING COUNT(DISTINCT tag_id) = ?
+        -- activity (直接タグ)
+        SELECT 'activity', activity_id FROM (
+            SELECT at.activity_id, at.tag_id
+            FROM activity_tags at
+            WHERE at.tag_id IN ({placeholders})
+        ) GROUP BY activity_id HAVING COUNT(DISTINCT tag_id) = ?
 
         UNION ALL
         -- decision (UNION継承)
@@ -156,7 +156,7 @@ def _build_tag_filter_cte(tag_ids: list[int]) -> tuple[str, list]:
     # topic
     params.extend(tag_ids)
     params.append(n_tags)
-    # task
+    # activity
     params.extend(tag_ids)
     params.append(n_tags)
     # decision (2つのIN句)
@@ -362,7 +362,7 @@ def search(
     Args:
         keyword: 検索キーワード（2文字以上）。配列で複数指定時はAND検索
         tags: タグフィルタ（AND条件。未指定=全件検索）
-        type_filter: 検索対象の絞り込み（'topic', 'decision', 'task', 'log'。未指定で全種類）
+        type_filter: 検索対象の絞り込み（'topic', 'decision', 'activity', 'log'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
 
     Returns:
@@ -474,7 +474,7 @@ def _format_row(type_name: str, data: dict, tags: list[str]) -> dict:
             "tags": tags,
             "created_at": data["created_at"],
         }
-    elif type_name == 'task':
+    elif type_name == 'activity':
         return {
             "id": data["id"],
             "title": data["title"],
@@ -507,7 +507,7 @@ def get_by_id(type: str, id: int, conn=None) -> dict:
     元データの完全な情報を取得する。
 
     Args:
-        type: データ種別（'topic', 'decision', 'task', 'log'）
+        type: データ種別（'topic', 'decision', 'activity', 'log'）
         id: データのID
         conn: 既存のDB接続（省略時は内部で新規作成・クローズ）
 
@@ -537,11 +537,11 @@ def get_by_id(type: str, id: int, conn=None) -> dict:
                 }
             }
 
-        # タグ取得: topic/taskはget_entity_tags、decision/logはget_effective_tags
+        # タグ取得: topic/activityはget_entity_tags、decision/logはget_effective_tags
         if type == 'topic':
             tags = get_entity_tags(conn, "topic_tags", "topic_id", id)
-        elif type == 'task':
-            tags = get_entity_tags(conn, "task_tags", "task_id", id)
+        elif type == 'activity':
+            tags = get_entity_tags(conn, "activity_tags", "activity_id", id)
         elif type == 'decision':
             tags = get_effective_tags(conn, "decision", id)
         elif type == 'log':

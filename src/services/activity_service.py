@@ -1,4 +1,4 @@
-"""タスク管理サービス"""
+"""アクティビティ管理サービス"""
 import logging
 import sqlite3
 from typing import Optional
@@ -20,34 +20,34 @@ logger = logging.getLogger(__name__)
 REAL_STATUSES = {"pending", "in_progress", "completed"}
 # "active"エイリアスが展開されるステータス
 ACTIVE_STATUSES = ("in_progress", "pending")
-# get_tasks用（エイリアス含む）
+# get_activities用（エイリアス含む）
 VALID_STATUSES = REAL_STATUSES | {"active"}
 
 
-def _task_to_response(task: dict, tags: list[str]) -> dict:
-    """タスクデータをAPIレスポンス形式に変換"""
+def _activity_to_response(activity: dict, tags: list[str]) -> dict:
+    """アクティビティデータをAPIレスポンス形式に変換"""
     return {
-        "task_id": task["id"],
-        "title": task["title"],
-        "description": task["description"],
-        "status": task["status"],
+        "activity_id": activity["id"],
+        "title": activity["title"],
+        "description": activity["description"],
+        "status": activity["status"],
         "tags": tags,
-        "created_at": task["created_at"],
-        "updated_at": task["updated_at"],
+        "created_at": activity["created_at"],
+        "updated_at": activity["updated_at"],
     }
 
 
-def add_task(title: str, description: str, tags: list[str]) -> dict:
+def add_activity(title: str, description: str, tags: list[str]) -> dict:
     """
-    タスクを作成してIDを返す
+    アクティビティを作成してIDを返す
 
     Args:
-        title: タスクのタイトル
-        description: タスクの説明
+        title: アクティビティのタイトル
+        description: アクティビティの説明
         tags: タグ配列（必須、1個以上）
 
     Returns:
-        作成されたタスク情報
+        作成されたアクティビティ情報
     """
     # タグのバリデーション
     parsed_tags = validate_and_parse_tags(tags, required=True)
@@ -56,34 +56,34 @@ def add_task(title: str, description: str, tags: list[str]) -> dict:
 
     conn = get_connection()
     try:
-        # タスクをINSERT
+        # アクティビティをINSERT
         cursor = conn.execute(
-            "INSERT INTO tasks (title, description, status) VALUES (?, ?, ?)",
+            "INSERT INTO activities (title, description, status) VALUES (?, ?, ?)",
             (title, description, 'pending'),
         )
-        task_id = cursor.lastrowid
+        activity_id = cursor.lastrowid
 
         # タグをリンク
         tag_ids = ensure_tag_ids(conn, parsed_tags)
-        link_tags(conn, "task_tags", "task_id", task_id, tag_ids)
+        link_tags(conn, "activity_tags", "activity_id", activity_id, tag_ids)
 
         conn.commit()
 
         # タグを取得
-        tag_strings = get_entity_tags(conn, "task_tags", "task_id", task_id)
+        tag_strings = get_entity_tags(conn, "activity_tags", "activity_id", activity_id)
 
-        # 作成したタスクを取得
-        cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        # 作成したアクティビティを取得
+        cursor = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,))
         row = cursor.fetchone()
         if not row:
-            raise Exception("Failed to retrieve created task")
+            raise Exception("Failed to retrieve created activity")
 
-        task = row_to_dict(row)
+        activity = row_to_dict(row)
 
-        # embedding生成（失敗してもtask作成には影響しない）
-        generate_and_store_embedding("task", task_id, build_embedding_text(title, description))
+        # embedding生成（失敗してもactivity作成には影響しない）
+        generate_and_store_embedding("activity", activity_id, build_embedding_text(title, description))
 
-        return _task_to_response(task, tag_strings)
+        return _activity_to_response(activity, tag_strings)
 
     except sqlite3.IntegrityError as e:
         conn.rollback()
@@ -105,9 +105,9 @@ def add_task(title: str, description: str, tags: list[str]) -> dict:
         conn.close()
 
 
-def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int = 5) -> dict:
+def get_activities(tags: list[str] | None = None, status: str = "active", limit: int = 5) -> dict:
     """
-    タスク一覧を取得（tagsでフィルタリング、statusでフィルタリング）
+    アクティビティ一覧を取得（tagsでフィルタリング、statusでフィルタリング）
 
     Args:
         tags: タグ配列（optional。指定時はAND条件でフィルタ、未指定時は全件）
@@ -116,7 +116,7 @@ def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int 
         limit: 取得件数上限（デフォルト: 5）
 
     Returns:
-        タスク一覧とtotal_count
+        アクティビティ一覧とtotal_count
     """
     # タグのバリデーション（tags指定時のみ）
     parsed_tags = None
@@ -143,37 +143,37 @@ def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int 
 
     conn = get_connection()
     try:
-        # タグフィルタでtask_idsを絞り込む（tags指定時のみ）
-        task_ids = None
+        # タグフィルタでactivity_idsを絞り込む（tags指定時のみ）
+        activity_ids = None
         if parsed_tags is not None:
             tag_ids = resolve_tag_ids(conn, parsed_tags)
             if not tag_ids or len(tag_ids) < len(parsed_tags):
-                return {"tasks": [], "total_count": 0}
+                return {"activities": [], "total_count": 0}
             tag_placeholders = ",".join("?" * len(tag_ids))
 
-            task_ids_rows = conn.execute(
+            activity_ids_rows = conn.execute(
                 f"""
-                SELECT task_id FROM task_tags
+                SELECT activity_id FROM activity_tags
                 WHERE tag_id IN ({tag_placeholders})
-                GROUP BY task_id
+                GROUP BY activity_id
                 HAVING COUNT(DISTINCT tag_id) = ?
                 """,
                 (*tag_ids, len(tag_ids)),
             ).fetchall()
 
-            task_ids = [row["task_id"] for row in task_ids_rows]
+            activity_ids = [row["activity_id"] for row in activity_ids_rows]
 
-            if not task_ids:
-                return {"tasks": [], "total_count": 0}
+            if not activity_ids:
+                return {"activities": [], "total_count": 0}
 
         # WHERE句・ORDER BY句・パラメータを組み立て
         conditions = []
         where_params = []
 
-        if task_ids is not None:
-            id_placeholders = ",".join("?" * len(task_ids))
+        if activity_ids is not None:
+            id_placeholders = ",".join("?" * len(activity_ids))
             conditions.append(f"id IN ({id_placeholders})")
-            where_params.extend(task_ids)
+            where_params.extend(activity_ids)
 
         if status == "active":
             status_placeholders = ", ".join("?" for _ in ACTIVE_STATUSES)
@@ -192,7 +192,7 @@ def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int 
 
         # 1. total_count取得（LIMITなし）
         count_row = conn.execute(
-            f"SELECT COUNT(*) as count FROM tasks {where_clause}",
+            f"SELECT COUNT(*) as count FROM activities {where_clause}",
             where_params,
         ).fetchone()
         total_count = count_row["count"]
@@ -200,7 +200,7 @@ def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int 
         # 2. LIMIT付きでデータ取得
         rows = conn.execute(
             f"""
-            SELECT * FROM tasks
+            SELECT * FROM activities
             {where_clause}
             ORDER BY {order_clause}
             LIMIT ?
@@ -210,22 +210,22 @@ def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int 
 
         # バッチでタグ取得
         fetched_ids = [row["id"] for row in rows]
-        tags_map = get_entity_tags_batch(conn, "task_tags", "task_id", fetched_ids)
+        tags_map = get_entity_tags_batch(conn, "activity_tags", "activity_id", fetched_ids)
 
-        tasks = []
+        activities = []
         for row in rows:
-            task = row_to_dict(row)
-            tasks.append({
-                "id": task["id"],
-                "title": task["title"],
-                "description": (task["description"] or "")[:100],
-                "status": task["status"],
-                "tags": tags_map.get(task["id"], []),
-                "created_at": task["created_at"],
-                "updated_at": task["updated_at"],
+            activity = row_to_dict(row)
+            activities.append({
+                "id": activity["id"],
+                "title": activity["title"],
+                "description": (activity["description"] or "")[:100],
+                "status": activity["status"],
+                "tags": tags_map.get(activity["id"], []),
+                "created_at": activity["created_at"],
+                "updated_at": activity["updated_at"],
             })
 
-        return {"tasks": tasks, "total_count": total_count}
+        return {"activities": activities, "total_count": total_count}
 
     except Exception as e:
         return {
@@ -238,25 +238,25 @@ def get_tasks(tags: list[str] | None = None, status: str = "active", limit: int 
         conn.close()
 
 
-def update_task(
-    task_id: int,
+def update_activity(
+    activity_id: int,
     new_status: Optional[str] = None,
     title: Optional[str] = None,
     description: Optional[str] = None,
     tags: Optional[list[str]] = None,
 ) -> dict:
     """
-    タスクを更新する（ステータス、タイトル、説明、タグを変更可能）
+    アクティビティを更新する（ステータス、タイトル、説明、タグを変更可能）
 
     Args:
-        task_id: タスクID
+        activity_id: アクティビティID
         new_status: 新しいステータス（optional）
         title: 新しいタイトル（optional）
         description: 新しい説明（optional）
         tags: 新しいタグ配列（optional、指定時は全置換。1個以上必須）
 
     Returns:
-        更新されたタスク情報
+        更新されたアクティビティ情報
     """
     # 最低1つのオプショナルパラメータが必要
     if new_status is None and title is None and description is None and tags is None:
@@ -302,14 +302,14 @@ def update_task(
 
     conn = get_connection()
     try:
-        # 現在のタスク情報を取得
-        cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        # 現在のアクティビティ情報を取得
+        cursor = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,))
         row = cursor.fetchone()
         if not row:
             return {
                 "error": {
                     "code": "NOT_FOUND",
-                    "message": f"Task with id {task_id} not found",
+                    "message": f"Activity with id {activity_id} not found",
                 }
             }
 
@@ -331,40 +331,40 @@ def update_task(
 
         # タグの全置換（tags指定時のみ）
         if parsed_tags is not None:
-            conn.execute("DELETE FROM task_tags WHERE task_id = ?", (task_id,))
+            conn.execute("DELETE FROM activity_tags WHERE activity_id = ?", (activity_id,))
             tag_ids = ensure_tag_ids(conn, parsed_tags)
-            link_tags(conn, "task_tags", "task_id", task_id, tag_ids)
+            link_tags(conn, "activity_tags", "activity_id", activity_id, tag_ids)
 
         set_parts.append("updated_at = CURRENT_TIMESTAMP")
 
         set_clause = ", ".join(set_parts)
-        values.append(task_id)
+        values.append(activity_id)
 
         conn.execute(
-            f"UPDATE tasks SET {set_clause} WHERE id = ?",
+            f"UPDATE activities SET {set_clause} WHERE id = ?",
             tuple(values),
         )
 
         conn.commit()
 
-        # 更新後のタスクを取得
-        cursor = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+        # 更新後のアクティビティを取得
+        cursor = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,))
         row = cursor.fetchone()
         if not row:
-            raise Exception("Failed to retrieve updated task")
+            raise Exception("Failed to retrieve updated activity")
 
         # title/descriptionが変更された場合、embeddingを再生成
         if title is not None or description is not None:
             updated = row_to_dict(row)
             generate_and_store_embedding(
-                "task", task_id,
+                "activity", activity_id,
                 build_embedding_text(updated["title"], updated["description"]),
             )
 
         # タグを取得
-        tag_strings = get_entity_tags(conn, "task_tags", "task_id", task_id)
+        tag_strings = get_entity_tags(conn, "activity_tags", "activity_id", activity_id)
 
-        return _task_to_response(row_to_dict(row), tag_strings)
+        return _activity_to_response(row_to_dict(row), tag_strings)
 
     except sqlite3.IntegrityError as e:
         conn.rollback()

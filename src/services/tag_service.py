@@ -297,7 +297,7 @@ def list_tags(namespace: Optional[str] = None) -> dict:
             """
             SELECT t.id, t.namespace, t.name,
               (SELECT COUNT(*) FROM topic_tags WHERE tag_id = t.id) +
-              (SELECT COUNT(*) FROM task_tags WHERE tag_id = t.id) +
+              (SELECT COUNT(*) FROM activity_tags WHERE tag_id = t.id) +
               (SELECT COUNT(*) FROM decision_tags WHERE tag_id = t.id) +
               (SELECT COUNT(*) FROM log_tags WHERE tag_id = t.id) AS usage_count
             FROM tags t
