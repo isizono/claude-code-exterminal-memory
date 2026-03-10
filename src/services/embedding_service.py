@@ -219,12 +219,12 @@ def backfill_embeddings() -> int:
             LEFT JOIN vec_index vi ON si.id = vi.rowid
             WHERE si.source_type = 'decision' AND vi.rowid IS NULL
         """,
-        "task": """
-            SELECT si.id, t.title, t.description
+        "activity": """
+            SELECT si.id, a.title, a.description
             FROM search_index si
-            INNER JOIN tasks t ON si.source_id = t.id
+            INNER JOIN activities a ON si.source_id = a.id
             LEFT JOIN vec_index vi ON si.id = vi.rowid
-            WHERE si.source_type = 'task' AND vi.rowid IS NULL
+            WHERE si.source_type = 'activity' AND vi.rowid IS NULL
         """,
         "log": """
             SELECT si.id, dl.title, dl.content

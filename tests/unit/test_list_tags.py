@@ -5,7 +5,7 @@ import pytest
 from src.db import init_database
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decision
-from src.services.task_service import add_task
+from src.services.activity_service import add_activity
 from src.services.discussion_log_service import add_log
 from src.services.tag_service import list_tags
 import src.services.embedding_service as emb
@@ -51,13 +51,13 @@ def test_list_tags_usage_count(temp_db):
     """usage_countが正しくカウントされる"""
     # domain:test を3つのエンティティで使用
     topic = add_topic(title="Topic 1", description="Desc", tags=["domain:test"])
-    add_task(title="Task 1", description="Desc", tags=["domain:test"])
+    add_activity(title="Activity 1", description="Desc", tags=["domain:test"])
     add_decision(topic_id=topic["topic_id"], decision="Dec 1", reason="Reason", tags=["scope:search"])
 
     result = list_tags()
     assert "error" not in result
 
-    # domain:test は topic_tags(1) + task_tags(1) = 2
+    # domain:test は topic_tags(1) + activity_tags(1) = 2
     test_tag = next(t for t in result["tags"] if t["tag"] == "domain:test")
     assert test_tag["usage_count"] == 2
 
@@ -151,6 +151,7 @@ def test_list_tags_response_format(temp_db):
     assert "namespace" in tag
     assert "name" in tag
     assert "usage_count" in tag
+    assert "notes" in tag
     assert isinstance(tag["id"], int)
     assert isinstance(tag["usage_count"], int)
 

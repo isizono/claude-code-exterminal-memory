@@ -8,7 +8,7 @@ import numpy as np
 from src.db import init_database, get_connection, execute_query
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decision
-from src.services.task_service import add_task
+from src.services.activity_service import add_activity
 import src.services.embedding_service as emb
 
 
@@ -251,20 +251,20 @@ def test_add_decision_creates_embedding(temp_db, mock_embedding_server):
         conn.close()
 
 
-def test_add_task_creates_embedding(temp_db, mock_embedding_server):
-    """add_task後にvec_indexにembeddingが存在する"""
-    task = add_task(
-        title="Embedding統合テストタスク",
+def test_add_activity_creates_embedding(temp_db, mock_embedding_server):
+    """add_activity後にvec_indexにembeddingが存在する"""
+    activity = add_activity(
+        title="Embedding統合テストアクティビティ",
         description="vec_indexへの格納を検証する",
         tags=DEFAULT_TAGS,
     )
 
-    assert "error" not in task
+    assert "error" not in activity
 
     # search_indexのIDを取得
     rows = execute_query(
         "SELECT id FROM search_index WHERE source_type = ? AND source_id = ?",
-        ("task", task["task_id"]),
+        ("activity", activity["activity_id"]),
     )
     assert len(rows) > 0
     search_index_id = rows[0]["id"]
@@ -415,20 +415,20 @@ def test_add_decision_succeeds_when_embedding_fails(temp_db, monkeypatch):
     assert dec["decision_id"] is not None
 
 
-def test_add_task_succeeds_when_embedding_fails(temp_db, monkeypatch):
-    """embedding生成失敗時もadd_task自体は成功する"""
+def test_add_activity_succeeds_when_embedding_fails(temp_db, monkeypatch):
+    """embedding生成失敗時もadd_activity自体は成功する"""
     monkeypatch.setattr(emb, '_server_initialized', False)
     monkeypatch.setattr(emb, '_backfill_done', True)
     monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
-    task = add_task(
-        title="Embedding失敗テストタスク",
-        description="サーバー接続失敗時もtask作成は成功する",
+    activity = add_activity(
+        title="Embedding失敗テストアクティビティ",
+        description="サーバー接続失敗時もactivity作成は成功する",
         tags=DEFAULT_TAGS,
     )
 
-    assert "error" not in task
-    assert task["task_id"] is not None
+    assert "error" not in activity
+    assert activity["activity_id"] is not None
 
 
 # ========================================

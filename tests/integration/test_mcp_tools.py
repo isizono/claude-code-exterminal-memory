@@ -4,7 +4,7 @@ import tempfile
 import pytest
 from src.db import init_database
 from src.services.topic_service import add_topic
-from src.services.task_service import add_task
+from src.services.activity_service import add_activity
 
 
 @pytest.fixture
@@ -48,26 +48,26 @@ def test_add_topic_tags_required(temp_db):
     assert result["error"]["code"] == "TAGS_REQUIRED"
 
 
-def test_add_task_with_tags(temp_db):
-    """タグ付きでタスクの追加が成功する"""
-    result = add_task(
-        title="test-task",
-        description="テストタスク",
+def test_add_activity_with_tags(temp_db):
+    """タグ付きでアクティビティの追加が成功する"""
+    result = add_activity(
+        title="test-activity",
+        description="テストアクティビティ",
         tags=["domain:test"],
     )
 
     assert "error" not in result
-    assert result["task_id"] > 0
-    assert result["title"] == "test-task"
+    assert result["activity_id"] > 0
+    assert result["title"] == "test-activity"
     assert result["status"] == "pending"
     assert "domain:test" in result["tags"]
 
 
-def test_add_task_tags_required(temp_db):
-    """タグなしでタスク追加するとTAGS_REQUIREDエラーが返る"""
-    result = add_task(
-        title="test-task",
-        description="テストタスク",
+def test_add_activity_tags_required(temp_db):
+    """タグなしでアクティビティ追加するとTAGS_REQUIREDエラーが返る"""
+    result = add_activity(
+        title="test-activity",
+        description="テストアクティビティ",
         tags=[],
     )
 

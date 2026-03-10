@@ -4,7 +4,7 @@ from . import (
     discussion_log_service,
     decision_service,
     search_service,
-    task_service,
+    activity_service,
     knowledge_service,
     tag_service,
 )
@@ -14,7 +14,7 @@ __all__ = [
     "discussion_log_service",
     "decision_service",
     "search_service",
-    "task_service",
+    "activity_service",
     "knowledge_service",
     "tag_service",
 ]

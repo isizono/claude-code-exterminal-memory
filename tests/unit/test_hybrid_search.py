@@ -13,7 +13,7 @@ from src.services.search_service import _rrf_merge, RRF_K, RRF_W_FTS, RRF_W_VEC
 from src.services import search_service
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decision
-from src.services.task_service import add_task
+from src.services.activity_service import add_activity
 import src.services.embedding_service as emb
 
 
@@ -109,7 +109,7 @@ def test_rrf_merge_vec_only():
     """RRF統合: ベクトルのみの結果"""
     vec = [
         {"type": "decision", "id": 10, "title": "X"},
-        {"type": "task", "id": 20, "title": "Y"},
+        {"type": "activity", "id": 20, "title": "Y"},
     ]
 
     results = _rrf_merge([], vec, limit=10)
@@ -272,7 +272,7 @@ def test_hybrid_search_with_tags(temp_db, mock_embedding_model):
 
 
 def test_hybrid_search_cross_type_with_tags(temp_db, mock_embedding_model):
-    """ハイブリッド検索: topic/decision/task全てが対象（タグフィルタ付き）"""
+    """ハイブリッド検索: topic/decision/activity全てが対象（タグフィルタ付き）"""
     topic = add_topic(
         title="横断ハイブリッドタグテスト用トピック",
         description="横断検索の動作確認",
@@ -283,9 +283,9 @@ def test_hybrid_search_cross_type_with_tags(temp_db, mock_embedding_model):
         decision="横断ハイブリッドタグテスト決定",
         reason="テスト用",
     )
-    add_task(
-        title="横断ハイブリッドタグテストタスク",
-        description="テスト用タスク",
+    add_activity(
+        title="横断ハイブリッドタグテストアクティビティ",
+        description="テスト用アクティビティ",
         tags=DEFAULT_TAGS,
     )
 
@@ -298,7 +298,7 @@ def test_hybrid_search_cross_type_with_tags(temp_db, mock_embedding_model):
     types_found = {r["type"] for r in result["results"]}
     assert "topic" in types_found
     assert "decision" in types_found
-    assert "task" in types_found
+    assert "activity" in types_found
 
 
 def test_hybrid_search_type_filter(temp_db, mock_embedding_model):

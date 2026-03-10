@@ -5,7 +5,7 @@ import pytest
 from src.db import init_database
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decision
-from src.services.task_service import add_task
+from src.services.activity_service import add_activity
 from src.services.discussion_log_service import add_log as add_log_entry
 from src.services import search_service
 import src.services.embedding_service as emb
@@ -197,14 +197,14 @@ def test_search_trigger_sync_decision(temp_db):
     assert "decision" in types
 
 
-def test_search_trigger_sync_task(temp_db):
-    """taskがsearch_indexに同期される"""
-    add_task(title="トリガー同期タスク検索テスト", description="テスト用タスク", tags=DEFAULT_TAGS)
-    result = search_service.search(keyword="トリガー同期タスク検索テスト")
+def test_search_trigger_sync_activity(temp_db):
+    """activityがsearch_indexに同期される"""
+    add_activity(title="トリガー同期アクティビティ検索テスト", description="テスト用アクティビティ", tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="トリガー同期アクティビティ検索テスト")
     assert "error" not in result
     assert len(result["results"]) >= 1
     types = [r["type"] for r in result["results"]]
-    assert "task" in types
+    assert "activity" in types
 
 
 def test_search_invalid_type_filter(temp_db):
@@ -215,16 +215,16 @@ def test_search_invalid_type_filter(temp_db):
 
 
 def test_search_cross_type(temp_db):
-    """横断検索: topic/decision/task全てが対象"""
+    """横断検索: topic/decision/activity全てが対象"""
     topic = add_topic(title="横断検索テスト用トピック", description="テスト", tags=DEFAULT_TAGS)
     add_decision(topic_id=topic["topic_id"], decision="横断検索テスト決定", reason="テスト")
-    add_task(title="横断検索テスト用タスク", description="テスト", tags=DEFAULT_TAGS)
+    add_activity(title="横断検索テスト用アクティビティ", description="テスト", tags=DEFAULT_TAGS)
     result = search_service.search(keyword="横断検索テスト")
     assert "error" not in result
     types_found = {r["type"] for r in result["results"]}
     assert "topic" in types_found
     assert "decision" in types_found
-    assert "task" in types_found
+    assert "activity" in types_found
 
 
 def test_search_decision_inherits_topic_tags(temp_db):
@@ -249,70 +249,82 @@ def test_search_log_inherits_topic_tags(temp_db):
 
 
 # ========================================
-# get_by_id ツールのテスト
+# get_by_ids ツールのテスト
 # ========================================
 
 
-def test_get_by_id_topic(temp_db):
-    """get_by_id: topicの詳細取得"""
+def test_get_by_ids_single_topic(temp_db):
+    """get_by_ids: topicの詳細取得（1件）"""
     topic = add_topic(title="詳細取得テスト用トピック", description="テスト説明", tags=DEFAULT_TAGS)
-    result = search_service.get_by_id("topic", topic["topic_id"])
-    assert "error" not in result
-    assert result["type"] == "topic"
-    assert result["data"]["title"] == "詳細取得テスト用トピック"
-    assert result["data"]["description"] == "テスト説明"
-    assert "tags" in result["data"]
-    assert "domain:test" in result["data"]["tags"]
+    result = search_service.get_by_ids([{"type": "topic", "id": topic["topic_id"]}])
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert "error" not in item
+    assert item["type"] == "topic"
+    assert item["data"]["title"] == "詳細取得テスト用トピック"
+    assert item["data"]["description"] == "テスト説明"
+    assert "tags" in item["data"]
+    assert "domain:test" in item["data"]["tags"]
 
 
-def test_get_by_id_decision(temp_db):
-    """get_by_id: decisionの詳細取得"""
+def test_get_by_ids_single_decision(temp_db):
+    """get_by_ids: decisionの詳細取得（1件）"""
     topic = add_topic(title="トピック", description="テスト", tags=DEFAULT_TAGS)
     dec = add_decision(topic_id=topic["topic_id"], decision="詳細取得テスト決定", reason="テスト理由")
-    result = search_service.get_by_id("decision", dec["decision_id"])
-    assert "error" not in result
-    assert result["type"] == "decision"
-    assert result["data"]["decision"] == "詳細取得テスト決定"
-    assert "tags" in result["data"]
-    assert "domain:test" in result["data"]["tags"]
+    result = search_service.get_by_ids([{"type": "decision", "id": dec["decision_id"]}])
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert "error" not in item
+    assert item["type"] == "decision"
+    assert item["data"]["decision"] == "詳細取得テスト決定"
+    assert "tags" in item["data"]
+    assert "domain:test" in item["data"]["tags"]
 
 
-def test_get_by_id_task(temp_db):
-    """get_by_id: taskの詳細取得"""
-    task = add_task(title="詳細取得テスト用タスク", description="テスト説明", tags=DEFAULT_TAGS)
-    result = search_service.get_by_id("task", task["task_id"])
-    assert "error" not in result
-    assert result["type"] == "task"
-    assert result["data"]["title"] == "詳細取得テスト用タスク"
-    assert "tags" in result["data"]
-    assert "domain:test" in result["data"]["tags"]
+def test_get_by_ids_single_activity(temp_db):
+    """get_by_ids: activityの詳細取得（1件）"""
+    activity = add_activity(title="詳細取得テスト用アクティビティ", description="テスト説明", tags=DEFAULT_TAGS)
+    result = search_service.get_by_ids([{"type": "activity", "id": activity["activity_id"]}])
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert "error" not in item
+    assert item["type"] == "activity"
+    assert item["data"]["title"] == "詳細取得テスト用アクティビティ"
+    assert "tags" in item["data"]
+    assert "domain:test" in item["data"]["tags"]
 
 
-def test_get_by_id_log(temp_db):
-    """get_by_id: logの詳細取得"""
+def test_get_by_ids_single_log(temp_db):
+    """get_by_ids: logの詳細取得（1件）"""
     topic = add_topic(title="トピック", description="テスト", tags=DEFAULT_TAGS)
     log = add_log_entry(topic_id=topic["topic_id"], title="詳細取得テストログ", content="テスト内容")
-    result = search_service.get_by_id("log", log["log_id"])
-    assert "error" not in result
-    assert result["type"] == "log"
-    assert result["data"]["title"] == "詳細取得テストログ"
-    assert result["data"]["content"] == "テスト内容"
-    assert "tags" in result["data"]
-    assert "domain:test" in result["data"]["tags"]
+    result = search_service.get_by_ids([{"type": "log", "id": log["log_id"]}])
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert "error" not in item
+    assert item["type"] == "log"
+    assert item["data"]["title"] == "詳細取得テストログ"
+    assert item["data"]["content"] == "テスト内容"
+    assert "tags" in item["data"]
+    assert "domain:test" in item["data"]["tags"]
 
 
-def test_get_by_id_not_found(temp_db):
-    """get_by_id: 存在しないIDでNOT_FOUNDエラー"""
-    result = search_service.get_by_id("topic", 999999)
-    assert "error" in result
-    assert result["error"]["code"] == "NOT_FOUND"
+def test_get_by_ids_not_found(temp_db):
+    """get_by_ids: 存在しないIDでNOT_FOUNDエラー"""
+    result = search_service.get_by_ids([{"type": "topic", "id": 999999}])
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert "error" in item
+    assert item["error"]["code"] == "NOT_FOUND"
 
 
-def test_get_by_id_invalid_type(temp_db):
-    """get_by_id: 不正な種別でINVALID_TYPEエラー"""
-    result = search_service.get_by_id("invalid", 1)
-    assert "error" in result
-    assert result["error"]["code"] == "INVALID_TYPE"
+def test_get_by_ids_invalid_type(temp_db):
+    """get_by_ids: 不正な種別でINVALID_TYPEエラー"""
+    result = search_service.get_by_ids([{"type": "invalid", "id": 1}])
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert "error" in item
+    assert item["error"]["code"] == "INVALID_TYPE"
 
 
 # ========================================
@@ -355,12 +367,13 @@ def test_search_cross_type_includes_log(temp_db):
 def test_search_log_title_fallback(temp_db):
     """logのtitleが空の場合、contentの先頭50文字をフォールバック"""
     # NOTE: add_log_entryはtitle空文字をバリデーションエラーにするため、
-    # ここではtitle付きで作成し、get_by_idでフォールバック動作を確認
+    # ここではtitle付きで作成し、get_by_idsでフォールバック動作を確認
     topic = add_topic(title="トピック", description="テスト", tags=DEFAULT_TAGS)
     log = add_log_entry(topic_id=topic["topic_id"], title="フォールバックテスト", content="テスト内容です")
-    result = search_service.get_by_id("log", log["log_id"])
-    assert "error" not in result
-    assert result["data"]["title"] == "フォールバックテスト"
+    result = search_service.get_by_ids([{"type": "log", "id": log["log_id"]}])
+    item = result["results"][0]
+    assert "error" not in item
+    assert item["data"]["title"] == "フォールバックテスト"
 
 
 def test_add_log_empty_title_error(temp_db):
@@ -410,15 +423,15 @@ def test_search_snippet_decision(temp_db):
     assert item["snippet"] == "スニペット決定事項テスト用の内容"
 
 
-def test_search_snippet_task(temp_db):
-    """search結果のtaskにsnippetが含まれること（ソース: description）"""
-    add_task(title="スニペットタスクテスト", description="タスクの詳細説明テスト", tags=DEFAULT_TAGS)
-    result = search_service.search(keyword="スニペットタスクテスト")
+def test_search_snippet_activity(temp_db):
+    """search結果のactivityにsnippetが含まれること（ソース: description）"""
+    add_activity(title="スニペットアクティビティテスト", description="アクティビティの詳細説明テスト", tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="スニペットアクティビティテスト")
     assert "error" not in result
     assert len(result["results"]) >= 1
-    item = next(r for r in result["results"] if r["type"] == "task")
+    item = next(r for r in result["results"] if r["type"] == "activity")
     assert "snippet" in item
-    assert item["snippet"] == "タスクの詳細説明テスト"
+    assert item["snippet"] == "アクティビティの詳細説明テスト"
 
 
 def test_search_snippet_log(temp_db):
@@ -516,15 +529,15 @@ def test_search_keyword_array_with_2char_fts_skipped(temp_db):
 def test_get_by_ids_batch(temp_db):
     """複数アイテムのバッチ取得"""
     add_topic(title="トピック1", description="説明1", tags=DEFAULT_TAGS)
-    add_task(title="タスク1", description="説明1", tags=DEFAULT_TAGS)
+    add_activity(title="アクティビティ1", description="説明1", tags=DEFAULT_TAGS)
     result = search_service.get_by_ids([
         {"type": "topic", "id": 1},
-        {"type": "task", "id": 1},
+        {"type": "activity", "id": 1},
     ])
     assert "results" in result
     assert len(result["results"]) == 2
     assert result["results"][0]["type"] == "topic"
-    assert result["results"][1]["type"] == "task"
+    assert result["results"][1]["type"] == "activity"
 
 
 def test_get_by_ids_empty(temp_db):
@@ -555,18 +568,18 @@ def test_get_by_ids_mixed_types(temp_db):
     """全4種類のtype混在でのバッチ取得"""
     topic = add_topic(title="混在テストトピック", description="テスト", tags=DEFAULT_TAGS)
     add_decision(topic_id=topic["topic_id"], decision="混在テスト決定", reason="テスト")
-    add_task(title="混在テストタスク", description="テスト", tags=DEFAULT_TAGS)
+    add_activity(title="混在テストアクティビティ", description="テスト", tags=DEFAULT_TAGS)
     add_log_entry(topic_id=topic["topic_id"], title="混在テストログ", content="テスト内容")
     result = search_service.get_by_ids([
         {"type": "topic", "id": 1},
         {"type": "decision", "id": 1},
-        {"type": "task", "id": 1},
+        {"type": "activity", "id": 1},
         {"type": "log", "id": 1},
     ])
     assert "results" in result
     assert len(result["results"]) == 4
     types = [r["type"] for r in result["results"]]
-    assert types == ["topic", "decision", "task", "log"]
+    assert types == ["topic", "decision", "activity", "log"]
 
 
 def test_get_by_ids_at_limit(temp_db):
