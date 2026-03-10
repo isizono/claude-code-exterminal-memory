@@ -379,3 +379,78 @@ def test_add_log_empty_title_error(temp_db):
     assert "error" in result
     assert result["error"]["code"] == "VALIDATION_ERROR"
     assert "title must not be empty" in result["error"]["message"]
+
+
+# ========================================
+# snippet テスト
+# ========================================
+
+
+def test_search_snippet_topic(temp_db):
+    """search結果のtopicにsnippetが含まれること（ソース: description）"""
+    add_topic(title="スニペットトピックテスト", description="これはトピックの説明文です", tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="スニペットトピックテスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "topic")
+    assert "snippet" in item
+    assert item["snippet"] == "これはトピックの説明文です"
+
+
+def test_search_snippet_decision(temp_db):
+    """search結果のdecisionにsnippetが含まれること（ソース: decision）"""
+    topic = add_topic(title="トピック", description="テスト", tags=DEFAULT_TAGS)
+    add_decision(topic_id=topic["topic_id"], decision="スニペット決定事項テスト用の内容", reason="テスト理由")
+    result = search_service.search(keyword="スニペット決定事項テスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "decision")
+    assert "snippet" in item
+    assert item["snippet"] == "スニペット決定事項テスト用の内容"
+
+
+def test_search_snippet_task(temp_db):
+    """search結果のtaskにsnippetが含まれること（ソース: description）"""
+    add_task(title="スニペットタスクテスト", description="タスクの詳細説明テスト", tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="スニペットタスクテスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "task")
+    assert "snippet" in item
+    assert item["snippet"] == "タスクの詳細説明テスト"
+
+
+def test_search_snippet_log(temp_db):
+    """search結果のlogにsnippetが含まれること（ソース: content）"""
+    topic = add_topic(title="トピック", description="テスト", tags=DEFAULT_TAGS)
+    add_log_entry(topic_id=topic["topic_id"], title="スニペットログテスト", content="ログの内容テスト文")
+    result = search_service.search(keyword="スニペットログテスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "log")
+    assert "snippet" in item
+    assert item["snippet"] == "ログの内容テスト文"
+
+
+def test_search_snippet_max_length(temp_db):
+    """snippetは200文字以下に切り詰められること"""
+    long_desc = "あ" * 300
+    add_topic(title="スニペット長制限テスト", description=long_desc, tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="スニペット長制限テスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "topic")
+    assert "snippet" in item
+    assert len(item["snippet"]) <= 200
+    assert item["snippet"] == "あ" * 200
+
+
+def test_search_snippet_empty_source(temp_db):
+    """snippetソースが空（空文字列）の場合、snippetは空文字列"""
+    add_topic(title="スニペット空ソーステスト", description="", tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="スニペット空ソーステスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "topic")
+    assert "snippet" in item
+    assert item["snippet"] == ""

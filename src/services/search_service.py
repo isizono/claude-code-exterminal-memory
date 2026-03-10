@@ -23,6 +23,16 @@ TYPE_TO_TABLE = {
     'log': 'discussion_logs',
 }
 
+# snippetソースの対応表: type → (テーブル名, カラム名)
+SNIPPET_SOURCE = {
+    'topic': ('discussion_topics', 'description'),
+    'decision': ('decisions', 'decision'),
+    'task': ('tasks', 'description'),
+    'log': ('discussion_logs', 'content'),
+}
+
+SNIPPET_MAX_LEN = 200
+
 # RRFパラメータ
 RRF_K = 60
 RRF_W_FTS = 1.0
@@ -34,6 +44,37 @@ def _escape_fts5_query(keyword: str) -> str:
     # ダブルクォート内のダブルクォートは2つ重ねてエスケープ
     escaped = keyword.replace('"', '""')
     return f'"{escaped}"'
+
+
+def _attach_snippets(results: list[dict]) -> None:
+    """検索結果にsnippetを付与する（in-place）。
+
+    typeごとにバッチクエリでsnippetソースを取得し、先頭SNIPPET_MAX_LEN文字を
+    snippetフィールドとして付与する。
+    logのtitleが空の場合はcontentの先頭50文字をフォールバック表示する。
+    """
+    # typeごとにグループ化
+    by_type: dict[str, list[dict]] = {}
+    for item in results:
+        by_type.setdefault(item["type"], []).append(item)
+
+    for type_name, items in by_type.items():
+        table, column = SNIPPET_SOURCE[type_name]
+        ids = [item["id"] for item in items]
+        placeholders = ",".join("?" * len(ids))
+        rows = execute_query(
+            f"SELECT id, {column} FROM {table} WHERE id IN ({placeholders})",
+            ids,
+        )
+        snippet_map = {r["id"]: (r[column] or "")[:SNIPPET_MAX_LEN] for r in rows}
+        for item in items:
+            item["snippet"] = snippet_map.get(item["id"], "")
+
+        # log: titleが空の場合にcontentの先頭50文字をフォールバック
+        if type_name == "log":
+            for item in items:
+                if not item["title"]:
+                    item["title"] = snippet_map.get(item["id"], "")[:50]
 
 
 def _resolve_tag_ids_readonly(conn, tag_strings: list[str]) -> list[int]:
@@ -314,7 +355,8 @@ def search(
         limit: 取得件数上限（デフォルト10件、最大50件）
 
     Returns:
-        検索結果一覧（type, id, title, score）
+        検索結果一覧（type, id, title, score, snippet）
+        snippetは各typeの対応するソースカラムの先頭200文字。
     """
     # バリデーション
     keyword = keyword.strip()
@@ -373,16 +415,7 @@ def search(
         effective_vec = vec_results if vec_results is not None else []
         results = _rrf_merge(fts_results, effective_vec, limit)
 
-        # titleが空のlogアイテムにcontentの先頭50文字をフォールバック表示
-        for item in results:
-            if item["type"] == "log" and not item["title"]:
-                rows = execute_query(
-                    "SELECT content FROM discussion_logs WHERE id = ?",
-                    (item["id"],)
-                )
-                if rows:
-                    content = rows[0]["content"]
-                    item["title"] = content[:50]
+        _attach_snippets(results)
 
         return {"results": results, "total_count": len(results)}
 
