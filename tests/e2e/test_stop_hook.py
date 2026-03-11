@@ -608,14 +608,14 @@ class TestActivityCheckinBlock:
         )
         assert result["decision"] == "approve"
 
-    def test_before_3_turns_no_block(self, env_setup):
-        """2ターン目ではblockしない（approved_turns=1）"""
+    def test_before_2_turns_no_block(self, env_setup):
+        """1ターン目ではblockしない（approved_turns=0）"""
         state_dir = Path(env_setup["state_dir"])
         turns_file = state_dir / "approved_turns_test-session"
-        turns_file.write_text("1")
+        turns_file.write_text("0")
         context_file = state_dir / "context_retrieved_test-session"
         context_file.write_text("1")
-        # check-in未呼出だが、まだ3ターン目未満
+        # check-in未呼出だが、まだ2ターン目未満
         transcript = env_setup["tmp_path"] / "transcript.jsonl"
         _write_transcript([
             _make_user_entry("hi"),
