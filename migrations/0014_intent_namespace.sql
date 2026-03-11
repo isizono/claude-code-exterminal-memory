@@ -83,24 +83,10 @@ DELETE FROM tags WHERE namespace = 'scope' AND name IN (
 UPDATE tags SET namespace = '' WHERE namespace = 'scope';
 
 -- ============================================
--- Step 2: mode:タグのintent:化
+-- Step 2: tagsテーブル再作成（CHECK制約更新 + mode:→intent:変換）
 -- ============================================
-
-UPDATE tags SET namespace = 'intent' WHERE namespace = 'mode';
-
--- ============================================
--- Step 3: intent:初期タグの投入
--- ============================================
-
-INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'design');
-INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'discuss');
-INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'investigate');
-INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'implement');
-INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'review');
-
--- ============================================
--- Step 4: tagsテーブル再作成（CHECK制約更新）
--- ============================================
+-- CHECK制約を先に更新しないと、後続のUPDATE/INSERTが制約違反になる。
+-- mode:→intent:の変換はコピー時にCASE WHENで同時に行う。
 
 CREATE TABLE tags_new (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,7 +98,20 @@ CREATE TABLE tags_new (
 );
 
 INSERT INTO tags_new (id, namespace, name, notes, created_at)
-SELECT id, namespace, name, notes, created_at FROM tags;
+SELECT id,
+  CASE WHEN namespace = 'mode' THEN 'intent' ELSE namespace END,
+  name, notes, created_at
+FROM tags;
 
 DROP TABLE tags;
 ALTER TABLE tags_new RENAME TO tags;
+
+-- ============================================
+-- Step 3: intent:初期タグの投入
+-- ============================================
+
+INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'design');
+INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'discuss');
+INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'investigate');
+INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'implement');
+INSERT OR IGNORE INTO tags (namespace, name) VALUES ('intent', 'review');
