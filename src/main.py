@@ -340,7 +340,7 @@ def add_topic(
 ) -> dict:
     """新しい議論トピックを追加する。
 
-    tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/intent:(作業意図と境界)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "error-handling", "validation", "stdin"]
+    tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "error-handling", "validation", "stdin"]
     """
     result = topic_service.add_topic(title, description, tags)
     if "error" not in result:
@@ -357,7 +357,7 @@ def add_log(
 ) -> dict:
     """トピックに議論ログを追加する。
 
-    tags: 追加タグ（optional）。省略時はtopicのタグを継承。内容を表すタグを積極的に追加すること。namespace: domain:(プロジェクト)/intent:(作業意図と境界)/素タグ(キーワード)。例: ["intent:discuss", "migration", "breaking-change", "schema"]
+    tags: 追加タグ（optional）。省略時はtopicのタグを継承。内容を表すタグを積極的に追加すること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["intent:discuss", "migration", "breaking-change", "schema"]
     """
     result = discussion_log_service.add_log(topic_id, title, content, tags)
     if "error" not in result and tags:
@@ -374,7 +374,7 @@ def add_decision(
 ) -> dict:
     """決定事項を記録する。
 
-    tags: 追加タグ（optional）。省略時はtopicのタグを継承。内容を表すタグを積極的に追加すること。namespace: domain:(プロジェクト)/intent:(作業意図と境界)/素タグ(キーワード)。例: ["intent:design", "naming-convention", "backward-compat"]
+    tags: 追加タグ（optional）。省略時はtopicのタグを継承。内容を表すタグを積極的に追加すること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["intent:design", "naming-convention", "backward-compat"]
     """
     result = decision_service.add_decision(decision, reason, topic_id, tags)
     if "error" not in result and tags:
@@ -530,7 +530,7 @@ def add_activity(
     Args:
         title: アクティビティのタイトル
         description: アクティビティの詳細説明（必須）
-        tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/intent:(作業意図と境界)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "search", "ranking"]
+        tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "search", "ranking"]
 
     Returns:
         作成されたアクティビティ情報
