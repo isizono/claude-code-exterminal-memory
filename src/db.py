@@ -93,7 +93,7 @@ def init_database() -> None:
             conn.execute(
                 """
                 INSERT INTO discussion_topics (title, description)
-                VALUES ('first_topic', 'これはサンプルのトピックです。トピックは「この会話を一言で表すと？」に答えられる粒度が目安です。例：「[議論] ユーザー認証に使う外部サービスの選定」「[設計] エラーAPIのレスポンス形式」「[作業] 商品詳細→カート画面遷移時のクラッシュ」など。新しい話題が出てきたら、新しいトピックを作成してください。\n\ncc-memoryの使い方を知りたい場合は /guide スキルを使ってください。')
+                VALUES ('first_topic', 'これはサンプルのトピックです。トピックは「この会話を一言で表すと？」に答えられる粒度が目安です。例：「[議論] ユーザー認証に使う外部サービスの選定」「[設計] エラーAPIのレスポンス形式」「[作業] 商品詳細→カート画面遷移時のクラッシュ」など。新しい話題が出てきたら、新しいトピックを作成してください。')
                 """
             )
             topic_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
