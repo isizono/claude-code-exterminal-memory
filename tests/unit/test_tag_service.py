@@ -441,12 +441,12 @@ class TestResolveTags:
         # まずタグを作成
         conn = get_connection()
         try:
-            ensure_tag_ids(conn, [("", "hook")])
+            ids = ensure_tag_ids(conn, [("", "hook")])
             conn.commit()
         finally:
             conn.close()
         # embeddingも生成
-        emb.generate_and_store_tag_embedding(1, "hook")
+        emb.generate_and_store_tag_embedding(ids[0], "hook")
 
         result = resolve_tags(["hook"])
         assert not isinstance(result, dict), f"Expected tuple, got error: {result}"

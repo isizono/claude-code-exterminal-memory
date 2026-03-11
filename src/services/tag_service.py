@@ -12,7 +12,9 @@ VALID_NAMESPACES = {'', 'domain', 'intent'}
 
 # resolve_tags 定数
 MERGE_THRESHOLD = 0.15  # コサイン距離。これ未満なら統合
-KNN_K = 10              # KNN検索の取得数（namespace後フィルタ前）
+KNN_K = 10              # KNN検索の取得数（namespace後フィルタ前）。
+                        # namespace別タグ数が偏る場合、フィルタ後の候補が0件になりうる。
+                        # タグ総数が増加したら値の引き上げを検討すること。
 
 # Entity table mapping (for UNION inheritance queries)
 _ENTITY_TABLE = {
@@ -217,6 +219,10 @@ def resolve_tags(
                 continue
 
             # 3. force_new_tags=True → KNN検索スキップ、新規作成
+            # NOTE: ループ内で中間commit()している。generate_and_store_tag_embedding()が
+            # 別コネクションを開くため、未コミットの行は参照できない制約による。
+            # このため複数タグ処理の途中でエラーが発生した場合、前半のINSERTは
+            # rollbackされない（アトミック性を犠牲にしている）。
             if force_new_tags:
                 conn.execute(
                     "INSERT OR IGNORE INTO tags (namespace, name) VALUES (?, ?)",
