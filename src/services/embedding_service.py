@@ -273,3 +273,113 @@ def backfill_embeddings() -> int:
         return 0
     finally:
         conn.close()
+
+
+# ========================================
+# Tag embedding ヘルパー
+# ========================================
+
+
+def _insert_tag_embedding_row(conn, tag_id: int, embedding: list[float]) -> None:
+    """tag_vecに1行UPSERT（DELETE+INSERT）する（コミットは呼び出し側の責任）。"""
+    blob = serialize_float32(embedding)
+    conn.execute("DELETE FROM tag_vec WHERE rowid = ?", (tag_id,))
+    conn.execute(
+        "INSERT INTO tag_vec(rowid, embedding) VALUES (?, ?)",
+        (tag_id, blob),
+    )
+
+
+def insert_tag_embedding(tag_id: int, embedding: list[float]) -> None:
+    """tag_vecにembeddingをINSERTする。"""
+    conn = get_connection()
+    try:
+        _insert_tag_embedding_row(conn, tag_id, embedding)
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Failed to insert tag embedding for tag_id={tag_id}: {e}")
+    finally:
+        conn.close()
+
+
+def generate_and_store_tag_embedding(tag_id: int, tag_name: str) -> None:
+    """タグ名からembeddingを生成しtag_vecに格納する。
+
+    サーバーダウン時は何もしない（graceful degradation）。
+    """
+    if not tag_name:
+        return
+    try:
+        embedding = encode_document(tag_name)
+        if embedding is not None:
+            insert_tag_embedding(tag_id, embedding)
+    except Exception as e:
+        logger.warning(f"Failed to generate tag embedding for tag_id={tag_id}: {e}")
+
+
+def search_similar_tags(query_text: str, k: int = 10) -> list[tuple[int, float]]:
+    """tag_vecでKNN検索し、(tag_id, distance)のリストを返す。
+
+    サーバーダウン時は空リストを返す。
+    """
+    try:
+        query_embedding = encode_query(query_text)
+        if query_embedding is None:
+            return []
+
+        blob = serialize_float32(query_embedding)
+        rows = execute_query(
+            "SELECT rowid, distance FROM tag_vec WHERE embedding MATCH ? AND k = ?",
+            (blob, k),
+        )
+        return [(row["rowid"], row["distance"]) for row in rows]
+    except Exception as e:
+        logger.warning(f"Tag similarity search failed: {e}")
+        return []
+
+
+def backfill_tag_embeddings() -> int:
+    """tag_vecが空のタグにembeddingを一括生成する。
+
+    Returns: 生成したembedding数
+    """
+    if not _is_server_running():
+        return 0
+
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT t.id, t.name
+            FROM tags t
+            LEFT JOIN tag_vec tv ON tv.rowid = t.id
+            WHERE tv.rowid IS NULL
+            """
+        ).fetchall()
+
+        if not rows:
+            return 0
+
+        ids = [row["id"] for row in rows]
+        texts = [row["name"] for row in rows]
+
+        try:
+            embeddings = _encode_batch(texts, "document")
+            if embeddings is None:
+                return 0
+            total = 0
+            for tag_id, embedding in zip(ids, embeddings):
+                _insert_tag_embedding_row(conn, tag_id, embedding)
+                total += 1
+            conn.commit()
+            logger.info(f"Backfilled {total} tag embeddings")
+            return total
+        except Exception as e:
+            logger.warning(f"Failed to backfill tag embeddings: {e}")
+            return 0
+
+    except Exception as e:
+        logger.warning(f"Tag embedding backfill failed: {e}")
+        return 0
+    finally:
+        conn.close()

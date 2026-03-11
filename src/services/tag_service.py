@@ -1,11 +1,20 @@
 """タグ管理ユーティリティ"""
+import logging
 import sqlite3
 from typing import Optional, Union
 
 from src.db import execute_query, get_connection, row_to_dict
 
 
+logger = logging.getLogger(__name__)
+
 VALID_NAMESPACES = {'', 'domain', 'intent'}
+
+# resolve_tags 定数
+MERGE_THRESHOLD = 0.15  # コサイン距離。これ未満なら統合
+KNN_K = 10              # KNN検索の取得数（namespace後フィルタ前）。
+                        # namespace別タグ数が偏る場合、フィルタ後の候補が0件になりうる。
+                        # タグ総数が増加したら値の引き上げを検討すること。
 
 # Entity table mapping (for UNION inheritance queries)
 _ENTITY_TABLE = {
@@ -121,6 +130,177 @@ def ensure_tag_ids(conn: sqlite3.Connection, parsed_tags: list[tuple[str, str]])
     ).fetchall()
     id_map = {(row["namespace"], row["name"]): row["id"] for row in rows}
     return [id_map[(ns, name)] for ns, name in parsed_tags]
+
+
+def resolve_tags(
+    tags: list[str],
+    force_new_tags: bool = False,
+) -> tuple[list[int], list[dict]] | dict:
+    """タグを解決する（あいまいマッチ付き）。
+
+    処理フロー（タグ1つあたり）:
+    1. パース: validate_and_parse_tags() を使用。namespace/name を lower().strip() で正規化
+    2. 完全一致チェック: SELECT id FROM tags WHERE namespace=? AND name=?
+    3. force_new_tags=True → 完全一致がなければ新規タグINSERT + embedding生成（KNN検索スキップ）
+    4. KNN検索: tag_vec に対して embedding MATCH → namespace 後フィルタ
+    5. 閾値判定: distance < MERGE_THRESHOLD → 既存タグIDに統合。なし → 新規作成 + embedding生成
+
+    Args:
+        tags: タグ文字列のリスト
+        force_new_tags: Trueの場合、KNN検索をスキップして新規作成する
+                        （ただし完全一致がある場合は既存IDを使用する）
+
+    Returns:
+        成功時: (tag_ids, merged_tags)
+            - tag_ids: 解決済みタグIDリスト
+            - merged_tags: [{"input": "hooks", "merged_to": "hook", "distance": 0.05}, ...]
+        失敗時: {"error": {"code": ..., "message": ...}}
+    """
+    from src.services.embedding_service import (
+        generate_and_store_tag_embedding,
+        search_similar_tags,
+    )
+
+    # 1. パース + 正規化 + バリデーション
+    # validate_and_parse_tags は正規化前にnamespace検証するため、
+    # resolve_tags では自前で parse_tag → lower/strip正規化 → バリデーション を行う
+    normalized = []
+    seen = set()
+    for tag_str in tags:
+        tag_str = tag_str.strip()
+        if not tag_str:
+            continue
+        ns, name = parse_tag(tag_str)
+        # 正規化: lower().strip()
+        ns = ns.lower().strip()
+        name = name.lower().strip()
+
+        if ns not in VALID_NAMESPACES:
+            return {"error": {
+                "code": "INVALID_TAG_NAMESPACE",
+                "message": f"Invalid namespace '{ns}' in tag '{tag_str}'. "
+                           f"Allowed: {sorted(VALID_NAMESPACES)}"
+            }}
+        if not name:
+            return {"error": {
+                "code": "INVALID_TAG_NAME",
+                "message": f"Tag name must not be empty in '{tag_str}'"
+            }}
+
+        key = (ns, name)
+        if key not in seen:
+            seen.add(key)
+            normalized.append(key)
+
+    if not normalized:
+        return ([], [])
+
+    conn = get_connection()
+    try:
+        resolved_ids: list[int] = []
+        merged_tags: list[dict] = []
+        seen_ids: set[int] = set()
+
+        for ns, name in normalized:
+            # 入力タグの表示用文字列
+            input_tag_str = f"{ns}:{name}" if ns else name
+
+            # 2. 完全一致チェック
+            row = conn.execute(
+                "SELECT id FROM tags WHERE namespace = ? AND name = ?",
+                (ns, name),
+            ).fetchone()
+
+            if row:
+                tag_id = row["id"]
+                if tag_id not in seen_ids:
+                    resolved_ids.append(tag_id)
+                    seen_ids.add(tag_id)
+                continue
+
+            # 3. force_new_tags=True → KNN検索スキップ、新規作成
+            # NOTE: ループ内で中間commit()している。generate_and_store_tag_embedding()が
+            # 別コネクションを開くため、未コミットの行は参照できない制約による。
+            # このため複数タグ処理の途中でエラーが発生した場合、前半のINSERTは
+            # rollbackされない（アトミック性を犠牲にしている）。
+            if force_new_tags:
+                conn.execute(
+                    "INSERT OR IGNORE INTO tags (namespace, name) VALUES (?, ?)",
+                    (ns, name),
+                )
+                new_row = conn.execute(
+                    "SELECT id FROM tags WHERE namespace = ? AND name = ?",
+                    (ns, name),
+                ).fetchone()
+                tag_id = new_row["id"]
+                if tag_id not in seen_ids:
+                    resolved_ids.append(tag_id)
+                    seen_ids.add(tag_id)
+                conn.commit()
+                # embedding生成（失敗してもエラーにしない）
+                generate_and_store_tag_embedding(tag_id, name)
+                continue
+
+            # 4. KNN検索
+            similar = search_similar_tags(name, k=KNN_K)
+
+            # namespace後フィルタ + 閾値判定
+            best_match = None
+            for candidate_id, distance in similar:
+                if distance >= MERGE_THRESHOLD:
+                    continue
+                # candidateのnamespaceを確認
+                candidate_row = conn.execute(
+                    "SELECT namespace, name FROM tags WHERE id = ?",
+                    (candidate_id,),
+                ).fetchone()
+                if candidate_row and candidate_row["namespace"] == ns:
+                    best_match = (candidate_id, candidate_row["name"], distance)
+                    break  # distance順なので最初のマッチがベスト
+
+            if best_match:
+                # 5a. 統合
+                match_id, match_name, distance = best_match
+                if match_id not in seen_ids:
+                    resolved_ids.append(match_id)
+                    seen_ids.add(match_id)
+                merged_to_str = f"{ns}:{match_name}" if ns else match_name
+                merged_tags.append({
+                    "input": input_tag_str,
+                    "merged_to": merged_to_str,
+                    "distance": round(distance, 4),
+                })
+            else:
+                # 5b. 新規作成 + embedding生成
+                conn.execute(
+                    "INSERT OR IGNORE INTO tags (namespace, name) VALUES (?, ?)",
+                    (ns, name),
+                )
+                new_row = conn.execute(
+                    "SELECT id FROM tags WHERE namespace = ? AND name = ?",
+                    (ns, name),
+                ).fetchone()
+                tag_id = new_row["id"]
+                if tag_id not in seen_ids:
+                    resolved_ids.append(tag_id)
+                    seen_ids.add(tag_id)
+                conn.commit()
+                # embedding生成（失敗してもエラーにしない）
+                generate_and_store_tag_embedding(tag_id, name)
+
+        conn.commit()
+        return (resolved_ids, merged_tags)
+
+    except Exception as e:
+        conn.rollback()
+        return {
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": str(e),
+            }
+        }
+    finally:
+        conn.close()
 
 
 def link_tags(
