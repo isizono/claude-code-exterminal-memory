@@ -126,7 +126,7 @@ def check_in(activity_id: int) -> dict:
             topic_info = _get_topic_info(conn, topic_id)
 
         # 3. tag_notes収集
-        tag_notes = collect_tag_notes_for_injection(conn, tags) or []
+        tag_notes = collect_tag_notes_for_injection(conn, tags, always_inject_namespaces=["intent"]) or []
 
         # 4. materials取得（カタログ形式、共有コネクション使用）
         materials = get_materials_by_activity_with_conn(conn, activity_id)
