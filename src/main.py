@@ -314,7 +314,7 @@ check-inするとtag_notes・資材・関連decisionsが一括で返り、status
 ## タグ
 
 トピック・決定事項・ログ・アクティビティはすべてタグで整理されます。
-記録時には必ずタグを付けてください。`domain:`タグは必須、`intent:`タグや素タグもたくさん付けてください。
+記録時には必ずタグを付けてください。`domain:`タグは必須。アクティビティには`intent:`タグも必須です。素タグも積極的に付けてください。
 namespace: `domain:`（関心領域）/ `intent:`（作業意図）/ 素タグ（キーワード）
 
 ### tag notes
@@ -560,7 +560,7 @@ def add_activity(
     Args:
         title: アクティビティのタイトル
         description: アクティビティの詳細説明（必須）
-        tags: タグ配列（必須、1個以上）。domain:タグに加えて内容を表すタグも付けること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "search", "ranking"]
+        tags: タグ配列（必須、1個以上）。domain:タグとintent:タグは必須。素タグも積極的に付けること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "search", "ranking"]
 
     Returns:
         作成されたアクティビティ情報
