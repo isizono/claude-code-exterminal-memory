@@ -521,12 +521,12 @@ class TestLastAssistantMessage:
 class TestActivityCheckinBlock:
     """activity check-in チェック"""
 
-    def test_no_checkin_after_3_turns_blocks(self, env_setup):
-        """3ターン目でcheck-in未呼出 → block"""
+    def test_no_checkin_after_2_turns_blocks(self, env_setup):
+        """2ターン目でcheck-in未呼出 → block（閾値境界: approved_turns=1）"""
         state_dir = Path(env_setup["state_dir"])
-        # approved_turns を 2 にセット（3ターン目）
+        # approved_turns を 1 にセット（2ターン目 = 閾値境界）
         turns_file = state_dir / "approved_turns_test-session"
-        turns_file.write_text("2")
+        turns_file.write_text("1")
         # context_retrieved フラグを設定
         context_file = state_dir / "context_retrieved_test-session"
         context_file.write_text("1")
@@ -544,7 +544,7 @@ class TestActivityCheckinBlock:
         assert result["decision"] == "block"
         assert "check-in" in result["reason"]
         # block時にapproved_turnsがインクリメントされていないことを確認
-        assert turns_file.read_text().strip() == "2"
+        assert turns_file.read_text().strip() == "1"
 
     def test_checkin_called_approves(self, env_setup):
         """check_in呼出済み → approve"""
