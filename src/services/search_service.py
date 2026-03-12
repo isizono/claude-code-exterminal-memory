@@ -513,6 +513,7 @@ def search(
     tags: Optional[list[str]] = None,
     type_filter: Optional[str] = None,
     limit: int = 10,
+    offset: int = 0,
     keyword_mode: str = "and",
 ) -> dict:
     """
@@ -532,6 +533,7 @@ def search(
         tags: タグフィルタ（AND条件。未指定=全件検索）
         type_filter: 検索対象の絞り込み（'topic', 'decision', 'activity', 'log'。未指定で全種類）
         limit: 取得件数上限（デフォルト10件、最大50件）
+        offset: スキップ件数（デフォルト0）。ページネーション用
         keyword_mode: キーワード結合モード（"and" または "or"。デフォルト "and"）
 
     Returns:
@@ -582,6 +584,7 @@ def search(
         }
 
     limit = max(1, min(limit, 50))
+    offset = max(0, offset)
 
     try:
         # タグフィルタの解決
@@ -596,8 +599,8 @@ def search(
             finally:
                 conn.close()
 
-        # RRFで両ソースをマージした後にlimitで切るため、各ソースからlimitより多めに取得する
-        fetch_limit = limit * 5
+        # RRFで両ソースをマージした後にoffset+limitで切るため、各ソースから多めに取得する
+        fetch_limit = (offset + limit) * 5
 
         # 使用された検索手法を追跡
         methods_used: list[str] = []
@@ -641,15 +644,16 @@ def search(
 
         _apply_recency_boost(results)
 
-        # recency boost後にlimit件に切り詰め
-        results = results[:limit]
+        # recency boost後にoffset+limitで切り詰め
+        total_count = len(results)
+        results = results[offset:offset + limit]
 
         _attach_snippets(results)
         _attach_tags(results)
 
         return {
             "results": results,
-            "total_count": len(results),
+            "total_count": total_count,
             "search_methods_used": methods_used,
         }
 
