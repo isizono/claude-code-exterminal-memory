@@ -2,7 +2,7 @@
 import os
 import tempfile
 import pytest
-from src.db import init_database, execute_query
+from src.db import init_database, execute_query, get_connection
 from src.services.activity_service import add_activity, get_activities, update_activity
 
 
@@ -121,6 +121,50 @@ class TestGetActivities:
         assert "error" not in result
         assert result["total_count"] == 1
         assert result["activities"][0]["title"] == "Activity A"
+
+    def test_get_activities_completed_sorted_by_updated_at_desc(self, temp_db):
+        """completedのソート順がupdated_at DESCになっている"""
+        a1 = add_activity(title="Old completed", description="Desc", tags=DEFAULT_TAGS)
+        a2 = add_activity(title="New completed", description="Desc", tags=DEFAULT_TAGS)
+        update_activity(a1["activity_id"], new_status="completed")
+        update_activity(a2["activity_id"], new_status="completed")
+
+        # a1のupdated_atを古い値に書き換えてソート順を明確にする
+        conn = get_connection()
+        conn.execute(
+            "UPDATE activities SET updated_at = '2000-01-01 00:00:00' WHERE id = ?",
+            (a1["activity_id"],),
+        )
+        conn.commit()
+        conn.close()
+
+        result = get_activities(status="completed", limit=10)
+
+        assert "error" not in result
+        assert result["total_count"] == 2
+        titles = [a["title"] for a in result["activities"]]
+        assert titles == ["New completed", "Old completed"]
+
+    def test_get_activities_pending_sorted_by_updated_at_desc(self, temp_db):
+        """pendingのソート順がupdated_at DESCになっている"""
+        a1 = add_activity(title="Old pending", description="Desc", tags=DEFAULT_TAGS)
+        a2 = add_activity(title="New pending", description="Desc", tags=DEFAULT_TAGS)
+
+        # a1のupdated_atを古い値に書き換えてソート順を明確にする
+        conn = get_connection()
+        conn.execute(
+            "UPDATE activities SET updated_at = '2000-01-01 00:00:00' WHERE id = ?",
+            (a1["activity_id"],),
+        )
+        conn.commit()
+        conn.close()
+
+        result = get_activities(status="pending", limit=10)
+
+        assert "error" not in result
+        assert result["total_count"] == 2
+        titles = [a["title"] for a in result["activities"]]
+        assert titles == ["New pending", "Old pending"]
 
 
 

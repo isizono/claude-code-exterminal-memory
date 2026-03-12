@@ -183,7 +183,7 @@ def get_activities(tags: list[str] | None = None, status: str = "active", limit:
         else:
             conditions.append("status = ?")
             where_params.append(status)
-            order_clause = "created_at ASC, id ASC"
+            order_clause = "updated_at DESC, id DESC"
 
         if conditions:
             where_clause = "WHERE " + " AND ".join(conditions)
