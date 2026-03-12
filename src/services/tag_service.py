@@ -411,29 +411,31 @@ def collect_tag_notes_for_injection(
     """
     always_ns = set(always_inject_namespaces) if always_inject_namespaces else set()
 
-    # always_inject対象とそれ以外を分離
-    always_tags = []
+    # always_inject対象とそれ以外を分離（パース結果も保持）
+    always_parsed = []
     normal_tags = []
+    normal_parsed = []
     for t in tag_strings:
-        ns, _ = parse_tag(t)
+        ns, name = parse_tag(t)
         if ns in always_ns:
-            always_tags.append(t)
+            always_parsed.append((ns, name))
         else:
             normal_tags.append(t)
+            normal_parsed.append((ns, name))
 
     # 通常タグ: 未注入のもののみ
-    new_normal_tags = [t for t in normal_tags if t not in _injected_tags]
+    new_normal = [
+        (t, p) for t, p in zip(normal_tags, normal_parsed)
+        if t not in _injected_tags
+    ]
 
     # 通常タグをすべてマーク（notes の有無に関わらず）
-    _injected_tags.update(new_normal_tags)
+    _injected_tags.update(t for t, _ in new_normal)
 
-    # クエリ対象: new_normal_tags + always_tags（always_tagsは毎回クエリ）
-    query_tags = new_normal_tags + always_tags
-    if not query_tags:
+    # クエリ対象: new_normal + always（always_tagsは毎回クエリ）
+    parsed = [p for _, p in new_normal] + always_parsed
+    if not parsed:
         return None
-
-    # notes がある分だけ取得（バッチクエリ）
-    parsed = [parse_tag(t) for t in query_tags]
     placeholders = " OR ".join(["(namespace = ? AND name = ?)"] * len(parsed))
     params = [v for pair in parsed for v in pair]
     rows = conn.execute(

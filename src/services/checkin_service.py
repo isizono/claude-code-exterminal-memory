@@ -91,9 +91,12 @@ def check_in(activity_id: int) -> dict:
     statusがin_progress以外（pending, completed含む）の場合はin_progressに自動更新する。
     completedのアクティビティも再オープンされる（追加作業が発生したケースに対応）。
 
-    tag_notesはセッション内初回遭遇時のみ注入される（_injected_tags管理）。
-    同一セッションで同じタグを持つアクティビティに2回check-inすると、
-    2回目のtag_notesは空になる。これはtag_service側の設計による意図的な動作。
+    tag_notesの注入ルール:
+    - 通常タグ: セッション内初回遭遇時のみ注入される（_injected_tags管理）。
+      同一セッションで同じタグを持つアクティビティに2回check-inすると、
+      2回目のtag_notesは空になる。
+    - always_inject_namespaces対象タグ（例: intent:）: 毎回注入される。
+      _injected_tagsによるフィルタをスキップし、check-inのたびにnotesを返す。
 
     Args:
         activity_id: アクティビティID
