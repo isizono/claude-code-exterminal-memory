@@ -105,7 +105,7 @@ transcriptを解析し、議論されたテーマを特定する。
 
 アクティビティの書き方:
 - title: [未完] 〜 のプレフィックスをつける
-- tags に domain:タグ（必須）＋内容を表すタグを付ける
+- tags に domain:タグ（必須）＋intent:タグ（必須）＋内容を表すタグを付ける。intent:はプレフィックスに対応: [未完]議論途中=intent:discuss, [未完]設計途中=intent:design, [未完]実装途中=intent:implement
 - description に文脈を多めに記載する。具体的には:
   - 何について話していたか
   - どこまで進んだか・何が決まったか
