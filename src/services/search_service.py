@@ -11,6 +11,7 @@ from src.services.tag_service import (
     get_entity_tags,
     get_entity_tags_batch,
     get_effective_tags,
+    get_effective_tags_batch_by_ids,
     parse_tag,
 )
 
@@ -96,7 +97,7 @@ def _attach_tags(results: list[dict]) -> None:
 
     typeごとに適切な方法でタグを取得する:
     - topic/activity: get_entity_tags_batch でバッチ取得
-    - decision/log: get_effective_tags で1件ずつ取得（UNION継承のため）
+    - decision/log: get_effective_tags_batch_by_ids でバッチ取得（UNION継承）
     """
     if not results:
         return
@@ -119,8 +120,10 @@ def _attach_tags(results: list[dict]) -> None:
                 for item in items:
                     item["tags"] = tag_map.get(item["id"], [])
             elif type_name in ("decision", "log"):
+                ids = [item["id"] for item in items]
+                tags_map = get_effective_tags_batch_by_ids(conn, type_name, ids)
                 for item in items:
-                    item["tags"] = get_effective_tags(conn, type_name, item["id"])
+                    item["tags"] = tags_map.get(item["id"], [])
             else:
                 for item in items:
                     item["tags"] = []

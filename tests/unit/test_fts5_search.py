@@ -689,3 +689,54 @@ def test_get_by_ids_missing_fields(temp_db):
     for r in result["results"]:
         assert "error" in r
         assert r["error"]["code"] == "VALIDATION_ERROR"
+
+
+# ========================================
+# decision/log 固有タグのテスト
+# ========================================
+
+
+def test_search_tags_decision_own_tags(temp_db):
+    """search結果のdecisionに固有タグ+継承タグの両方が含まれること"""
+    topic = add_topic(
+        title="トピック", description="テスト",
+        tags=["domain:test"],
+    )
+    add_decision(
+        topic_id=topic["topic_id"],
+        decision="固有タグ付き決定事項検索テスト",
+        reason="テスト理由",
+        tags=["intent:design"],
+    )
+    result = search_service.search(keyword="固有タグ付き決定事項検索テスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "decision")
+    assert "tags" in item
+    # topicから継承したタグ
+    assert "domain:test" in item["tags"]
+    # decision固有のタグ
+    assert "intent:design" in item["tags"]
+
+
+def test_search_tags_log_own_tags(temp_db):
+    """search結果のlogに固有タグ+継承タグの両方が含まれること"""
+    topic = add_topic(
+        title="トピック", description="テスト",
+        tags=["domain:test"],
+    )
+    add_log_entry(
+        topic_id=topic["topic_id"],
+        title="固有タグ付きログ検索テスト",
+        content="テスト内容",
+        tags=["intent:investigate"],
+    )
+    result = search_service.search(keyword="固有タグ付きログ検索テスト")
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = next(r for r in result["results"] if r["type"] == "log")
+    assert "tags" in item
+    # topicから継承したタグ
+    assert "domain:test" in item["tags"]
+    # log固有のタグ
+    assert "intent:investigate" in item["tags"]
