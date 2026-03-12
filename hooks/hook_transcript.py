@@ -166,3 +166,50 @@ _CONTEXT_RETRIEVAL_TOOLS = [
 def has_context_retrieval_calls(entries: list[dict]) -> bool:
     """entriesにget系APIの呼び出しがあるかチェック。"""
     return _has_tool_calls(entries, _CONTEXT_RETRIEVAL_TOOLS)
+
+
+def _extract_user_content_text(entry: dict) -> str:
+    """userエントリからcontent文字列を取得する。"""
+    content = entry.get("message", {}).get("content", "")
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return " ".join(
+            b.get("text", "") if isinstance(b, dict) else str(b)
+            for b in content
+        )
+    return ""
+
+
+def get_transcript_info(transcript_path: str) -> tuple[list[dict], bool]:
+    """transcript全行を1パスで読み、(assistant_entries, has_skill_command)を返す。
+
+    has_skill_commandは直近のuserエントリに<command-name>が含まれるかを示す。
+    """
+    path = Path(transcript_path).expanduser()
+    if not path.exists():
+        return [], False
+
+    entries: list[dict] = []
+    last_user_has_command = False
+
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    entry_type = entry.get("type", "")
+                    if entry_type == "assistant":
+                        entries.append(entry)
+                    elif entry_type in ("user", "human"):
+                        text = _extract_user_content_text(entry)
+                        last_user_has_command = "<command-name>" in text
+                except json.JSONDecodeError:
+                    continue
+    except Exception:
+        return [], False
+
+    return entries, last_user_has_command
