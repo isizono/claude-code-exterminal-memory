@@ -1,5 +1,6 @@
 """MCPサーバーのメインエントリーポイント"""
 import logging
+import random
 from fastmcp import FastMCP
 from typing import Literal, Optional
 from src.services import (
@@ -770,6 +771,12 @@ def add_knowledge(
         保存結果（file_path, title, category, tags）
     """
     return knowledge_service.add_knowledge(title, content, tags, category)
+
+
+@mcp.tool()
+def roll_dice(sides: int = 10) -> dict:
+    """指定面数のダイスを振る。デフォルト1d10。"""
+    return {"result": random.randint(1, sides)}
 
 
 if __name__ == "__main__":
