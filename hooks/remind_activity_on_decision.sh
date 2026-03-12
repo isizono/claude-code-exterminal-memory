@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# PostToolUseフック: add_decision後にタスク追加をリマインドする
+# PostToolUseフック: add_decision後にアクティビティ追加をリマインドする
 #
 # 発火条件:
 # - settings.jsonのmatcherにより、add_decision呼び出し時のみ実行される

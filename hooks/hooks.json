@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/remind_task_on_decision.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/remind_activity_on_decision.sh"
           }
         ]
       }
