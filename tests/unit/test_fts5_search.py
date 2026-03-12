@@ -48,12 +48,14 @@ def test_search_basic(temp_db):
 
 
 def test_search_response_format(temp_db):
-    """レスポンス形式: results配列とtotal_count"""
+    """レスポンス形式: results配列とtotal_countとsearch_methods_used"""
     add_topic(title="レスポンス形式検索テスト", description="テスト用", tags=DEFAULT_TAGS)
     result = search_service.search(keyword="レスポンス形式検索テスト")
     assert "error" not in result
     assert "results" in result
     assert "total_count" in result
+    assert "search_methods_used" in result
+    assert isinstance(result["search_methods_used"], list)
     assert isinstance(result["results"], list)
     if result["results"]:
         item = result["results"][0]
@@ -376,8 +378,8 @@ def test_search_log_title_fallback(temp_db):
     assert item["data"]["title"] == "フォールバックテスト"
 
 
-def test_add_log_empty_title_error(temp_db):
-    """バリデーション: title空文字でadd_logするとバリデーションエラー"""
+def test_add_log_empty_title_auto_generates_from_content(temp_db):
+    """title空文字でcontentありの場合、contentの先頭行からtitleを自動生成する"""
     topic = add_topic(
         title="バリデーションテスト用トピック",
         description="テスト用",
@@ -387,12 +389,11 @@ def test_add_log_empty_title_error(temp_db):
     result = add_log_entry(
         topic_id=topic["topic_id"],
         title="",
-        content="内容があってもtitleが空ならエラー",
+        content="内容があればtitleが自動生成される",
     )
 
-    assert "error" in result
-    assert result["error"]["code"] == "VALIDATION_ERROR"
-    assert "title must not be empty" in result["error"]["message"]
+    assert "error" not in result
+    assert result["title"] == "内容があればtitleが自動生成される"
 
 
 # ========================================
@@ -698,3 +699,25 @@ def test_get_by_ids_missing_fields(temp_db):
     for r in result["results"]:
         assert "error" in r
         assert r["error"]["code"] == "VALIDATION_ERROR"
+
+
+# ========================================
+# search_methods_used テスト
+# ========================================
+
+
+def test_search_methods_used_fts_only(temp_db):
+    """embedding無効時: FTS5のみが使われる（3文字以上キーワード）"""
+    add_topic(title="メソッド確認用トピック検索テスト", description="テスト", tags=DEFAULT_TAGS)
+    result = search_service.search(keyword="メソッド確認用トピック検索テスト")
+    assert "error" not in result
+    assert "search_methods_used" in result
+    assert result["search_methods_used"] == ["fts5"]
+
+
+def test_search_methods_used_empty_results(temp_db):
+    """結果0件でもsearch_methods_usedは返る"""
+    result = search_service.search(keyword="絶対に存在しないキーワード999999")
+    assert "error" not in result
+    assert "search_methods_used" in result
+    assert result["search_methods_used"] == ["fts5"]
