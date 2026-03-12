@@ -1,6 +1,5 @@
 """check-inサービス"""
 import logging
-import sqlite3
 
 from src.db import get_connection, row_to_dict
 from src.services import activity_service, decision_service
@@ -16,19 +15,15 @@ logger = logging.getLogger(__name__)
 def _get_topic_id(conn, activity_id: int) -> int | None:
     """activitiesテーブルからtopic_idを取得する。
 
-    topic_idカラムが存在しない場合やNULLの場合はNoneを返す。
+    NULLの場合はNoneを返す。
     """
-    try:
-        row = conn.execute(
-            "SELECT topic_id FROM activities WHERE id = ?",
-            (activity_id,),
-        ).fetchone()
-        if row is None:
-            return None
-        return row["topic_id"]
-    except sqlite3.OperationalError:
-        # topic_idカラムが存在しない場合（migration 0010で削除済み）
+    row = conn.execute(
+        "SELECT topic_id FROM activities WHERE id = ?",
+        (activity_id,),
+    ).fetchone()
+    if row is None:
         return None
+    return row["topic_id"]
 
 
 def _get_topic_info(conn, topic_id: int) -> dict | None:

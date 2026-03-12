@@ -4,6 +4,7 @@ import tempfile
 import pytest
 from src.db import init_database, execute_query, get_connection
 from src.services.activity_service import add_activity, get_activities, update_activity
+from src.services.topic_service import add_topic
 
 
 DEFAULT_TAGS = ["domain:test"]
@@ -72,6 +73,53 @@ class TestAddActivity:
 
         assert "error" not in result
         assert sorted(result["tags"]) == ["domain:cc-memory", "hooks"]
+
+    def test_add_activity_with_topic_id(self, temp_db):
+        """topic_id付きでアクティビティが作成できる"""
+        topic = add_topic(
+            title="Test Topic",
+            description="Topic for testing",
+            tags=DEFAULT_TAGS,
+        )
+        topic_id = topic["topic_id"]
+
+        result = add_activity(
+            title="Activity with topic",
+            description="Linked to a topic",
+            tags=DEFAULT_TAGS,
+            topic_id=topic_id,
+        )
+
+        assert "error" not in result
+        assert result["activity_id"] > 0
+
+        # DBに正しくtopic_idが保存されている
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT topic_id FROM activities WHERE id = ?",
+            (result["activity_id"],),
+        ).fetchone()
+        conn.close()
+        assert row["topic_id"] == topic_id
+
+    def test_add_activity_without_topic_id(self, temp_db):
+        """topic_id未指定でNULLとして作成される"""
+        result = add_activity(
+            title="Activity without topic",
+            description="No topic link",
+            tags=DEFAULT_TAGS,
+        )
+
+        assert "error" not in result
+
+        # DBにtopic_id=NULLで保存されている
+        conn = get_connection()
+        row = conn.execute(
+            "SELECT topic_id FROM activities WHERE id = ?",
+            (result["activity_id"],),
+        ).fetchone()
+        conn.close()
+        assert row["topic_id"] is None
 
 
 class TestGetActivities:

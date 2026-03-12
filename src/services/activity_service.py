@@ -37,7 +37,7 @@ def _activity_to_response(activity: dict, tags: list[str]) -> dict:
     }
 
 
-def add_activity(title: str, description: str, tags: list[str]) -> dict:
+def add_activity(title: str, description: str, tags: list[str], topic_id: int | None = None) -> dict:
     """
     アクティビティを作成してIDを返す
 
@@ -45,6 +45,7 @@ def add_activity(title: str, description: str, tags: list[str]) -> dict:
         title: アクティビティのタイトル
         description: アクティビティの説明
         tags: タグ配列（必須、1個以上）
+        topic_id: 紐づけるトピックID（optional）
 
     Returns:
         作成されたアクティビティ情報
@@ -58,8 +59,8 @@ def add_activity(title: str, description: str, tags: list[str]) -> dict:
     try:
         # アクティビティをINSERT
         cursor = conn.execute(
-            "INSERT INTO activities (title, description, status) VALUES (?, ?, ?)",
-            (title, description, 'pending'),
+            "INSERT INTO activities (title, description, status, topic_id) VALUES (?, ?, ?, ?)",
+            (title, description, 'pending', topic_id),
         )
         activity_id = cursor.lastrowid
 

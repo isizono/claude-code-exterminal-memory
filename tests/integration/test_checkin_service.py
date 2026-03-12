@@ -4,7 +4,9 @@ import tempfile
 import pytest
 from src.db import init_database, get_connection
 from src.services.activity_service import add_activity, update_activity
+from src.services.decision_service import add_decision
 from src.services.material_service import add_material
+from src.services.topic_service import add_topic
 from src.services.checkin_service import check_in
 from src.services.tag_service import _injected_tags
 
@@ -106,7 +108,7 @@ class TestCheckIn:
         result = check_in(activity_id)
 
         assert "error" not in result
-        # activitiesテーブルにtopic_idカラムがないため、topicは省略される
+        # topic_idがNULLなので、topicは省略される
         assert "topic" not in result
 
     def test_check_in_materials_empty(self, activity_id):
@@ -303,3 +305,66 @@ class TestCheckInTagNotes:
         assert "error" not in result2
         domain_notes2 = [n for n in result2["tag_notes"] if n["tag"] == "domain:once"]
         assert len(domain_notes2) == 0
+
+
+class TestCheckInWithTopicId:
+    """topic_id付きアクティビティのcheck-inテスト"""
+
+    def test_check_in_with_topic_returns_topic_info(self, temp_db):
+        """topic_id付きアクティビティのcheck-inでtopicフィールドが返る"""
+        topic = add_topic(
+            title="Design Topic",
+            description="Topic for design discussion",
+            tags=["domain:test"],
+        )
+        topic_id = topic["topic_id"]
+
+        activity = add_activity(
+            title="Activity with topic",
+            description="Linked to topic",
+            tags=["domain:test"],
+            topic_id=topic_id,
+        )
+
+        result = check_in(activity["activity_id"])
+
+        assert "error" not in result
+        assert "topic" in result
+        assert result["topic"]["id"] == topic_id
+        assert result["topic"]["title"] == "Design Topic"
+
+    def test_check_in_with_topic_returns_recent_decisions(self, temp_db):
+        """topic_id付きアクティビティのcheck-inでrecent_decisionsが取得できる"""
+        topic = add_topic(
+            title="Decision Topic",
+            description="Topic with decisions",
+            tags=["domain:test"],
+        )
+        topic_id = topic["topic_id"]
+
+        # トピックに決定事項を追加
+        add_decision(
+            decision="Use JSON format",
+            reason="For compatibility",
+            topic_id=topic_id,
+        )
+        add_decision(
+            decision="Add validation",
+            reason="For safety",
+            topic_id=topic_id,
+        )
+
+        activity = add_activity(
+            title="Activity with decisions",
+            description="Linked to topic with decisions",
+            tags=["domain:test"],
+            topic_id=topic_id,
+        )
+
+        result = check_in(activity["activity_id"])
+
+        assert "error" not in result
+        assert len(result["recent_decisions"]) == 2
+        decision_titles = {d["title"] for d in result["recent_decisions"]}
+        assert "Use JSON format" in decision_titles
+        assert "Add validation" in decision_titles

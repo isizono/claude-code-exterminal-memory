@@ -264,6 +264,7 @@ decisions・logs（議論の詳細な経緯はlogsに入っていることが多
 アクティブコンテキストのアクティビティ一覧やユーザーの発言から、
 どのアクティビティに取り組もうとしているか判断できるはずです。
 ぴったりなアクティビティがなければそこで`add_activity`をしてください。
+`add_activity`はデフォルトでcheck-inも同時に実行します（check_in=True）。topic_idを指定するとrecent_decisionsも取得できます。
 check-inするとtag_notes・資材・関連decisionsが一括で返り、statusも自動更新されます。
 返ってきたsummaryフィールドはそのまま出力してください。
 
@@ -570,24 +571,32 @@ def add_activity(
     title: str,
     description: str,
     tags: list[str],
+    topic_id: Optional[int] = None,
+    check_in: bool = True,
 ) -> dict:
     """
-    新しいアクティビティを追加する。
+    新しいアクティビティを追加する。check_in=True（デフォルト）で自動的にcheck-inも実行する。
 
     典型的な使い方:
-    - 作業アクティビティを作成: add_activity("○○機能を実装", "詳細説明...", ["domain:cc-memory", "intent:implement", "search", "ranking"])
+    - 作業アクティビティを作成: add_activity("○○機能を実装", "詳細説明...", ["domain:cc-memory", "intent:implement", "search", "ranking"], topic_id=123)
 
     Args:
         title: アクティビティのタイトル
         description: アクティビティの詳細説明（必須）
         tags: タグ配列（必須、1個以上）。domain:タグとintent:タグは必須。素タグも積極的に付けること。namespace: domain:(プロジェクト)/intent:(意図)/素タグ(キーワード)。例: ["domain:cc-memory", "intent:implement", "search", "ranking"]
+        topic_id: 紐づけるトピックID（optional）。指定するとcheck-in時にそのトピックのrecent_decisionsが返る
+        check_in: True（デフォルト）で作成直後にcheck-inを実行し、tag_notes・materials・recent_decisionsを一括取得する。Falseで従来動作（status=pending、check_in_resultなし）
 
     Returns:
-        作成されたアクティビティ情報
+        作成されたアクティビティ情報。check_in=Trueの場合はcheck_in_resultフィールドにcheck-in結果がネストされる
     """
-    result = activity_service.add_activity(title, description, tags)
+    result = activity_service.add_activity(title, description, tags, topic_id)
     if "error" not in result:
         _maybe_inject_tag_notes(result, tags)
+        if check_in:
+            checkin_result = _check_in(result["activity_id"])
+            if "error" not in checkin_result:
+                result["check_in_result"] = checkin_result
     return result
 
 
