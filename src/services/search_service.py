@@ -497,11 +497,12 @@ def search(
         _apply_recency_boost(results)
 
         # recency boost後にoffset+limitで切り詰め
+        total_count = len(results)
         results = results[offset:offset + limit]
 
         _attach_snippets(results)
 
-        return {"results": results, "total_count": len(results)}
+        return {"results": results, "total_count": total_count}
 
     except Exception as e:
         return {
