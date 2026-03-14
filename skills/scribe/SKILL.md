@@ -30,6 +30,8 @@ cc-memoryの記録（decisions, logs, materials）を元に、外部共有可能
 - `get_logs(topic_id=...)` で議論経緯を取得
 - `list_materials` / `get_material` で資材を取得
 
+必要に応じて、ソースアクティビティのタグで `search` し、関連する別トピックの情報も補足的に収集する。
+
 ## 4. ボリューム判断と構成
 
 収集した素材の量を確認する。
