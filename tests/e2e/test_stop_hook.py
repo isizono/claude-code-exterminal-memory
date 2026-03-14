@@ -427,6 +427,82 @@ class TestNudgeCounter:
         assert not counter_file.exists()
 
 
+class TestActivityNudge:
+    """decision作成後のアクティビティ作成nudge"""
+
+    def test_decision_without_activity_sets_nudge(self, env_setup):
+        """add_decisionあり + add_activityなし → activity_nudge_pending設定"""
+        state_dir = Path(env_setup["state_dir"])
+        context_file = state_dir / "context_retrieved_test-session"
+        context_file.write_text("1")
+
+        transcript = env_setup["tmp_path"] / "transcript.jsonl"
+        _write_transcript([
+            _make_user_entry("hi"),
+            _make_assistant_entry(
+                tool_calls=["mcp__plugin_claude-code-memory_cc-memory__add_decision"],
+                text=f"{META_TAG}\nrecorded",
+            ),
+        ], transcript)
+
+        result = _run_stop_hook(
+            str(transcript), "test-session", env_setup["env_override"],
+            last_assistant_message=f"recorded\n{META_TAG}",
+        )
+        assert result["decision"] == "approve"
+
+        pending_file = state_dir / "activity_nudge_pending_test-session"
+        assert pending_file.exists()
+
+    def test_decision_with_activity_no_nudge(self, env_setup):
+        """add_decision + add_activity両方あり → activity_nudge_pending設定されない"""
+        state_dir = Path(env_setup["state_dir"])
+        context_file = state_dir / "context_retrieved_test-session"
+        context_file.write_text("1")
+
+        transcript = env_setup["tmp_path"] / "transcript.jsonl"
+        _write_transcript([
+            _make_user_entry("hi"),
+            _make_assistant_entry(
+                tool_calls=[
+                    "mcp__plugin_claude-code-memory_cc-memory__add_decision",
+                    "mcp__plugin_claude-code-memory_cc-memory__add_activity",
+                ],
+                text=f"{META_TAG}\nrecorded",
+            ),
+        ], transcript)
+
+        result = _run_stop_hook(
+            str(transcript), "test-session", env_setup["env_override"],
+            last_assistant_message=f"recorded\n{META_TAG}",
+        )
+        assert result["decision"] == "approve"
+
+        pending_file = state_dir / "activity_nudge_pending_test-session"
+        assert not pending_file.exists()
+
+    def test_no_decision_no_nudge(self, env_setup):
+        """add_decisionなし → activity_nudge_pending設定されない"""
+        state_dir = Path(env_setup["state_dir"])
+        context_file = state_dir / "context_retrieved_test-session"
+        context_file.write_text("1")
+
+        transcript = env_setup["tmp_path"] / "transcript.jsonl"
+        _write_transcript([
+            _make_user_entry("hi"),
+            _make_assistant_entry(text=f"{META_TAG}\nresponse"),
+        ], transcript)
+
+        result = _run_stop_hook(
+            str(transcript), "test-session", env_setup["env_override"],
+            last_assistant_message=f"response\n{META_TAG}",
+        )
+        assert result["decision"] == "approve"
+
+        pending_file = state_dir / "activity_nudge_pending_test-session"
+        assert not pending_file.exists()
+
+
 class TestStateUpdatedOnApprove:
     """approve時の状態更新"""
 

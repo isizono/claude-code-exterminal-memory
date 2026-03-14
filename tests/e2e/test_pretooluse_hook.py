@@ -74,6 +74,45 @@ class TestNudgePending:
         assert state.pop_nudge_pending() is False
 
 
+class TestActivityNudgePending:
+    """activity_nudge_pendingフラグあり → system-reminder注入 + フラグ消去確認"""
+
+    def test_activity_nudge_injection(self, state_dir):
+        state = HookState(_SESSION_ID)
+        state.set_activity_nudge_pending()
+
+        result = _run_hook({"session_id": _SESSION_ID}, state_dir)
+        assert result.returncode == 0
+
+        output = json.loads(result.stdout)
+        assert "hookSpecificOutput" in output
+        ctx = output["hookSpecificOutput"]["additionalContext"]
+        assert "decision" in ctx
+        assert "activity" in ctx.lower()
+
+    def test_activity_nudge_flag_cleared(self, state_dir):
+        state = HookState(_SESSION_ID)
+        state.set_activity_nudge_pending()
+
+        _run_hook({"session_id": _SESSION_ID}, state_dir)
+        assert state.pop_activity_nudge_pending() is False
+
+    def test_activity_nudge_takes_priority_over_record_nudge(self, state_dir):
+        """両方のフラグがある場合、activity_nudgeが先に消費される"""
+        state = HookState(_SESSION_ID)
+        state.set_activity_nudge_pending()
+        state.set_nudge_pending()
+
+        result = _run_hook({"session_id": _SESSION_ID}, state_dir)
+        output = json.loads(result.stdout)
+        ctx = output["hookSpecificOutput"]["additionalContext"]
+        # activity nudgeが注入される
+        assert "activity" in ctx.lower()
+
+        # record nudgeはまだ残っている
+        assert state.pop_nudge_pending() is True
+
+
 class TestEmptySessionId:
     """session_id空 → 空JSON"""
 

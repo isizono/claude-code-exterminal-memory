@@ -4,8 +4,9 @@
 1. stdin読み込み → JSON parse（session_id取得）
 2. session_idが空/null → 空JSON出力して終了
 3. HookState(session_id)を生成
-4. 記録リマインダーnudge → system-reminder注入
-5. 何もなし → 空JSON出力
+4. アクティビティ作成nudge → system-reminder注入
+5. 記録リマインダーnudge → system-reminder注入
+6. 何もなし → 空JSON出力
 """
 import json
 import os
@@ -29,6 +30,15 @@ def _make_hook_output(message: str) -> dict:
         }
     }
 
+
+_ACTIVITY_NUDGE_MESSAGE = (
+    "<system-reminder>"
+    "You just recorded a decision. Consider whether it implies follow-up work "
+    "(design discussion, implementation, investigation) that should be tracked "
+    "as a new activity. If so, create one with add_activity. "
+    "Ignore if not applicable."
+    "</system-reminder>"
+)
 
 _RECORD_NUDGE_MESSAGE = (
     "<system-reminder>"
@@ -66,12 +76,17 @@ def main() -> None:
         # 3. HookState生成
         state = HookState(session_id)
 
-        # 4. 記録リマインダーnudge
+        # 4. アクティビティ作成nudge
+        if state.pop_activity_nudge_pending():
+            print(json.dumps(_make_hook_output(_ACTIVITY_NUDGE_MESSAGE), ensure_ascii=False))
+            return
+
+        # 5. 記録リマインダーnudge
         if state.pop_nudge_pending():
             print(json.dumps(_make_hook_output(_RECORD_NUDGE_MESSAGE), ensure_ascii=False))
             return
 
-        # 5. 何もなし
+        # 6. 何もなし
         print("{}")
 
     except Exception as e:

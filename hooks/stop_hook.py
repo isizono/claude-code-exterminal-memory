@@ -31,6 +31,7 @@ from hooks.hook_transcript import (
     get_transcript_info,
     has_activity_checkin_calls,
     has_context_retrieval_calls,
+    has_decision_without_activity,
     has_recent_recording,
     parse_meta_tag,
 )
@@ -170,6 +171,11 @@ def main() -> None:
                 state.reset_nudge_counter()
             else:
                 state.set_nudge_pending()
+
+        # 8b. decision後のアクティビティ作成nudge
+        recent_entries_short = all_entries[-2:] if all_entries else []
+        if has_decision_without_activity(recent_entries_short):
+            state.set_activity_nudge_pending()
 
         # 9. 状態更新 + approve
         state.set_prev_topic(current_topic_name)
