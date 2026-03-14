@@ -105,6 +105,7 @@ transcriptを解析し、議論されたテーマを特定する。
 - log には Step 3 で保存した material ID を参照として含める（例: 「SA出力（material #NNN）を踏まえてA案を採用」）
 - `topic_id` は関連するトピックを指定
 - `tags` で内容を表すタグを付ける（省略時はtopicのタグを継承）
+- **記録したdecisionの中に、今後の作業や継続議論を伴うものがあれば、対応するアクティビティを `add_activity` で作成する**（Step 2で未登録の場合）
 
 ### 5. 未決定の論点を記録 (add_decision)
 

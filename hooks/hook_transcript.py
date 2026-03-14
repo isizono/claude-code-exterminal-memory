@@ -88,6 +88,8 @@ _RECORDING_TOOLS = [
     "mcp__plugin_claude-code-memory_cc-memory__add_log",
 ]
 
+_ADD_DECISION_TOOL = "mcp__plugin_claude-code-memory_cc-memory__add_decision"
+
 
 def _has_tool_calls(entries: list[dict], tool_names: list[str]) -> bool:
     """entriesに指定ツールの呼び出しがあるかチェック。"""
@@ -138,6 +140,15 @@ _CONTEXT_RETRIEVAL_TOOLS = [
 def has_context_retrieval_calls(entries: list[dict]) -> bool:
     """entriesにget系APIの呼び出しがあるかチェック。"""
     return _has_tool_calls(entries, _CONTEXT_RETRIEVAL_TOOLS)
+
+
+def has_decision_without_activity(entries: list[dict]) -> bool:
+    """entriesにadd_decisionがあり、かつcheck_in/add_activityがない場合True。"""
+    has_decision = _has_tool_calls(entries, [_ADD_DECISION_TOOL])
+    if not has_decision:
+        return False
+    has_activity = _has_tool_calls(entries, _ACTIVITY_CHECKIN_TOOLS)
+    return not has_activity
 
 
 def _extract_user_content_text(entry: dict) -> str:

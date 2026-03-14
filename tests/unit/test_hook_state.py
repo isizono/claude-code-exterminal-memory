@@ -83,6 +83,20 @@ class TestNudgePending:
         assert hook_state.pop_nudge_pending() is False
 
 
+class TestActivityNudgePending:
+    def test_pop_returns_false_when_no_file(self, hook_state):
+        assert hook_state.pop_activity_nudge_pending() is False
+
+    def test_set_then_pop(self, hook_state):
+        hook_state.set_activity_nudge_pending()
+        assert hook_state.pop_activity_nudge_pending() is True
+
+    def test_pop_after_pop_returns_false(self, hook_state):
+        hook_state.set_activity_nudge_pending()
+        hook_state.pop_activity_nudge_pending()
+        assert hook_state.pop_activity_nudge_pending() is False
+
+
 class TestApprovedTurns:
     def test_get_returns_zero_when_no_file(self, hook_state):
         assert hook_state.get_approved_turns() == 0
@@ -141,6 +155,7 @@ class TestClearSession:
         state.increment_block_count()
         state.increment_nudge_counter()
         state.set_nudge_pending()
+        state.set_activity_nudge_pending()
         state.increment_approved_turns()
         state.set_activity_checkin()
         state.set_skill_skip_remaining(3)
@@ -153,6 +168,7 @@ class TestClearSession:
         assert state.get_block_count() == 0
         assert state.get_nudge_counter() == 0
         assert state.pop_nudge_pending() is False
+        assert state.pop_activity_nudge_pending() is False
         assert state.get_approved_turns() == 0
         assert state.has_activity_checkin() is False
         assert state.get_skill_skip_remaining() == 0

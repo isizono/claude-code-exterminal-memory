@@ -97,6 +97,20 @@ class HookState:
         except FileNotFoundError:
             return False
 
+    # --- activity_nudge_pending ---
+
+    def set_activity_nudge_pending(self) -> None:
+        """state/activity_nudge_pending_{session_id_safe} に '1' を書く"""
+        self._write(self._path("activity_nudge_pending"), "1")
+
+    def pop_activity_nudge_pending(self) -> bool:
+        """ファイルが存在すれば削除して True、なければ False"""
+        try:
+            self._path("activity_nudge_pending").unlink()
+            return True
+        except FileNotFoundError:
+            return False
+
     # --- approved_turns ---
 
     def get_approved_turns(self) -> int:
