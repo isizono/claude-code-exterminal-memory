@@ -69,7 +69,7 @@ def main() -> None:
         # 2. ブロック上限チェック
         if state.get_block_count() >= _BLOCK_LIMIT:
             state.reset_block_count()
-            _output("approve", "ブロック上限（{_BLOCK_LIMIT}回）に達しました。強制的に通します。")
+            _output("approve", f"ブロック上限（{_BLOCK_LIMIT}回）に達しました。強制的に通します。")
             return
 
         # 3. スキルスキップ判定
