@@ -4,9 +4,12 @@ import tempfile
 import pytest
 from src.db import init_database, get_connection
 from src.services.activity_service import add_activity, update_activity
+from src.services.decision_service import add_decision
 from src.services.material_service import add_material
+from src.services.relation_service import add_relation
 from src.services.reminder_service import add_reminder, update_reminder
-from src.services.checkin_service import check_in
+from src.services.topic_service import add_topic
+from src.services.checkin_service import check_in, DECISIONS_FULL_LIMIT
 from src.services.tag_service import _injected_tags
 
 
@@ -104,13 +107,13 @@ class TestCheckIn:
         assert result["error"]["code"] == "NOT_FOUND"
         assert "9999" in result["error"]["message"]
 
-    def test_check_in_topic_omitted_when_no_topic_id(self, activity_id):
-        """topic_idがない場合、topicフィールドが結果に含まれない"""
+    def test_check_in_no_related_topics_when_no_relations(self, activity_id):
+        """リレーションがない場合、related_topicsが結果に含まれない"""
         result = check_in(activity_id)
 
         assert "error" not in result
-        # topic_idが未指定（NULL）のため、topicは省略される
-        assert "topic" not in result
+        # リレーションが未設定のため、related_topicsは省略される
+        assert "related_topics" not in result
 
     def test_check_in_materials_empty(self, activity_id):
         """materials 0件の場合、空リストが返る"""
@@ -135,8 +138,8 @@ class TestCheckIn:
             assert "created_at" in m
             assert "content" not in m
 
-    def test_check_in_recent_decisions_empty_without_topic(self, activity_id):
-        """topic_idがない場合、recent_decisionsは空リスト"""
+    def test_check_in_recent_decisions_empty_without_relations(self, activity_id):
+        """リレーションがない場合、recent_decisionsは空リスト"""
         result = check_in(activity_id)
 
         assert "error" not in result
@@ -334,3 +337,67 @@ class TestCheckInReminders:
         assert "error" not in result
         for reminder in result["reminders"]:
             assert isinstance(reminder, str)
+
+
+class TestCheckInRelations:
+    """リレーション関連のcheck-inテスト"""
+
+    def test_related_activities_returned(self, temp_db):
+        """関連アクティビティがrelated_activitiesに含まれる"""
+        a1 = add_activity(title="親タスク", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        a2 = add_activity(title="子タスク", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        add_relation("activity", a1["activity_id"], [{"type": "activity", "ids": [a2["activity_id"]]}])
+
+        result = check_in(a1["activity_id"])
+
+        assert "error" not in result
+        assert "related_activities" in result
+        assert len(result["related_activities"]) == 1
+        assert result["related_activities"][0]["id"] == a2["activity_id"]
+        assert result["related_activities"][0]["title"] == "子タスク"
+
+    def test_no_related_activities_key_when_empty(self, activity_id):
+        """関連アクティビティがない場合、related_activitiesキーは省略される"""
+        result = check_in(activity_id)
+
+        assert "error" not in result
+        assert "related_activities" not in result
+
+    def test_single_related_topic_sets_topic_key(self, temp_db):
+        """関連トピックが1件の場合、topicキーにdictがセットされる"""
+        topic = add_topic(title="テストトピック", description="Desc", tags=DEFAULT_TAGS)
+        a = add_activity(title="タスク", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        add_relation("activity", a["activity_id"], [{"type": "topic", "ids": [topic["topic_id"]]}])
+
+        result = check_in(a["activity_id"])
+
+        assert "error" not in result
+        assert "topic" in result
+        assert result["topic"]["id"] == topic["topic_id"]
+        assert result["related_topics"] == [result["topic"]]
+
+    def test_multiple_related_topics_no_topic_key(self, temp_db):
+        """関連トピックが複数の場合、topicキーは省略される"""
+        t1 = add_topic(title="トピック1", description="Desc", tags=DEFAULT_TAGS)
+        t2 = add_topic(title="トピック2", description="Desc", tags=DEFAULT_TAGS)
+        a = add_activity(title="タスク", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        add_relation("activity", a["activity_id"], [{"type": "topic", "ids": [t1["topic_id"], t2["topic_id"]]}])
+
+        result = check_in(a["activity_id"])
+
+        assert "error" not in result
+        assert "topic" not in result
+        assert len(result["related_topics"]) == 2
+
+    def test_decisions_limited_to_max(self, temp_db):
+        """decisionsがDECISIONS_FULL_LIMIT件に制限される"""
+        topic = add_topic(title="決定多数トピック", description="Desc", tags=DEFAULT_TAGS)
+        for i in range(DECISIONS_FULL_LIMIT + 5):
+            add_decision(decision=f"決定事項{i}", reason="理由", topic_id=topic["topic_id"])
+        a = add_activity(title="タスク", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        add_relation("activity", a["activity_id"], [{"type": "topic", "ids": [topic["topic_id"]]}])
+
+        result = check_in(a["activity_id"])
+
+        assert "error" not in result
+        assert len(result["recent_decisions"]) == DECISIONS_FULL_LIMIT
