@@ -44,7 +44,7 @@ def acquire(port: int) -> bool:
 
     # ファイルが既に存在する場合、stale判定
     existing = read()
-    if existing is not None and _is_process_alive(existing["pid"]):
+    if existing is not None and is_process_alive(existing["pid"]):
         logger.warning(
             f"Server already running: pid={existing['pid']}, port={existing['port']}"
         )
@@ -114,7 +114,7 @@ def release() -> None:
         logger.warning(f"Failed to release lock file: {e}")
 
 
-def _is_process_alive(pid: int) -> bool:
+def is_process_alive(pid: int) -> bool:
     """指定PIDのプロセスが生存しているか確認する。"""
     try:
         os.kill(pid, 0)
