@@ -109,10 +109,17 @@ def main() -> None:
 
 
 def _rewrite_events(state: HookState, events: list[dict]) -> None:
-    """events.jsonlを全書き換えする（nudge消費マーク用）。"""
-    with open(state.events_path, "w") as f:
+    """events.jsonlを全書き換えする（nudge消費マーク用）。
+    tempfile + os.replace()でアトミックに書き換える。"""
+    import os
+    import tempfile
+
+    dir_ = state.events_path.parent
+    with tempfile.NamedTemporaryFile("w", dir=dir_, delete=False, suffix=".tmp", encoding="utf-8") as f:
+        tmp = f.name
         for event in events:
             f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    os.replace(tmp, state.events_path)
 
 
 if __name__ == "__main__":

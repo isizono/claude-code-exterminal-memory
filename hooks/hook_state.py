@@ -113,7 +113,7 @@ class HookState:
         """events.jsonl にイベントを追記する"""
         if not events:
             return
-        with open(self.events_path, "a") as f:
+        with open(self.events_path, "a", encoding="utf-8") as f:
             for event in events:
                 f.write(json.dumps(event, ensure_ascii=False) + "\n")
 
@@ -123,7 +123,7 @@ class HookState:
             return []
         events = []
         try:
-            with open(self.events_path) as f:
+            with open(self.events_path, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:

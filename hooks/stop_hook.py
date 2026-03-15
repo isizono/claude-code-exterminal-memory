@@ -77,7 +77,15 @@ def main() -> None:
         # 3. transcript差分読み → イベント抽出 → events.jsonl追記
         offset = state.get_transcript_offset()
         current_turn = state.get_current_turn()
-        new_entries, new_offset = read_transcript_from_offset(transcript_path, offset)
+        new_entries, new_offset, offset_was_reset = read_transcript_from_offset(transcript_path, offset)
+
+        # オフセットリセット時はcurrent_turnとevents.jsonlもリセット
+        if offset_was_reset:
+            current_turn = 0
+            # events.jsonlを空にする（古いイベントは無効）
+            if state.events_path.exists():
+                state.events_path.unlink()
+
         new_events, current_turn = extract_events(new_entries, current_turn)
 
         # stdinのlast_assistant_messageからメタタグを補完（レースコンディション対策）
@@ -120,7 +128,8 @@ def main() -> None:
                 _output("approve", "1ターン目のためメタタグチェックを猶予します。")
                 _update_state_on_approve(state, all_events, transcript_path)
                 return
-            # stdinフォールバック: last_assistant_messageが無い場合transcriptから
+            # フォールバック: last_assistant_messageが無い場合transcriptから取得
+            # NOTE: get_last_assistant_entryは全行逆順走査（Phase 3で廃止予定）
             if not last_msg:
                 last_entry = get_last_assistant_entry(transcript_path)
                 if last_entry is not None:

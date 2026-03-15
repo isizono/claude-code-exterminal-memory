@@ -43,19 +43,21 @@ _CHECKIN_TOOLS = {
 # ===================================================================
 
 
-def read_transcript_from_offset(transcript_path: str, offset: int) -> tuple[list[dict], int]:
-    """transcriptをバイトオフセットから読み、(新規エントリ一覧, 新オフセット)を返す。
+def read_transcript_from_offset(transcript_path: str, offset: int) -> tuple[list[dict], int, bool]:
+    """transcriptをバイトオフセットから読み、(新規エントリ一覧, 新オフセット, リセット発生)を返す。
 
     transcriptはappend-onlyのJSONL形式。offsetがファイルサイズを超えた場合は
     0にリセットして全読みする（defensive coding）。
+    リセット発生時は呼び出し側でcurrent_turnやevents.jsonlもリセットすべき。
     """
     path = Path(transcript_path).expanduser()
     if not path.exists():
-        return [], 0
+        return [], 0, False
 
     try:
         file_size = path.stat().st_size
-        if offset > file_size:
+        offset_reset = offset > file_size
+        if offset_reset:
             offset = 0
 
         entries = []
@@ -73,10 +75,10 @@ def read_transcript_from_offset(transcript_path: str, offset: int) -> tuple[list
             except json.JSONDecodeError:
                 continue
 
-        return entries, new_offset
+        return entries, new_offset, offset_reset
 
     except Exception:
-        return [], offset
+        return [], offset, False
 
 
 def is_user_message(entry: dict) -> bool:
