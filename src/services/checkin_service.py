@@ -88,7 +88,7 @@ def check_in(activity_id: int) -> dict:
         activity_id: アクティビティID
 
     Returns:
-        check-in結果（activity, topic, tag_notes, rules, materials, recent_decisions, summary）
+        check-in結果（activity, topic, tag_notes, reminders, materials, recent_decisions, summary）
     """
     conn = get_connection()
     try:
@@ -117,11 +117,11 @@ def check_in(activity_id: int) -> dict:
         # 3. tag_notes収集
         tag_notes = collect_tag_notes_for_injection(conn, tags, always_inject_namespaces=["intent"]) or []
 
-        # 4. rules取得
-        rules_rows = conn.execute(
-            "SELECT content FROM rules WHERE active = 1"
+        # 4. reminders取得
+        reminder_rows = conn.execute(
+            "SELECT content FROM reminders WHERE active = 1"
         ).fetchall()
-        active_rules = [r["content"] for r in rules_rows]
+        active_reminders = [r["content"] for r in reminder_rows]
 
         # 5. materials取得（カタログ形式、共有コネクション使用）
         materials = get_materials_by_activity_with_conn(conn, activity_id)
@@ -174,7 +174,7 @@ def check_in(activity_id: int) -> dict:
             result["topic"] = topic_info
 
         result["tag_notes"] = tag_notes
-        result["rules"] = active_rules
+        result["reminders"] = active_reminders
         result["materials"] = materials
         result["recent_decisions"] = recent_decisions
         result["summary"] = summary

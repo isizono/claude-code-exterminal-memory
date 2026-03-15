@@ -1,4 +1,4 @@
-"""ルール管理サービス"""
+"""リマインダー管理サービス"""
 import logging
 
 from src.db import get_connection, row_to_dict
@@ -6,14 +6,14 @@ from src.db import get_connection, row_to_dict
 logger = logging.getLogger(__name__)
 
 
-def add_rule(content: str) -> dict:
-    """ルールを追加する。
+def add_reminder(content: str) -> dict:
+    """リマインダーを追加する。
 
     Args:
-        content: ルールの内容（空文字不可）
+        content: リマインダーの内容（空文字不可）
 
     Returns:
-        作成されたルール情報
+        作成されたリマインダー情報
     """
     if not content or not content.strip():
         return {
@@ -26,25 +26,25 @@ def add_rule(content: str) -> dict:
     conn = get_connection()
     try:
         cursor = conn.execute(
-            "INSERT INTO rules (content) VALUES (?)",
+            "INSERT INTO reminders (content) VALUES (?)",
             (content,),
         )
-        rule_id = cursor.lastrowid
+        reminder_id = cursor.lastrowid
         conn.commit()
 
         row = conn.execute(
-            "SELECT * FROM rules WHERE id = ?",
-            (rule_id,),
+            "SELECT * FROM reminders WHERE id = ?",
+            (reminder_id,),
         ).fetchone()
         if not row:
-            raise Exception("Failed to retrieve created rule")
+            raise Exception("Failed to retrieve created reminder")
 
-        rule = row_to_dict(row)
+        reminder = row_to_dict(row)
         return {
-            "rule_id": rule["id"],
-            "content": rule["content"],
-            "active": rule["active"],
-            "created_at": rule["created_at"],
+            "reminder_id": reminder["id"],
+            "content": reminder["content"],
+            "active": reminder["active"],
+            "created_at": reminder["created_at"],
         }
 
     except Exception as e:
@@ -59,31 +59,31 @@ def add_rule(content: str) -> dict:
         conn.close()
 
 
-def list_rules() -> dict:
-    """ルール一覧を取得する。
+def list_reminders() -> dict:
+    """リマインダー一覧を取得する。
 
     Returns:
-        ルール一覧とtotal_count
+        リマインダー一覧とtotal_count
     """
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT * FROM rules ORDER BY id"
+            "SELECT * FROM reminders ORDER BY id"
         ).fetchall()
 
-        rules = []
+        reminders = []
         for row in rows:
-            rule = row_to_dict(row)
-            rules.append({
-                "rule_id": rule["id"],
-                "content": rule["content"],
-                "active": rule["active"],
-                "created_at": rule["created_at"],
+            reminder = row_to_dict(row)
+            reminders.append({
+                "reminder_id": reminder["id"],
+                "content": reminder["content"],
+                "active": reminder["active"],
+                "created_at": reminder["created_at"],
             })
 
         return {
-            "rules": rules,
-            "total_count": len(rules),
+            "reminders": reminders,
+            "total_count": len(reminders),
         }
 
     except Exception as e:
@@ -97,16 +97,16 @@ def list_rules() -> dict:
         conn.close()
 
 
-def update_rule(rule_id: int, content: str | None = None, active: int | None = None) -> dict:
-    """ルールを更新する。
+def update_reminder(reminder_id: int, content: str | None = None, active: int | None = None) -> dict:
+    """リマインダーを更新する。
 
     Args:
-        rule_id: ルールID
+        reminder_id: リマインダーID
         content: 新しい内容（optional）
         active: 有効/無効フラグ（0 or 1、optional）
 
     Returns:
-        更新されたルール情報
+        更新されたリマインダー情報
     """
     if content is None and active is None:
         return {
@@ -136,14 +136,14 @@ def update_rule(rule_id: int, content: str | None = None, active: int | None = N
     try:
         # 存在チェック
         row = conn.execute(
-            "SELECT * FROM rules WHERE id = ?",
-            (rule_id,),
+            "SELECT * FROM reminders WHERE id = ?",
+            (reminder_id,),
         ).fetchone()
         if not row:
             return {
                 "error": {
                     "code": "NOT_FOUND",
-                    "message": f"Rule with id {rule_id} not found",
+                    "message": f"Reminder with id {reminder_id} not found",
                 }
             }
 
@@ -160,28 +160,28 @@ def update_rule(rule_id: int, content: str | None = None, active: int | None = N
             values.append(active)
 
         set_clause = ", ".join(set_parts)
-        values.append(rule_id)
+        values.append(reminder_id)
 
         conn.execute(
-            f"UPDATE rules SET {set_clause} WHERE id = ?",
+            f"UPDATE reminders SET {set_clause} WHERE id = ?",
             tuple(values),
         )
         conn.commit()
 
-        # 更新後のルールを取得
+        # 更新後のリマインダーを取得
         row = conn.execute(
-            "SELECT * FROM rules WHERE id = ?",
-            (rule_id,),
+            "SELECT * FROM reminders WHERE id = ?",
+            (reminder_id,),
         ).fetchone()
         if not row:
-            raise Exception("Failed to retrieve updated rule")
+            raise Exception("Failed to retrieve updated reminder")
 
-        rule = row_to_dict(row)
+        reminder = row_to_dict(row)
         return {
-            "rule_id": rule["id"],
-            "content": rule["content"],
-            "active": rule["active"],
-            "created_at": rule["created_at"],
+            "reminder_id": reminder["id"],
+            "content": reminder["content"],
+            "active": reminder["active"],
+            "created_at": reminder["created_at"],
         }
 
     except Exception as e:
