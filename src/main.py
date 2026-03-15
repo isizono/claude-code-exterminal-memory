@@ -19,6 +19,8 @@ from src.services.checkin_service import check_in as _check_in
 from src.services.tag_service import list_tags as _list_tags, update_tag as _update_tag, collect_tag_notes_for_injection
 from src.services.tag_analysis_service import analyze_tags as _analyze_tags
 from src.db import execute_query, get_connection, row_to_dict
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -289,6 +291,14 @@ def _maybe_inject_tag_notes(result: dict, tag_strings: list[str]) -> dict:
 
 # MCPサーバーを作成
 mcp = FastMCP("cc-memory", instructions=build_instructions())
+
+# セッション管理（HTTPモードで使用）
+_session_manager = None
+
+
+def get_session_manager():
+    """現在のSessionManagerインスタンスを返す。HTTPモード以外ではNone。"""
+    return _session_manager
 
 
 # MCPツール定義
@@ -815,7 +825,116 @@ def roll_dice(sides: int = 10) -> dict:
     return {"result": random.randint(1, sides)}
 
 
+# セッションエンドポイント（HTTPモード用カスタムルート）
+@mcp.custom_route("/session/register", methods=["POST"])
+async def session_register(request: Request) -> JSONResponse:
+    """セッション登録エンドポイント"""
+    mgr = get_session_manager()
+    if mgr is None:
+        return JSONResponse(
+            {"error": "Session management not available (stdio mode)"},
+            status_code=503,
+        )
+    try:
+        body = await request.json()
+        session_id = body.get("session_id")
+        if not session_id or not isinstance(session_id, str):
+            return JSONResponse(
+                {"error": "session_id is required (string)"},
+                status_code=400,
+            )
+        is_new = mgr.register(session_id)
+        return JSONResponse({
+            "registered": is_new,
+            "active_sessions": mgr.active_count,
+        })
+    except Exception as e:
+        logger.exception("session_register failed")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@mcp.custom_route("/session/unregister", methods=["POST"])
+async def session_unregister(request: Request) -> JSONResponse:
+    """セッション解除エンドポイント"""
+    mgr = get_session_manager()
+    if mgr is None:
+        return JSONResponse(
+            {"error": "Session management not available (stdio mode)"},
+            status_code=503,
+        )
+    try:
+        body = await request.json()
+        session_id = body.get("session_id")
+        if not session_id or not isinstance(session_id, str):
+            return JSONResponse(
+                {"error": "session_id is required (string)"},
+                status_code=400,
+            )
+        removed = mgr.unregister(session_id)
+        return JSONResponse({
+            "unregistered": removed,
+            "active_sessions": mgr.active_count,
+        })
+    except Exception as e:
+        logger.exception("session_unregister failed")
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# サーバー起動
+HTTP_HOST = "localhost"
+HTTP_PORT = 52837
+
+
 if __name__ == "__main__":
+    import argparse
+    import os
+    import signal
+
+    parser = argparse.ArgumentParser(description="cc-memory MCP server")
+    parser.add_argument(
+        "--transport",
+        default="stdio",
+        choices=["stdio", "http"],
+        help="トランスポート方式（デフォルト: stdio）",
+    )
+    args = parser.parse_args()
+
     from src.db import init_database
     init_database()
-    mcp.run()
+
+    if args.transport == "http":
+        import socket
+        from src.services.lock_file import acquire, release
+        from src.services.session_manager import SessionManager
+
+        # ポートの空き確認
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.bind((HTTP_HOST, HTTP_PORT))
+        except OSError:
+            logger.error(f"Port {HTTP_PORT} is already in use")
+            raise SystemExit(1)
+
+        # ロックファイル取得
+        if not acquire(HTTP_PORT):
+            logger.error("Failed to acquire lock file. Another server may be running.")
+            raise SystemExit(1)
+
+        # セッションマネージャー初期化
+        _session_manager = SessionManager()
+
+        def _shutdown_server():
+            """ウォッチドッグから呼ばれるシャットダウンハンドラ"""
+            logger.info("Shutdown triggered by watchdog, sending SIGINT")
+            os.kill(os.getpid(), signal.SIGINT)
+
+        _session_manager.set_shutdown_callback(_shutdown_server)
+        _session_manager.start_watchdog()
+
+        try:
+            logger.info(f"Starting HTTP server on {HTTP_HOST}:{HTTP_PORT}")
+            mcp.run(transport="http", host=HTTP_HOST, port=HTTP_PORT)
+        finally:
+            release()
+    else:
+        mcp.run()
