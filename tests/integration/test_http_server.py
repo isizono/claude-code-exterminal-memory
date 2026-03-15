@@ -86,7 +86,7 @@ class TestSessionLifecycle:
 
     def test_stale_lock_recovery_and_new_session(self, monkeypatch):
         """staleロック回収後に新しいセッションが動作する"""
-        monkeypatch.setattr(lock_file, "_is_process_alive", lambda pid: False)
+        monkeypatch.setattr(lock_file, "is_process_alive", lambda pid: False)
         lock_file.LOCK_FILE.write_text(
             json.dumps({"pid": 99999999, "port": 52837}), encoding="utf-8"
         )

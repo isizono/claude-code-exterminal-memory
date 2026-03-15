@@ -34,7 +34,7 @@ class TestAcquire:
         """死んだプロセスのロックファイルは上書きされる"""
         # 存在しないPIDでロックファイルを手動作成
         stale_pid = 99999999
-        monkeypatch.setattr(lock_file, "_is_process_alive", lambda pid: False)
+        monkeypatch.setattr(lock_file, "is_process_alive", lambda pid: False)
         lock_file.LOCK_FILE.write_text(
             json.dumps({"pid": stale_pid, "port": 52837}), encoding="utf-8"
         )
@@ -100,8 +100,8 @@ class TestRelease:
 class TestIsProcessAlive:
     def test_current_process_is_alive(self):
         """自プロセスは生存している"""
-        assert lock_file._is_process_alive(os.getpid()) is True
+        assert lock_file.is_process_alive(os.getpid()) is True
 
     def test_nonexistent_process(self):
         """存在しないPIDはFalse"""
-        assert lock_file._is_process_alive(99999999) is False
+        assert lock_file.is_process_alive(99999999) is False

@@ -55,8 +55,8 @@ def _is_server_running() -> bool:
         with urllib.request.urlopen(req, timeout=2) as resp:
             return resp.status == 200
     except urllib.error.HTTPError as e:
-        # 405 等のHTTPエラーは「サーバー起動済み」を意味する
-        return e.code in (405, 400)
+        # 4xx系HTTPエラーは「サーバー起動済み」を意味する
+        return e.code in (405, 406, 400)
     except Exception:
         return False
 
@@ -88,9 +88,16 @@ def _ensure_server_running() -> bool:
         return True
     # ロックファイルが存在する場合、別のランチャーが起動中の可能性がある。
     # 二重起動を避けてサーバーの準備完了を待つだけにする。
-    from src.services.lock_file import read as read_lock
+    # ただしプロセスが死んでいる場合はstale lockとして削除し、新規起動する。
+    from src.services.lock_file import read as read_lock, is_process_alive
+    from src.services.lock_file import LOCK_FILE
 
-    if read_lock() is None:
+    lock_info = read_lock()
+    if lock_info is not None and not is_process_alive(lock_info["pid"]):
+        logger.info(f"Removing stale lock file: pid={lock_info['pid']}")
+        LOCK_FILE.unlink(missing_ok=True)
+        lock_info = None
+    if lock_info is None:
         if not _start_http_server():
             return False
     # 最大30秒待機（0.5秒間隔 x 60回）
