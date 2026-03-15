@@ -1,6 +1,6 @@
 """ハートビート機能の統合テスト
 
-get_activities の is_heartbeat_active, _build_active_context の別セッション表示
+get_activities の is_heartbeat_active, _build_activities_section の別セッション表示
 """
 import os
 import tempfile
@@ -10,12 +10,21 @@ import pytest
 from src.db import init_database, get_connection
 from src.services.activity_service import add_activity, get_activities, update_activity
 from src.services.tag_service import _injected_tags
-from src.main import _build_active_context, _get_active_activities_by_tag
+from hooks.session_start_hook import _build_activities_section, _get_active_activities_by_tag
 from src.services.topic_service import add_topic
 import src.services.embedding_service as emb
 
 
 DEFAULT_TAGS = ["domain:test"]
+
+
+def _build_activities_section_wrapper():
+    """テスト用: connを自動管理してアクティビティセクションを組み立てる"""
+    conn = get_connection()
+    try:
+        return _build_activities_section(conn)
+    finally:
+        conn.close()
 
 
 @pytest.fixture(autouse=True)
@@ -162,7 +171,7 @@ class TestGetActiveActivitiesByTagHeartbeat:
 
 
 # ========================================
-# _build_active_context: 別セッション表示
+# _build_activities_section: 別セッション表示
 # ========================================
 
 
@@ -185,7 +194,7 @@ class TestBuildActiveContextHeartbeat:
         conn.commit()
         conn.close()
 
-        result = _build_active_context()
+        result = _build_activities_section_wrapper()
 
         assert "作業中（別セッション）:" in result
         assert "[作業] HB機能実装" in result
@@ -197,7 +206,7 @@ class TestBuildActiveContextHeartbeat:
             title="[作業] 通常タスク", description="Desc", tags=["domain:hb-ctx2"], check_in=False,
         )
 
-        result = _build_active_context()
+        result = _build_activities_section_wrapper()
 
         assert "○" in result
         assert "[作業] 通常タスク" in result
@@ -226,7 +235,7 @@ class TestBuildActiveContextHeartbeat:
         conn.commit()
         conn.close()
 
-        result = _build_active_context()
+        result = _build_activities_section_wrapper()
 
         assert "作業中（別セッション）:" in result
         assert "○" in result
@@ -250,7 +259,7 @@ class TestBuildActiveContextHeartbeat:
         conn.commit()
         conn.close()
 
-        result = _build_active_context()
+        result = _build_activities_section_wrapper()
 
         assert "○" in result
         assert "作業中（別セッション）:" not in result
