@@ -86,9 +86,12 @@ def is_user_message(entry: dict) -> bool:
 
     User Message = ユーザーが実際に送信したuserエントリ。
     tool_resultやsystem-reminderを含むuser/humanエントリは除外する。
+    isMeta=trueのエントリ（スキル内容注入等）も除外する。
     string形式のsystem-reminderの誤判定は許容（発生率0.02%）。
     """
     if entry.get("type") not in ("user", "human"):
+        return False
+    if entry.get("isMeta"):
         return False
     content = entry.get("message", {}).get("content")
     if isinstance(content, str):
