@@ -50,6 +50,18 @@ RRF_W_FTS = 1.0
 RRF_W_VEC = 1.0
 RRF_W_TAG = 0.5
 
+# Adaptive RRF: FTS/ベクトルのヒット数比率に応じて重みを動的調整
+ADAPTIVE_RRF_ENABLED = True
+ADAPTIVE_RRF_THRESHOLDS: tuple[tuple[float, float, float], ...] = (
+    # (ratio上限, w_fts, w_vec) — ratioが小さい順に評価
+    (0.2, 0.5, 1.5),
+    (0.5, 0.8, 1.2),
+)
+assert all(
+    ADAPTIVE_RRF_THRESHOLDS[i][0] < ADAPTIVE_RRF_THRESHOLDS[i + 1][0]
+    for i in range(len(ADAPTIVE_RRF_THRESHOLDS) - 1)
+), "ADAPTIVE_RRF_THRESHOLDS must be sorted in ascending order of threshold"
+
 # Recency boost パラメータ
 # 半年(182日)で約0.80倍、1年(365日)で約0.66倍
 RECENCY_DECAY_RATE = 0.0014
@@ -823,6 +835,25 @@ def _apply_recency_boost(results: list[dict], now: datetime | None = None) -> No
     results.sort(key=lambda x: x["score"], reverse=True)
 
 
+def _compute_adaptive_weights(fts_count: int, vec_count: int) -> tuple[float, float]:
+    """FTS/ベクトルのヒット数比率に応じてRRF重みを動的に算出する。
+
+    ADAPTIVE_RRF_ENABLED=Falseまたはvec_count=0のときはデフォルト重みを返す。
+    fts_count=0かつvec_count>0の場合はratio=0.0となり最もベクトル寄りの重みが適用される。
+    タグLIKEの重み(RRF_W_TAG)は適応対象外。
+
+    Returns:
+        (w_fts, w_vec) のタプル
+    """
+    if not ADAPTIVE_RRF_ENABLED or vec_count == 0:
+        return RRF_W_FTS, RRF_W_VEC
+    ratio = fts_count / vec_count
+    for threshold, w_fts, w_vec in ADAPTIVE_RRF_THRESHOLDS:
+        if ratio < threshold:
+            return w_fts, w_vec
+    return RRF_W_FTS, RRF_W_VEC
+
+
 def _rrf_merge(
     fts_results: list[dict],
     vec_results: list[dict],
@@ -832,6 +863,9 @@ def _rrf_merge(
     """RRF（Reciprocal Rank Fusion）でFTS5・ベクトル・タグLIKE結果を統合する。"""
     scores: dict[tuple, dict] = {}  # key: (type, id)
 
+    # Adaptive RRF: ヒット数比率に応じてFTS/ベクトルの重みを動的調整
+    w_fts, w_vec = _compute_adaptive_weights(len(fts_results), len(vec_results))
+
     # FTS5結果にRRFスコアを付与（1始まりランク）
     for rank, item in enumerate(fts_results, start=1):
         key = (item["type"], item["id"])
@@ -839,13 +873,13 @@ def _rrf_merge(
             "type": item["type"],
             "id": item["id"],
             "title": item["title"],
-            "score": RRF_W_FTS / (RRF_K + rank),
+            "score": w_fts / (RRF_K + rank),
         }
 
     # ベクトル結果のRRFスコアを加算（1始まりランク）
     for rank, item in enumerate(vec_results, start=1):
         key = (item["type"], item["id"])
-        vec_score = RRF_W_VEC / (RRF_K + rank)
+        vec_score = w_vec / (RRF_K + rank)
         if key in scores:
             scores[key]["score"] += vec_score
         else:
