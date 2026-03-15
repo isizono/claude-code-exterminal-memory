@@ -819,10 +819,18 @@ def update_tag(
 
         conn.commit()
 
-        # タグ変更に伴うembedding再生成（コミット後に非同期的に実行）
+        # タグ変更に伴うembedding再生成（コミット後に同期的に実行）
         from src.services.embedding_service import regenerate_embedding
         for etype, eid in affected_entities:
             regenerate_embedding(etype, eid)
+            # activityに紐づくmaterialのembeddingも再生成
+            if etype == "activity":
+                mat_rows = conn.execute(
+                    "SELECT id FROM materials WHERE activity_id = ?",
+                    (eid,),
+                ).fetchall()
+                for mat_row in mat_rows:
+                    regenerate_embedding("material", mat_row["id"])
 
         c_tag_str = f"{c_namespace}:{c_name}" if c_namespace else c_name
         return {"tag": tag_str, "canonical": c_tag_str, "updated": True}

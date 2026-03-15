@@ -40,6 +40,10 @@ SNIPPET_SOURCE = {
 
 SNIPPET_MAX_LEN = 200
 
+# _tag_like_search: SQLiteパラメータ上限(999)超過を防ぐためのtag_id数制限
+# パラメータ数 = 2 + 7 * len(matched_tag_ids) + 1 なので、100件で最大703パラメータ
+TAG_LIKE_MAX_TAG_IDS = 100
+
 # RRFパラメータ
 RRF_K = 60
 RRF_W_FTS = 1.0
@@ -601,6 +605,9 @@ def _tag_like_search(
         return []
 
     matched_tag_ids = [r["id"] for r in matching_tags]
+
+    # SQLiteパラメータ上限(999)超過を防止
+    matched_tag_ids = matched_tag_ids[:TAG_LIKE_MAX_TAG_IDS]
 
     # tag_idsフィルタ: 指定がある場合は交差を取る
     if tag_ids:
