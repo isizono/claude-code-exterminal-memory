@@ -382,6 +382,49 @@ class TestExceptionFailOpen:
         assert result["decision"] == "approve"
         assert "error" in result.get("reason", "").lower()
 
+    def test_post_approve_exception_no_double_output(self, env_setup):
+        """approve後の状態更新で例外 → stdoutは1行のみ（double-output防止の回帰テスト）"""
+        state_dir = env_setup["state_dir"]
+
+        # checked_in_activityを設定 → update_heartbeatが呼ばれる
+        Path(state_dir, "checked_in_activity_test-session").write_text("999")
+
+        transcript = env_setup["tmp_path"] / "transcript.jsonl"
+        _write_transcript([
+            _make_user_entry("hi"),
+            CONTEXT_RETRIEVAL_ENTRY,
+            _make_assistant_entry(text=f"{META_TAG}\nresponse"),
+        ], transcript)
+
+        # DB pathを空ファイルに向ける → activitiesテーブルがないのでsqlite3.OperationalError
+        empty_db = env_setup["tmp_path"] / "empty.db"
+        empty_db.touch()
+
+        env = {**os.environ, **env_setup["env_override"], "DISCUSSION_DB_PATH": str(empty_db)}
+        input_data = json.dumps({
+            "transcript_path": str(transcript),
+            "session_id": "test-session",
+            "last_assistant_message": f"response\n{META_TAG}",
+        })
+
+        result = subprocess.run(
+            [sys.executable, "hooks/stop_hook.py"],
+            input=input_data,
+            capture_output=True,
+            text=True,
+            cwd=str(PROJECT_ROOT),
+            env=env,
+        )
+
+        # stdoutは1行のJSONのみ（double-outputなし）
+        stdout_lines = result.stdout.strip().split("\n")
+        assert len(stdout_lines) == 1, f"Expected 1 stdout line, got {len(stdout_lines)}: {result.stdout}"
+        parsed = json.loads(stdout_lines[0])
+        assert parsed["decision"] == "approve"
+
+        # stderrにpost-approve errorログが出ている
+        assert "post-approve error" in result.stderr
+
 
 class TestContextRetrievalCheck:
     """コンテキスト取得ツール呼び出しチェック"""

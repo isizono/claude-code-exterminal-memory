@@ -15,6 +15,7 @@
 import json
 import os
 import sys
+import traceback
 from pathlib import Path
 
 # プロジェクトルートをパスに追加（src.db等の参照用）
@@ -212,7 +213,10 @@ def main() -> None:
         # 10. nudge判定 + 状態更新 + approve
         state.reset_block_count()
         _output("approve")
-        _safe_post_approve(state, all_events, transcript_path, current_turn)
+        _safe_post_approve(
+            state, all_events, transcript_path, current_turn,
+            run_nudges=True,
+        )
 
     except Exception as e:
         # フェイルオープン: 例外時はapprove
@@ -268,15 +272,20 @@ def _update_checked_in_activity(
 
 def _safe_post_approve(
     state: HookState, events: list[dict], transcript_path: str,
-    current_turn: int | None = None,
+    current_turn: int = 0,
+    *,
+    run_nudges: bool = False,
 ) -> None:
     """approve出力後の状態更新。例外はstderrログのみ（double-output防止）。"""
     try:
         _update_state_on_approve(state, events, transcript_path)
-        if current_turn is not None:
+        if run_nudges:
             _handle_nudges(state, events, current_turn)
     except Exception as e:
-        print(f"stop_hook.py post-approve error: {e}", file=sys.stderr)
+        print(
+            f"stop_hook.py post-approve error: {e}\n{traceback.format_exc()}",
+            file=sys.stderr,
+        )
 
 
 def _update_state_on_approve(
