@@ -170,7 +170,7 @@ transcriptを解析し、議論されたテーマを特定する。
 **フォーマット例:**
 ```
 title: "[未完] sync-memoryに未完アクティビティ自動作成機能を追加"
-description: "topic_id:135で議論中。ステップ4のdecision記録はそのまま残し、追加でadd_activityでも登録する方針で合意済み（decision A案）。残作業：SKILL.mdへのステップ追加と動作確認。"
+description: "「sync-memory改善」トピックで議論中。ステップ4のdecision記録はそのまま残し、追加でadd_activityでも登録する方針で合意済み（decision A案）。残作業：SKILL.mdへのステップ追加と動作確認。"
 ```
 
 **注意:**
