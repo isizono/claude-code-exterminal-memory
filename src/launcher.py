@@ -20,9 +20,9 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# サーバー接続設定
-HTTP_HOST = "localhost"
-HTTP_PORT = 52837
+# サーバー接続設定（HTTP_HOST, HTTP_PORTはmain.pyと共有）
+from src.http_config import HTTP_HOST, HTTP_PORT
+
 MCP_ENDPOINT = f"http://{HTTP_HOST}:{HTTP_PORT}/mcp"
 SESSION_REGISTER_URL = f"http://{HTTP_HOST}:{HTTP_PORT}/session/register"
 SESSION_UNREGISTER_URL = f"http://{HTTP_HOST}:{HTTP_PORT}/session/unregister"
@@ -62,7 +62,11 @@ def _is_server_running() -> bool:
 
 
 def _start_http_server() -> bool:
-    """HTTPサーバーをデーモンとして起動する。"""
+    """HTTPサーバーをデーモンとして起動する。
+
+    sys.executableは.mcp.jsonの「uv run python -m src.launcher」経由で
+    起動されることを前提とし、uv仮想環境のPython（.venv/bin/python）を使用する。
+    """
     try:
         subprocess.Popen(
             [sys.executable, "-m", "src.main", "--transport", "http"],
@@ -82,8 +86,13 @@ def _ensure_server_running() -> bool:
     """ヘルスチェック -> 起動 -> 待機のフロー。成功でTrue、タイムアウトでFalse。"""
     if _is_server_running():
         return True
-    if not _start_http_server():
-        return False
+    # ロックファイルが存在する場合、別のランチャーが起動中の可能性がある。
+    # 二重起動を避けてサーバーの準備完了を待つだけにする。
+    from src.services.lock_file import read as read_lock
+
+    if read_lock() is None:
+        if not _start_http_server():
+            return False
     # 最大30秒待機（0.5秒間隔 x 60回）
     for _ in range(60):
         time.sleep(0.5)
@@ -195,6 +204,10 @@ async def _bridge() -> None:
             except Exception:
                 logger.debug("stdin reader ended")
             finally:
+                if buffer.strip():
+                    logger.warning(
+                        f"Discarding {len(buffer)} bytes of incomplete data in stdin buffer"
+                    )
                 transport.close()
                 await write_stream.aclose()
 
@@ -214,7 +227,7 @@ async def _bridge() -> None:
             except anyio.ClosedResourceError:
                 pass
             except Exception:
-                logger.debug("stdout writer ended")
+                logger.debug("stdout writer ended", exc_info=True)
 
         async with anyio.create_task_group() as tg:
             tg.start_soon(stdin_to_server)
