@@ -44,6 +44,9 @@ SNIPPET_MAX_LEN = 200
 # パラメータ数 = 2 + 7 * len(matched_tag_ids) + 1 なので、100件で最大703パラメータ
 TAG_LIKE_MAX_TAG_IDS = 100
 
+# details付与パラメータ
+DETAILS_MAX_RESULTS = 10
+DETAILS_DESCRIPTION_MAX = 500
 # RRFパラメータ
 RRF_K = 60
 RRF_W_FTS = 1.0
@@ -203,6 +206,108 @@ def _attach_snippets(results: list[dict]) -> None:
             for item in items:
                 if not item["title"]:
                     item["title"] = snippet_map.get(item["id"], "")[:50]
+
+
+def _attach_details(results: list[dict]) -> None:
+    """検索結果にdetailsを付与する（in-place）。
+
+    typeごとにバッチクエリで詳細情報を取得し、detailsフィールドとして付与する。
+    - topic: description(500文字制限) + recent_decisions最大3件
+    - activity: description(500文字制限) + status
+    - decision: decision + reason全文
+    - log: content先頭500文字
+    - material: detailsは付与しない（snippetのまま）
+    """
+    if not results:
+        return
+
+    # typeごとにグループ化
+    by_type: dict[str, list[dict]] = {}
+    for item in results:
+        by_type.setdefault(item["type"], []).append(item)
+
+    for type_name, items in by_type.items():
+        ids = [item["id"] for item in items]
+        placeholders = ",".join("?" * len(ids))
+
+        if type_name == "topic":
+            # description取得
+            rows = execute_query(
+                f"SELECT id, description FROM discussion_topics WHERE id IN ({placeholders})",
+                tuple(ids),
+            )
+            desc_map = {r["id"]: (r["description"] or "")[:DETAILS_DESCRIPTION_MAX] for r in rows}
+
+            # recent_decisions取得（各topicの最新3件）
+            # topic_idごとにまとめてクエリし、ROW_NUMBERで上位3件に絞る
+            decision_rows = execute_query(
+                f"""
+                SELECT topic_id, decision, reason,
+                       ROW_NUMBER() OVER (PARTITION BY topic_id ORDER BY id DESC) AS rn
+                FROM decisions
+                WHERE topic_id IN ({placeholders})
+                """,
+                tuple(ids),
+            )
+            decisions_map: dict[int, list[dict]] = {}
+            for r in decision_rows:
+                if r["rn"] <= 3:
+                    decisions_map.setdefault(r["topic_id"], []).append({
+                        "decision": r["decision"],
+                        "reason": r["reason"],
+                    })
+
+            for item in items:
+                item["details"] = {
+                    "description": desc_map.get(item["id"], ""),
+                    "recent_decisions": decisions_map.get(item["id"], []),
+                }
+
+        elif type_name == "activity":
+            rows = execute_query(
+                f"SELECT id, description, status FROM activities WHERE id IN ({placeholders})",
+                tuple(ids),
+            )
+            detail_map = {
+                r["id"]: {
+                    "description": (r["description"] or "")[:DETAILS_DESCRIPTION_MAX],
+                    "status": r["status"],
+                }
+                for r in rows
+            }
+            for item in items:
+                item["details"] = detail_map.get(item["id"], {"description": "", "status": ""})
+
+        elif type_name == "decision":
+            rows = execute_query(
+                f"SELECT id, decision, reason FROM decisions WHERE id IN ({placeholders})",
+                tuple(ids),
+            )
+            detail_map = {
+                r["id"]: {
+                    "decision": r["decision"],
+                    "reason": r["reason"],
+                }
+                for r in rows
+            }
+            for item in items:
+                item["details"] = detail_map.get(item["id"], {"decision": "", "reason": ""})
+
+        elif type_name == "log":
+            rows = execute_query(
+                f"SELECT id, content FROM discussion_logs WHERE id IN ({placeholders})",
+                tuple(ids),
+            )
+            detail_map = {
+                r["id"]: {
+                    "content": (r["content"] or "")[:DETAILS_DESCRIPTION_MAX],
+                }
+                for r in rows
+            }
+            for item in items:
+                item["details"] = detail_map.get(item["id"], {"content": ""})
+
+        # material: detailsは付与しない（snippetのまま）
 
 
 def _attach_tags(results: list[dict]) -> None:
@@ -917,6 +1022,7 @@ def search(
     limit: int = 10,
     offset: int = 0,
     keyword_mode: str = "and",
+    include_details: bool = False,
 ) -> dict:
     """
     キーワードで横断検索する。
@@ -937,11 +1043,13 @@ def search(
         limit: 取得件数上限（デフォルト10件、最大50件）
         offset: スキップ件数（デフォルト0）。ページネーション用
         keyword_mode: キーワード結合モード（"and" または "or"。デフォルト "and"）
+        include_details: Trueのとき上位DETAILS_MAX_RESULTS件にdetailsを自動添付する（デフォルトFalse）
 
     Returns:
         検索結果一覧（type, id, title, score, snippet, tags）
         snippetは各typeの対応するソースカラムの先頭200文字（materialはtitle優先表示）。
         tagsはエンティティに紐づくタグ文字列のリスト。
+        include_details=Trueの場合、上位DETAILS_MAX_RESULTS件にdetailsが追加される。
     """
     # keyword_modeバリデーション
     if keyword_mode not in ("and", "or"):
@@ -1072,6 +1180,10 @@ def search(
 
         _attach_snippets(results)
         _attach_tags(results)
+
+        if include_details:
+            details_targets = results[:DETAILS_MAX_RESULTS]
+            _attach_details(details_targets)
 
         return {
             "results": results,

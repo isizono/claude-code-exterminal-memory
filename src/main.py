@@ -265,6 +265,7 @@ def search(
     limit: int = 10,
     offset: int = 0,
     keyword_mode: str = "and",
+    include_details: bool = False,
 ) -> dict:
     """
     キーワードで横断検索する。
@@ -282,13 +283,15 @@ def search(
         limit: 取得件数上限（デフォルト10件、最大50件）
         offset: スキップ件数（デフォルト0）。ページネーション用
         keyword_mode: キーワード結合モード（"and" または "or"。デフォルト "and"）
+        include_details: Trueのとき上位10件にdetailsを自動添付する（デフォルトFalse）
 
     Returns:
         検索結果一覧（type, id, title, score, snippet, tags）
         snippetは各typeの対応するソースカラムの先頭200文字（materialはtitle優先表示）。
         tagsはエンティティに紐づくタグ文字列のリスト。
+        include_details=Trueの場合、上位10件にdetailsが追加される。
     """
-    result = search_service.search(keyword, tags, type_filter, limit, offset, keyword_mode)
+    result = search_service.search(keyword, tags, type_filter, limit, offset, keyword_mode, include_details)
     if "error" not in result and tags:
         _maybe_inject_tag_notes(result, tags)
     return result
