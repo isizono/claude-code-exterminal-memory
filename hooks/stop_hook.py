@@ -10,7 +10,7 @@
    → なければblock
 6. activity check-inチェック（_CHECKIN_DEFER_TURNSターン後、one-shot block）
    → check-in/add_activity未呼出 → block
-7. トピック変更チェック → 直近に記録系ツール呼び出しがなければblock
+7. トピック変更チェック → 初回遷移は許容、2回目以降は記録がなければblock
 8. nudgeカウンター管理
 9. 状態更新 → approve
 """
