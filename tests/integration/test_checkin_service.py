@@ -5,6 +5,7 @@ import pytest
 from src.db import init_database, get_connection
 from src.services.activity_service import add_activity, update_activity
 from src.services.material_service import add_material
+from src.services.rule_service import add_rule, update_rule
 from src.services.checkin_service import check_in
 from src.services.tag_service import _injected_tags
 
@@ -272,3 +273,64 @@ class TestCheckInTagNotes:
         assert "error" not in result2
         domain_notes2 = [n for n in result2["tag_notes"] if n["tag"] == "domain:once"]
         assert len(domain_notes2) == 0
+
+
+class TestCheckInRules:
+    """check-in時のrules注入テスト"""
+
+    def test_check_in_has_rules_field(self, activity_id):
+        """check-in結果にrulesフィールドが含まれる"""
+        result = check_in(activity_id)
+
+        assert "error" not in result
+        assert "rules" in result
+        assert isinstance(result["rules"], list)
+
+    def test_check_in_includes_initial_rule(self, activity_id):
+        """マイグレーションで投入された初期ルールがrulesに含まれる"""
+        result = check_in(activity_id)
+
+        assert "error" not in result
+        assert len(result["rules"]) >= 1
+        assert any("IDを指示語代わりにしない" in r for r in result["rules"])
+
+    def test_check_in_includes_added_rule(self, temp_db):
+        """add_ruleで追加したルールがcheck-inのrulesに含まれる"""
+        add_rule("テスト用カスタムルール")
+
+        activity = add_activity(
+            title="Rules test",
+            description="Desc",
+            tags=DEFAULT_TAGS,
+            check_in=False,
+        )
+
+        result = check_in(activity["activity_id"])
+
+        assert "error" not in result
+        assert "テスト用カスタムルール" in result["rules"]
+
+    def test_check_in_excludes_inactive_rule(self, temp_db):
+        """active=0のルールはcheck-inのrulesに含まれない"""
+        created = add_rule("無効化されるルール")
+        update_rule(created["rule_id"], active=0)
+
+        activity = add_activity(
+            title="Inactive rules test",
+            description="Desc",
+            tags=DEFAULT_TAGS,
+            check_in=False,
+        )
+
+        result = check_in(activity["activity_id"])
+
+        assert "error" not in result
+        assert "無効化されるルール" not in result["rules"]
+
+    def test_check_in_rules_content_only(self, activity_id):
+        """rulesはcontent文字列のリストである（dictではない）"""
+        result = check_in(activity_id)
+
+        assert "error" not in result
+        for rule in result["rules"]:
+            assert isinstance(rule, str)
