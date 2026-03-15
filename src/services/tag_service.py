@@ -652,6 +652,13 @@ def update_tag(
             parsed_new = validate_and_parse_tags([rename])
             if isinstance(parsed_new, dict):
                 return parsed_new
+            if not parsed_new:
+                return {
+                    "error": {
+                        "code": "INVALID_TAG_NAME",
+                        "message": "rename cannot be empty.",
+                    }
+                }
             new_namespace, new_name = parsed_new[0]
 
             # 同一名へのリネームは無意味

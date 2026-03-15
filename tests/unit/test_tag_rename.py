@@ -103,6 +103,42 @@ class TestRenamePreservesLinks:
 class TestRenameValidation:
     """renameのバリデーションテスト"""
 
+    def test_rename_empty_string_error(self, temp_db):
+        """空文字でのリネームでエラー"""
+        add_topic(title="T", description="D", tags=["hooks"])
+
+        result = update_tag("hooks", rename="")
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_TAG_NAME"
+
+    def test_rename_alias_tag(self, temp_db):
+        """エイリアスタグ（canonical_id設定済み）のリネーム"""
+        add_topic(title="T", description="D", tags=["old-alias", "canonical-target"])
+        update_tag("old-alias", canonical="canonical-target")
+
+        result = update_tag("old-alias", rename="new-alias")
+        assert result["updated"] is True
+        assert result["renamed_to"] == "new-alias"
+
+    def test_rename_tag_with_notes(self, temp_db):
+        """notes付きタグのリネーム（notes維持）"""
+        add_topic(title="T", description="D", tags=["hooks"])
+        update_tag("hooks", notes="重要な教訓")
+
+        result = update_tag("hooks", rename="hook-system")
+        assert result["updated"] is True
+        assert result["renamed_to"] == "hook-system"
+
+        # notesが維持されていることを確認
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT notes FROM tags WHERE namespace = '' AND name = 'hook-system'",
+            ).fetchone()
+            assert row["notes"] == "重要な教訓"
+        finally:
+            conn.close()
+
     def test_rename_same_name_error(self, temp_db):
         """同一名へのリネームでエラー"""
         add_topic(title="T", description="D", tags=["hooks"])
