@@ -3,13 +3,12 @@ import logging
 import sqlite3
 
 from src.db import get_connection, row_to_dict
-from src.services import activity_service, decision_service
+from src.services import activity_service
 from src.services.material_service import get_materials_by_activity_with_conn
 from src.services.relation_service import _get_map_with_conn
 from src.services.tag_service import (
     collect_tag_notes_for_injection,
     get_entity_tags,
-    get_entity_tags_batch,
 )
 
 logger = logging.getLogger(__name__)
@@ -71,10 +70,11 @@ def _get_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -
     placeholders = ",".join("?" * len(topic_ids))
     rows = conn.execute(
         f"""
-        SELECT id, decision, topic_id
+        SELECT id, decision
         FROM decisions
         WHERE topic_id IN ({placeholders})
         ORDER BY id DESC
+        LIMIT {DECISIONS_FULL_LIMIT}
         """,
         tuple(topic_ids),
     ).fetchall()
@@ -212,8 +212,12 @@ def check_in(activity_id: int) -> dict:
         }
 
         if related_topics:
-            result["topic"] = related_topics[0] if len(related_topics) == 1 else None
+            if len(related_topics) == 1:
+                result["topic"] = related_topics[0]
             result["related_topics"] = related_topics
+
+        if related_activities:
+            result["related_activities"] = related_activities
 
         result["tag_notes"] = tag_notes
         result["reminders"] = active_reminders
