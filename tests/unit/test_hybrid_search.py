@@ -11,16 +11,19 @@ import numpy as np
 
 from src.db import init_database, get_connection
 from src.services.search_service import (
-    _rrf_merge, _apply_recency_boost, _compute_adaptive_weights,
+    _rrf_merge, _apply_recency_boost, _attach_details, _compute_adaptive_weights,
     find_similar_topics, _expand_query_with_tags,
     RRF_K, RRF_W_FTS, RRF_W_VEC, RRF_W_TAG, RECENCY_DECAY_RATE,
     QE_DISTANCE_THRESHOLD, QE_MAX_EXPANSIONS, QE_EXCLUDE_NAMESPACES,
     ADAPTIVE_RRF_ENABLED, ADAPTIVE_RRF_THRESHOLDS,
+    DETAILS_MAX_RESULTS, DETAILS_DESCRIPTION_MAX,
 )
 from src.services import search_service
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decision
 from src.services.activity_service import add_activity
+from src.services.discussion_log_service import add_log
+from src.services.material_service import add_material
 import src.services.embedding_service as emb
 
 
@@ -1371,3 +1374,307 @@ class TestRrfMergeAdaptive:
         results = _rrf_merge(fts, [], limit=10)
 
         assert results[0]["score"] == pytest.approx(RRF_W_FTS / (RRF_K + 1))
+
+
+# ========================================
+# include_details テスト
+# ========================================
+
+
+def test_include_details_false_no_details(temp_db, mock_embedding_model):
+    """include_details=False（デフォルト）: detailsフィールドが付かない"""
+    add_topic(
+        title="ディテール無効テスト用トピック",
+        description="ディテールが付かないことを確認する",
+        tags=DEFAULT_TAGS,
+    )
+
+    result = search_service.search(keyword="ディテール無効テスト用")
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    for item in result["results"]:
+        assert "details" not in item
+
+
+def test_include_details_true_topic(temp_db, mock_embedding_model):
+    """include_details=True + topic型: description + recent_decisionsが付く"""
+    topic = add_topic(
+        title="トピック詳細テスト用",
+        description="これはトピックの詳細説明テストです",
+        tags=DEFAULT_TAGS,
+    )
+    add_decision(
+        topic_id=topic["topic_id"],
+        decision="テスト決定事項1",
+        reason="理由1",
+    )
+    add_decision(
+        topic_id=topic["topic_id"],
+        decision="テスト決定事項2",
+        reason="理由2",
+    )
+
+    result = search_service.search(
+        keyword="トピック詳細テスト用",
+        type_filter="topic",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert "details" in item
+    assert "description" in item["details"]
+    assert "recent_decisions" in item["details"]
+    assert item["details"]["description"] == "これはトピックの詳細説明テストです"
+    assert len(item["details"]["recent_decisions"]) == 2
+
+
+def test_include_details_true_topic_decisions_limit(temp_db, mock_embedding_model):
+    """include_details=True + topic型: recent_decisionsは最大3件"""
+    topic = add_topic(
+        title="決定件数制限テスト用トピック",
+        description="3件制限のテスト",
+        tags=DEFAULT_TAGS,
+    )
+    for i in range(5):
+        add_decision(
+            topic_id=topic["topic_id"],
+            decision=f"決定事項{i}",
+            reason=f"理由{i}",
+        )
+
+    result = search_service.search(
+        keyword="決定件数制限テスト用",
+        type_filter="topic",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert len(item["details"]["recent_decisions"]) == 3
+
+
+def test_include_details_true_topic_description_truncated(temp_db, mock_embedding_model):
+    """include_details=True + topic型: descriptionが500文字に制限される"""
+    long_desc = "あ" * 800
+    add_topic(
+        title="説明文長さ制限テスト用トピック",
+        description=long_desc,
+        tags=DEFAULT_TAGS,
+    )
+
+    result = search_service.search(
+        keyword="説明文長さ制限テスト用",
+        type_filter="topic",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert len(item["details"]["description"]) == DETAILS_DESCRIPTION_MAX
+
+
+def test_include_details_true_activity(temp_db, mock_embedding_model):
+    """include_details=True + activity型: description + statusが付く"""
+    add_activity(
+        title="アクティビティ詳細テスト用",
+        description="アクティビティの説明テスト",
+        tags=DEFAULT_TAGS,
+        check_in=False,
+    )
+
+    result = search_service.search(
+        keyword="アクティビティ詳細テスト用",
+        type_filter="activity",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert "details" in item
+    assert item["details"]["description"] == "アクティビティの説明テスト"
+    assert "status" in item["details"]
+
+
+def test_include_details_true_decision(temp_db, mock_embedding_model):
+    """include_details=True + decision型: decision + reasonが付く"""
+    topic = add_topic(
+        title="決定詳細テスト用トピック",
+        description="テスト用",
+        tags=DEFAULT_TAGS,
+    )
+    add_decision(
+        topic_id=topic["topic_id"],
+        decision="決定詳細テスト用の決定",
+        reason="詳細テスト用の理由",
+    )
+
+    result = search_service.search(
+        keyword="決定詳細テスト用",
+        type_filter="decision",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert "details" in item
+    assert item["details"]["decision"] == "決定詳細テスト用の決定"
+    assert item["details"]["reason"] == "詳細テスト用の理由"
+
+
+def test_include_details_true_log(temp_db, mock_embedding_model):
+    """include_details=True + log型: content先頭500文字が付く"""
+    topic = add_topic(
+        title="ログ詳細テスト用トピック",
+        description="テスト用",
+        tags=DEFAULT_TAGS,
+    )
+    add_log(
+        topic_id=topic["topic_id"],
+        title="ログ詳細テスト用ログ",
+        content="ログの本文テスト内容です",
+    )
+
+    result = search_service.search(
+        keyword="ログ詳細テスト用",
+        type_filter="log",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert "details" in item
+    assert item["details"]["content"] == "ログの本文テスト内容です"
+
+
+def test_include_details_true_log_content_truncated(temp_db, mock_embedding_model):
+    """include_details=True + log型: contentが500文字に制限される"""
+    topic = add_topic(
+        title="ログ長さ制限テスト用トピック",
+        description="テスト用",
+        tags=DEFAULT_TAGS,
+    )
+    long_content = "い" * 800
+    add_log(
+        topic_id=topic["topic_id"],
+        title="ログ長さ制限テスト用ログ",
+        content=long_content,
+    )
+
+    result = search_service.search(
+        keyword="ログ長さ制限テスト用",
+        type_filter="log",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 1
+    item = result["results"][0]
+    assert len(item["details"]["content"]) == DETAILS_DESCRIPTION_MAX
+
+
+def test_include_details_true_material_no_details(temp_db, mock_embedding_model):
+    """include_details=True + material型: detailsは付与されない"""
+    activity = add_activity(
+        title="マテリアル詳細テスト用アクティビティ",
+        description="テスト用",
+        tags=DEFAULT_TAGS,
+        check_in=False,
+    )
+    add_material(
+        activity_id=activity["activity_id"],
+        title="マテリアル詳細テスト用素材",
+        content="素材の本文内容",
+    )
+
+    result = search_service.search(
+        keyword="マテリアル詳細テスト用",
+        type_filter="material",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    # material結果がある場合、detailsが付かないことを確認
+    material_items = [r for r in result["results"] if r["type"] == "material"]
+    for item in material_items:
+        assert "details" not in item
+
+
+def test_include_details_top_n_limit(temp_db, mock_embedding_model):
+    """include_details=True: 上位DETAILS_MAX_RESULTS件のみにdetailsが付く"""
+    # DETAILS_MAX_RESULTS + 5件のトピックを作成
+    for i in range(DETAILS_MAX_RESULTS + 5):
+        add_topic(
+            title=f"上位制限テスト用トピック{i:02d}",
+            description=f"上位制限テスト用の説明{i:02d}",
+            tags=DEFAULT_TAGS,
+        )
+
+    result = search_service.search(
+        keyword="上位制限テスト用",
+        type_filter="topic",
+        limit=DETAILS_MAX_RESULTS + 5,
+        include_details=True,
+    )
+
+    assert "error" not in result
+    results = result["results"]
+    assert len(results) >= DETAILS_MAX_RESULTS + 1
+
+    # 上位DETAILS_MAX_RESULTS件にはdetailsが付く
+    for item in results[:DETAILS_MAX_RESULTS]:
+        assert "details" in item, f"Top {DETAILS_MAX_RESULTS} items should have details"
+
+    # それ以降にはdetailsが付かない
+    for item in results[DETAILS_MAX_RESULTS:]:
+        assert "details" not in item, f"Items beyond top {DETAILS_MAX_RESULTS} should not have details"
+
+
+def test_include_details_cross_type(temp_db, mock_embedding_model):
+    """include_details=True: 異なるtypeを横断してdetailsが付く"""
+    topic = add_topic(
+        title="横断ディテールテスト用トピック",
+        description="横断ディテールテスト用の説明",
+        tags=DEFAULT_TAGS,
+    )
+    add_decision(
+        topic_id=topic["topic_id"],
+        decision="横断ディテールテスト用決定",
+        reason="テスト理由",
+    )
+    add_activity(
+        title="横断ディテールテスト用アクティビティ",
+        description="テスト用アクティビティ説明",
+        tags=DEFAULT_TAGS,
+        check_in=False,
+    )
+
+    result = search_service.search(
+        keyword="横断ディテールテスト用",
+        include_details=True,
+    )
+
+    assert "error" not in result
+    assert len(result["results"]) >= 2
+
+    types_with_details = set()
+    for item in result["results"]:
+        if "details" in item:
+            types_with_details.add(item["type"])
+
+    # 少なくともtopicとdecisionとactivityのうち複数にdetailsが付く
+    assert len(types_with_details) >= 2
+
+
+def test_attach_details_unit_empty_list():
+    """_attach_details単体: 空リストでエラーにならない"""
+    results = []
+    _attach_details(results)
+    assert results == []
