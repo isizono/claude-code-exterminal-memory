@@ -5,11 +5,13 @@ from pathlib import Path
 import pytest
 
 from hooks.hook_transcript import (
+    extract_events,
     extract_text_from_entry,
     get_last_assistant_entry,
     get_transcript_info,
     has_context_retrieval_calls,
     has_recent_recording,
+    is_user_message,
     parse_meta_tag,
 )
 
@@ -374,3 +376,75 @@ class TestGetTranscriptInfo:
         entries, has_skill = get_transcript_info(str(path))
         assert entries == []
         assert has_skill is False
+
+
+# --- is_user_message ---
+
+
+class TestIsUserMessage:
+    def test_string_content_is_user_message(self):
+        entry = {"type": "user", "message": {"content": "hello"}}
+        assert is_user_message(entry) is True
+
+    def test_list_content_without_tool_result_is_user_message(self):
+        entry = {"type": "user", "message": {"content": [
+            {"type": "text", "text": "hello"},
+        ]}}
+        assert is_user_message(entry) is True
+
+    def test_tool_result_is_not_user_message(self):
+        entry = {"type": "user", "message": {"content": [
+            {"type": "tool_result", "tool_use_id": "toolu_123", "content": "result"},
+        ]}}
+        assert is_user_message(entry) is False
+
+    def test_assistant_is_not_user_message(self):
+        entry = {"type": "assistant", "message": {"content": "hello"}}
+        assert is_user_message(entry) is False
+
+    def test_is_meta_entry_is_not_user_message(self):
+        """isMeta=trueのエントリ（スキル内容注入等）はUser Messageではない"""
+        entry = {
+            "type": "user",
+            "isMeta": True,
+            "message": {"content": [
+                {"type": "text", "text": "Base directory for this skill: ..."},
+            ]},
+        }
+        assert is_user_message(entry) is False
+
+    def test_is_meta_false_is_user_message(self):
+        """isMeta=falseは通常のUser Message"""
+        entry = {
+            "type": "user",
+            "isMeta": False,
+            "message": {"content": "hello"},
+        }
+        assert is_user_message(entry) is True
+
+
+# --- extract_events: isMeta handling ---
+
+
+class TestExtractEventsIsMeta:
+    def test_is_meta_does_not_advance_turn(self):
+        """isMeta=trueのエントリはturnを進めない"""
+        entries = [
+            # ユーザーのスキル呼び出し
+            {"type": "user", "message": {"content":
+                "<command-name>/check-in</command-name>"}},
+            # スキル内容注入（isMeta=true）
+            {"type": "user", "isMeta": True, "message": {"content": [
+                {"type": "text", "text": "Base directory for this skill..."},
+            ]}},
+            # アシスタント応答
+            {"type": "assistant", "message": {"content": [
+                {"type": "text", "text": "response"},
+            ]}},
+        ]
+        events, current_turn = extract_events(entries, 0)
+        # turn 1のみ（isMeta=trueでturn 2にならない）
+        assert current_turn == 1
+        skill_events = [e for e in events if e["e"] == "skill"]
+        assert len(skill_events) == 1
+        assert skill_events[0]["turn"] == 1

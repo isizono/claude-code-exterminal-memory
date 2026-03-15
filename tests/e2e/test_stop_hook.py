@@ -621,6 +621,28 @@ class TestSkillSpan:
         assert result["decision"] == "approve"
         assert "Skill Span" in result["reason"]
 
+    def test_skill_span_with_is_meta_entry(self, env_setup):
+        """スキル内容注入（isMeta=true）がturnを進めずSkill Spanが維持される"""
+        transcript = env_setup["tmp_path"] / "transcript.jsonl"
+        _write_transcript([
+            # スキル呼び出し
+            _make_skill_user_entry("check-in"),
+            # スキル内容注入（isMeta=true）— turnを進めてはいけない
+            {"type": "user", "isMeta": True, "message": {"role": "user", "content": [
+                {"type": "text", "text": "Base directory for this skill: ...\n# check-in\n..."},
+            ]}},
+            _make_assistant_entry(
+                tool_calls=["mcp__plugin_claude-code-memory_cc-memory__get_activities"],
+            ),
+            _make_assistant_entry(text="activity list here"),
+        ], transcript)
+
+        result = _run_stop_hook(
+            str(transcript), "test-session", env_setup["env_override"],
+        )
+        assert result["decision"] == "approve"
+        assert "Skill Span" in result["reason"]
+
     def test_skill_span_continues_on_next_skill_turn(self, env_setup):
         """連続するSkill turnでもSpan継続"""
         state_dir = env_setup["state_dir"]
