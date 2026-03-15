@@ -117,7 +117,7 @@ def main() -> None:
         if in_skill_span:
             state.reset_block_count()
             _output("approve", "Skill Span中のためチェックをスキップします。")
-            _update_state_on_approve(state, all_events, transcript_path)
+            _safe_post_approve(state, all_events, transcript_path)
             return
 
         # 6. メタタグ判定
@@ -126,7 +126,7 @@ def main() -> None:
             if current_turn <= 1:
                 state.reset_block_count()
                 _output("approve", "1ターン目のためメタタグチェックを猶予します。")
-                _update_state_on_approve(state, all_events, transcript_path)
+                _safe_post_approve(state, all_events, transcript_path)
                 return
             # フォールバック: last_assistant_messageが無い場合transcriptから取得
             # NOTE: get_last_assistant_entryは全行逆順走査（Phase 3で廃止予定）
@@ -212,8 +212,7 @@ def main() -> None:
         # 10. nudge判定 + 状態更新 + approve
         state.reset_block_count()
         _output("approve")
-        _update_state_on_approve(state, all_events, transcript_path)
-        _handle_nudges(state, all_events, current_turn)
+        _safe_post_approve(state, all_events, transcript_path, current_turn)
 
     except Exception as e:
         # フェイルオープン: 例外時はapprove
@@ -265,6 +264,19 @@ def _update_checked_in_activity(
     aid = extract_last_activity_id(transcript_path)
     if aid is not None:
         state.set_checked_in_activity(aid)
+
+
+def _safe_post_approve(
+    state: HookState, events: list[dict], transcript_path: str,
+    current_turn: int | None = None,
+) -> None:
+    """approve出力後の状態更新。例外はstderrログのみ（double-output防止）。"""
+    try:
+        _update_state_on_approve(state, events, transcript_path)
+        if current_turn is not None:
+            _handle_nudges(state, events, current_turn)
+    except Exception as e:
+        print(f"stop_hook.py post-approve error: {e}", file=sys.stderr)
 
 
 def _update_state_on_approve(
