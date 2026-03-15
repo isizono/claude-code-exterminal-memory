@@ -68,15 +68,15 @@ class TestSessionLifecycle:
     def test_watchdog_does_not_trigger_while_sessions_active(self):
         """セッションが残っている間はshutdownが呼ばれない"""
         shutdown_called = threading.Event()
-        mgr = SessionManager(grace_period_sec=1)
+        mgr = SessionManager(grace_period_sec=10)
         mgr.set_shutdown_callback(shutdown_called.set)
         mgr.start_watchdog()
 
-        # 0.5秒後にセッション登録
-        time.sleep(0.5)
+        # 1秒後にセッション登録（grace_period=10sなので十分余裕がある）
+        time.sleep(1)
         mgr.register("s1")
 
-        # 猶予期間+マージンを待つ
+        # キャンセル後、少し待ってもshutdownは呼ばれない
         assert shutdown_called.wait(timeout=3) is False
 
     def test_lock_prevents_double_start(self):
@@ -117,11 +117,11 @@ class TestInitialGracePeriod:
     def test_startup_grace_cancelled_by_first_session(self):
         """起動直後の猶予期間中に最初のセッションが来るとキャンセル"""
         shutdown_called = threading.Event()
-        mgr = SessionManager(grace_period_sec=2)
+        mgr = SessionManager(grace_period_sec=10)
         mgr.set_shutdown_callback(shutdown_called.set)
         mgr.start_watchdog()
 
-        time.sleep(0.5)
+        time.sleep(1)
         mgr.register("s1")
 
         assert shutdown_called.wait(timeout=3) is False

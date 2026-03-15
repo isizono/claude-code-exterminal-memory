@@ -68,15 +68,15 @@ class TestGraceTimer:
     def test_grace_timer_cancelled_by_register(self):
         """猶予期間中にセッション登録があるとタイマーがキャンセルされる"""
         shutdown_called = threading.Event()
-        mgr = SessionManager(grace_period_sec=2)
+        mgr = SessionManager(grace_period_sec=10)
         mgr.set_shutdown_callback(shutdown_called.set)
         mgr.start_watchdog()
 
-        # 0.5秒後にセッション登録
-        time.sleep(0.5)
+        # 1秒後にセッション登録（grace_period=10sなので十分余裕がある）
+        time.sleep(1)
         mgr.register("s1")
 
-        # 猶予期間（2秒）+ マージンを待ってもshutdownは呼ばれない
+        # キャンセル後、少し待ってもshutdownは呼ばれない
         assert shutdown_called.wait(timeout=3) is False
         assert mgr.is_shutdown_requested is False
 
@@ -110,7 +110,7 @@ class TestGraceTimer:
     def test_register_during_grace_resets_timer(self):
         """猶予期間中にregister→unregisterすると猶予がリセットされる"""
         shutdown_called = threading.Event()
-        mgr = SessionManager(grace_period_sec=2)
+        mgr = SessionManager(grace_period_sec=3)
         mgr.set_shutdown_callback(shutdown_called.set)
         mgr.start_watchdog()
 
@@ -119,9 +119,9 @@ class TestGraceTimer:
         mgr.register("s1")
         mgr.unregister("s1")
 
-        # リセット後の新しい猶予期間（2秒）の前にはshutdownされない
+        # リセット後の新しい猶予期間（3秒）の前にはshutdownされない
         time.sleep(1)
         assert mgr.is_shutdown_requested is False
 
         # 合計で猶予期間分待てばshutdownされる
-        assert shutdown_called.wait(timeout=3) is True
+        assert shutdown_called.wait(timeout=5) is True

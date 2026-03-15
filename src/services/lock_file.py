@@ -22,10 +22,11 @@ class LockInfo(TypedDict):
 
 
 def acquire(port: int) -> bool:
-    """ロックファイルを作成する。
+    """ロックファイルをアトミックに作成する。
 
-    既に有効なロックファイルが存在する場合（プロセスが生存中）はFalseを返す。
-    プロセスが死んでいる場合はロックファイルを上書きする（stale lock回収）。
+    open('x')（O_CREAT | O_EXCL）でアトミックな排他作成を行う。
+    既にファイルが存在する場合はstale判定を行い、staleなら削除して再試行する。
+    プロセスが生存中であればFalseを返す。
 
     Args:
         port: サーバーのポート番号
@@ -35,22 +36,40 @@ def acquire(port: int) -> bool:
     """
     LOCK_DIR.mkdir(parents=True, exist_ok=True)
 
-    existing = read()
-    if existing is not None:
-        # プロセスが生存しているか確認
-        if _is_process_alive(existing["pid"]):
-            logger.warning(
-                f"Server already running: pid={existing['pid']}, port={existing['port']}"
-            )
-            return False
-        # stale lock — 上書き
-        logger.info(f"Removing stale lock file: pid={existing['pid']}")
-
     info: LockInfo = {"pid": os.getpid(), "port": port}
+
+    # まずアトミックな排他作成を試みる
+    if _try_create_exclusive(info):
+        return True
+
+    # ファイルが既に存在する場合、stale判定
+    existing = read()
+    if existing is not None and _is_process_alive(existing["pid"]):
+        logger.warning(
+            f"Server already running: pid={existing['pid']}, port={existing['port']}"
+        )
+        return False
+
+    # stale lock — 削除して再試行
+    if existing is not None:
+        logger.info(f"Removing stale lock file: pid={existing['pid']}")
     try:
-        LOCK_FILE.write_text(json.dumps(info), encoding="utf-8")
+        LOCK_FILE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+    return _try_create_exclusive(info)
+
+
+def _try_create_exclusive(info: LockInfo) -> bool:
+    """open('x')でアトミックにロックファイルを作成する。"""
+    try:
+        with open(LOCK_FILE, "x", encoding="utf-8") as f:
+            f.write(json.dumps(info))
         logger.info(f"Lock file created: {LOCK_FILE}")
         return True
+    except FileExistsError:
+        return False
     except OSError as e:
         logger.error(f"Failed to create lock file: {e}")
         return False

@@ -19,6 +19,8 @@ from src.services.checkin_service import check_in as _check_in
 from src.services.tag_service import list_tags as _list_tags, update_tag as _update_tag, collect_tag_notes_for_injection
 from src.services.tag_analysis_service import analyze_tags as _analyze_tags
 from src.db import execute_query, get_connection, row_to_dict
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -823,10 +825,6 @@ def roll_dice(sides: int = 10) -> dict:
 
 
 # セッションエンドポイント（HTTPモード用カスタムルート）
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-
-
 @mcp.custom_route("/session/register", methods=["POST"])
 async def session_register(request: Request) -> JSONResponse:
     """セッション登録エンドポイント"""

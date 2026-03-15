@@ -3,7 +3,6 @@
 HTTPサーバーモードで使用するセッションカウント管理と自動停止ウォッチドッグを提供する。
 セッション数が0になると猶予期間後にサーバーをシャットダウンする。
 """
-import asyncio
 import logging
 import threading
 from typing import Callable, Optional
