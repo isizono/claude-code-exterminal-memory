@@ -153,7 +153,7 @@ def _attach_tags(results: list[dict]) -> None:
                     JOIN activity_tags at ON at.activity_id = m.activity_id
                     JOIN tags t ON t.id = at.tag_id
                     WHERE m.id IN ({placeholders})
-                """, ids).fetchall()
+                """, tuple(ids)).fetchall()
                 # material_id → tags のマップ構築
                 mat_tag_map: dict[int, list[str]] = {}
                 for r in rows:
@@ -817,12 +817,9 @@ def get_by_id(type: str, id: int, conn=None) -> dict:
         elif type == 'log':
             tags = get_effective_tags(conn, "log", id)
         elif type == 'material':
-            # material: activityのタグを継承
+            # material: activityのタグを継承 (activity_idはNOT NULL制約あり)
             activity_id = row_to_dict(row).get("activity_id")
-            if activity_id:
-                tags = get_entity_tags(conn, "activity_tags", "activity_id", activity_id)
-            else:
-                tags = []
+            tags = get_entity_tags(conn, "activity_tags", "activity_id", activity_id)
         else:
             tags = []
 
