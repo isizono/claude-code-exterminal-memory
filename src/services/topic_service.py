@@ -65,10 +65,10 @@ def add_topic(
 
         # embedding生成（失敗してもtopic作成には影響しない）
         embedding_text = build_embedding_text(title, description)
-        generate_and_store_embedding("topic", topic_id, embedding_text)
+        embedding_vec = generate_and_store_embedding("topic", topic_id, embedding_text)
 
-        # 類似トピックをサジェスト
-        similar = find_similar_topics(embedding_text, exclude_id=topic_id)
+        # 類似トピックをサジェスト（生成済みembeddingを再利用しHTTPリクエストを削減）
+        similar = find_similar_topics(embedding_text, exclude_id=topic_id, embedding=embedding_vec)
 
         result = {
             "topic_id": topic["id"],

@@ -839,12 +839,12 @@ def test_add_topic_includes_similar_topics(temp_db, mock_embedding_model):
 
     assert "error" not in result
     assert "topic_id" in result
-    if "similar_topics" in result:
-        assert isinstance(result["similar_topics"], list)
-        for item in result["similar_topics"]:
-            assert "id" in item
-            assert "title" in item
-            assert "distance" in item
+    assert "similar_topics" in result
+    assert isinstance(result["similar_topics"], list)
+    for item in result["similar_topics"]:
+        assert "id" in item
+        assert "title" in item
+        assert "distance" in item
 
 
 def test_add_topic_no_similar_when_embedding_disabled(temp_db, disable_embedding):

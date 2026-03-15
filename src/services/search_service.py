@@ -482,7 +482,12 @@ def _vector_search(
         return None
 
 
-def find_similar_topics(text: str, exclude_id: int, limit: int = 3) -> list[dict]:
+def find_similar_topics(
+    text: str,
+    exclude_id: int,
+    limit: int = 3,
+    embedding: list[float] | None = None,
+) -> list[dict]:
     """テキストに類似するトピックをベクトル検索で取得する（自身を除外）。
 
     add_topic のレスポンスに含めるサジェスト用。
@@ -492,12 +497,13 @@ def find_similar_topics(text: str, exclude_id: int, limit: int = 3) -> list[dict
         text: 検索テキスト（title + description）
         exclude_id: 除外するトピックID（新規作成された自身）
         limit: 最大取得件数
+        embedding: 事前生成済みのembeddingベクトル（指定時はencode_queryをスキップ）
 
     Returns:
         類似トピックのリスト [{id, title, distance}, ...]
     """
     try:
-        query_embedding = embedding_service.encode_query(text)
+        query_embedding = embedding if embedding is not None else embedding_service.encode_query(text)
         if query_embedding is None:
             return []
 
@@ -505,7 +511,7 @@ def find_similar_topics(text: str, exclude_id: int, limit: int = 3) -> list[dict
         # 自身除外 + type フィルタ分を考慮して多めに取得
         vec_rows = execute_query(
             "SELECT rowid, distance FROM vec_index WHERE embedding MATCH ? AND k = ?",
-            (blob, limit + 10),
+            (blob, limit * 5),
         )
         if not vec_rows:
             return []
