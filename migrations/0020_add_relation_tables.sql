@@ -26,6 +26,11 @@ CREATE TABLE activity_relations (
     CHECK (activity_id_1 < activity_id_2)
 );
 
+-- 逆方向参照用インデックス
+CREATE INDEX idx_topic_relations_id2 ON topic_relations(topic_id_2);
+CREATE INDEX idx_topic_activity_relations_activity ON topic_activity_relations(activity_id);
+CREATE INDEX idx_activity_relations_id2 ON activity_relations(activity_id_2);
+
 -- 双方向VIEW
 CREATE VIEW relations_view AS
   SELECT topic_id_1 AS source_id, 'topic' AS source_type,

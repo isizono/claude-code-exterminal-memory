@@ -84,11 +84,15 @@ def _get_delete_params(source_type: str, source_id: int, target_type: str, targe
     """source/targetの組み合わせから、適切なテーブルとDELETE条件を返す。
 
     Returns:
-        (table_name, where_clause, values)
+        (table_name, where_clause, values) or None（自己参照の場合）
 
     Raises:
         ValueError: 不正なtype組み合わせ（バリデーション済みなら到達しない）
     """
+    # 自己参照チェック（_get_insert_paramsと対称）
+    if source_type == target_type and source_id == target_id:
+        return None
+
     if source_type == "topic" and target_type == "topic":
         id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
         return ("topic_relations", "topic_id_1 = ? AND topic_id_2 = ?", (id_1, id_2))
@@ -330,6 +334,13 @@ def get_map(entity_type: str, entity_id: int, min_depth: int = 0, max_depth: int
             "error": {
                 "code": "INVALID_PARAMETER",
                 "message": "max_depth must be >= min_depth",
+            }
+        }
+    if max_depth > 10:
+        return {
+            "error": {
+                "code": "INVALID_PARAMETER",
+                "message": "max_depth must be <= 10",
             }
         }
 
