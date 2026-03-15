@@ -1,6 +1,7 @@
 """_build_activities_section および関連ヘルパー関数のユニットテスト
 
-NOTE: これらの関数はsrc/main.pyからhooks/session_start_hook.pyに移行した。
+データ取得関数はsrc/services/activity_service.pyに、
+表示整形関数はhooks/session_start_hook.pyに配置されている。
 """
 import os
 import tempfile
@@ -10,12 +11,15 @@ from unittest.mock import patch
 import pytest
 from src.db import init_database, get_connection
 from src.services.topic_service import add_topic
-from src.services.activity_service import add_activity, update_activity
+from src.services.activity_service import (
+    add_activity,
+    update_activity,
+    get_active_domains,
+    get_active_activities_by_tag,
+)
 import src.services.embedding_service as emb
 from hooks.session_start_hook import (
     _build_activities_section,
-    _get_active_domains,
-    _get_active_activities_by_tag,
     _calc_elapsed_days,
     IN_PROGRESS_LIMIT,
     PENDING_LIMIT,
@@ -113,7 +117,7 @@ def test_calc_elapsed_days_empty():
 
 
 # ========================================
-# _get_active_domains のテスト
+# get_active_domains のテスト
 # ========================================
 
 
@@ -124,7 +128,7 @@ def test_get_active_domains_with_active_activity(temp_db):
         tags=["domain:myproject"], check_in=False,
     )
 
-    domains = _get_active_domains()
+    domains = get_active_domains()
     names = [d["name"] for d in domains]
     assert "myproject" in names
 
@@ -137,7 +141,7 @@ def test_get_active_domains_excludes_completed(temp_db):
     )
     update_activity(result["activity_id"], new_status="completed")
 
-    domains = _get_active_domains()
+    domains = get_active_domains()
     names = [d["name"] for d in domains]
     assert "completed-proj" not in names
 
@@ -149,7 +153,7 @@ def test_get_active_domains_excludes_non_domain(temp_db):
         tags=["intent:design"], check_in=False,
     )
 
-    domains = _get_active_domains()
+    domains = get_active_domains()
     names = [d["name"] for d in domains]
     assert "design" not in names
 
@@ -159,7 +163,7 @@ def test_get_active_domains_sorted_by_name(temp_db):
     add_activity(title="Z", description="Desc", tags=["domain:zzz"], check_in=False)
     add_activity(title="A", description="Desc", tags=["domain:aaa"], check_in=False)
 
-    domains = _get_active_domains()
+    domains = get_active_domains()
     names = [d["name"] for d in domains]
     aaa_idx = names.index("aaa")
     zzz_idx = names.index("zzz")
@@ -171,7 +175,7 @@ def test_get_active_domains_deduplicates(temp_db):
     add_activity(title="A1", description="Desc", tags=["domain:myproject"], check_in=False)
     add_activity(title="A2", description="Desc", tags=["domain:myproject"], check_in=False)
 
-    domains = _get_active_domains()
+    domains = get_active_domains()
     myproject_domains = [d for d in domains if d["name"] == "myproject"]
     assert len(myproject_domains) == 1
 
@@ -180,13 +184,13 @@ def test_get_active_domains_no_activities(temp_db):
     """アクティビティがないdomainは返らない（トピックだけでは返らない）"""
     add_topic(title="Topic Only", description="Desc", tags=["domain:topic-only-proj"])
 
-    domains = _get_active_domains()
+    domains = get_active_domains()
     names = [d["name"] for d in domains]
     assert "topic-only-proj" not in names
 
 
 # ========================================
-# _get_active_activities_by_tag のテスト
+# get_active_activities_by_tag のテスト
 # ========================================
 
 
@@ -195,7 +199,7 @@ def test_get_active_activities_by_tag_basic(temp_db):
     add_activity(title="Activity 1", description="Desc", tags=["domain:test-proj"], check_in=False)
 
     tag_id = _get_tag_id("domain", "test-proj")
-    activities = _get_active_activities_by_tag(tag_id)
+    activities = get_active_activities_by_tag(tag_id)
 
     assert len(activities) == 1
     assert activities[0]["title"] == "Activity 1"
@@ -207,7 +211,7 @@ def test_get_active_activities_by_tag_has_updated_at(temp_db):
     add_activity(title="Activity 1", description="Desc", tags=["domain:test-proj"], check_in=False)
 
     tag_id = _get_tag_id("domain", "test-proj")
-    activities = _get_active_activities_by_tag(tag_id)
+    activities = get_active_activities_by_tag(tag_id)
 
     assert "updated_at" in activities[0]
     assert activities[0]["updated_at"] is not None
@@ -219,7 +223,7 @@ def test_get_active_activities_by_tag_excludes_completed(temp_db):
     update_activity(result["activity_id"], new_status="completed")
 
     tag_id = _get_tag_id("domain", "test-proj")
-    activities = _get_active_activities_by_tag(tag_id)
+    activities = get_active_activities_by_tag(tag_id)
 
     assert len(activities) == 0
 
@@ -231,7 +235,7 @@ def test_get_active_activities_by_tag_sort_order(temp_db):
     update_activity(r2["activity_id"], new_status="in_progress")
 
     tag_id = _get_tag_id("domain", "test-proj")
-    activities = _get_active_activities_by_tag(tag_id)
+    activities = get_active_activities_by_tag(tag_id)
 
     assert len(activities) == 2
     assert activities[0]["status"] == "in_progress"
@@ -243,7 +247,7 @@ def test_get_active_activities_by_tag_empty(temp_db):
     add_topic(title="Topic Only", description="Desc", tags=["domain:no-activities"])
 
     tag_id = _get_tag_id("domain", "no-activities")
-    activities = _get_active_activities_by_tag(tag_id)
+    activities = get_active_activities_by_tag(tag_id)
 
     assert activities == []
 

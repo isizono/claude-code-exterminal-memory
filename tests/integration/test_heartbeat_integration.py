@@ -8,9 +8,14 @@ import tempfile
 import pytest
 
 from src.db import init_database, get_connection
-from src.services.activity_service import add_activity, get_activities, update_activity
+from src.services.activity_service import (
+    add_activity,
+    get_activities,
+    update_activity,
+    get_active_activities_by_tag,
+)
 from src.services.tag_service import _injected_tags
-from hooks.session_start_hook import _build_activities_section, _get_active_activities_by_tag
+from hooks.session_start_hook import _build_activities_section
 from src.services.topic_service import add_topic
 import src.services.embedding_service as emb
 
@@ -132,18 +137,18 @@ class TestGetActivitiesHeartbeat:
 
 
 # ========================================
-# _get_active_activities_by_tag: is_heartbeat_active
+# get_active_activities_by_tag: is_heartbeat_active
 # ========================================
 
 
 class TestGetActiveActivitiesByTagHeartbeat:
     def test_is_heartbeat_active_in_result(self, temp_db):
-        """_get_active_activities_by_tagの結果にis_heartbeat_activeが含まれる"""
+        """get_active_activities_by_tagの結果にis_heartbeat_activeが含まれる"""
         add_activity(
             title="Activity", description="Desc", tags=["domain:hb-test"], check_in=False,
         )
         tag_id = _get_tag_id("domain", "hb-test")
-        activities = _get_active_activities_by_tag(tag_id)
+        activities = get_active_activities_by_tag(tag_id)
 
         assert len(activities) == 1
         assert "is_heartbeat_active" in activities[0]
@@ -165,7 +170,7 @@ class TestGetActiveActivitiesByTagHeartbeat:
         conn.close()
 
         tag_id = _get_tag_id("domain", "hb-test")
-        activities = _get_active_activities_by_tag(tag_id)
+        activities = get_active_activities_by_tag(tag_id)
 
         assert activities[0]["is_heartbeat_active"] is True
 

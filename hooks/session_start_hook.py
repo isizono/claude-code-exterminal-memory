@@ -1,6 +1,6 @@
 """SessionStart hook: セッションレベル文脈注入
 
-DBから直接クエリしてセッション開始時のコンテキストを注入する。
+サービス層経由でDBからデータを取得し、セッション開始時のコンテキストを注入する。
 - アクティビティ一覧（active = in_progress + pending）
 - トピック一覧
 - リマインダー（active=1）
@@ -15,12 +15,18 @@ _project_root = Path(__file__).resolve().parents[1]
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from src.db import get_connection, row_to_dict
-from src.services.activity_service import HEARTBEAT_TIMEOUT_MINUTES
+from src.db import get_connection
+from src.services.activity_service import (
+    get_active_domains_with_conn,
+    get_active_activities_by_tag_with_conn,
+)
+from src.services.topic_service import get_recent_topics_with_conn
+from src.services.reminder_service import get_active_reminder_contents_with_conn
 
-# アクティブコンテキスト用の定数
+# 表示用の定数
 IN_PROGRESS_LIMIT = 3
 PENDING_LIMIT = 2
+TOPICS_LIMIT = 10
 
 
 def _calc_elapsed_days(updated_at_str: str) -> int:
@@ -33,81 +39,9 @@ def _calc_elapsed_days(updated_at_str: str) -> int:
         return 0
 
 
-def _get_active_domains_with_conn(conn) -> list[dict]:
-    """アクティブなアクティビティ（in_progress/pending）があるdomain:タグを取得する（conn共有版）。
-
-    Returns:
-        [{"tag_id": int, "name": str}, ...]（name順ソート）
-    """
-    rows = conn.execute(
-        """
-        SELECT DISTINCT t.id AS tag_id, t.name
-        FROM tags t
-        JOIN activity_tags at ON t.id = at.tag_id
-        JOIN activities a ON at.activity_id = a.id
-        WHERE t.namespace = 'domain'
-          AND a.status IN ('in_progress', 'pending')
-        ORDER BY t.name
-        """,
-    ).fetchall()
-    return [row_to_dict(r) for r in rows]
-
-
-def _get_active_domains() -> list[dict]:
-    """アクティブなアクティビティがあるdomain:タグを取得する（テスト用公開API）。
-
-    hook本体は_get_active_domains_with_conn()を使用する。
-    """
-    conn = get_connection()
-    try:
-        return _get_active_domains_with_conn(conn)
-    finally:
-        conn.close()
-
-
-def _get_active_activities_by_tag_with_conn(conn, tag_id: int) -> list[dict]:
-    """domain:タグに紐づくホットアクティビティ（conn共有版）。
-
-    Returns:
-        [{"id": int, "title": str, "status": str, "updated_at": str, "is_heartbeat_active": bool}, ...]
-        （in_progress優先、updated_at降順）
-    """
-    rows = conn.execute(
-        """
-        SELECT a.id, a.title, a.status, a.updated_at,
-               CASE WHEN a.last_heartbeat_at > datetime('now', '-' || ? || ' minutes') THEN 1 ELSE 0 END AS is_heartbeat_active
-        FROM activities a
-        JOIN activity_tags at ON a.id = at.activity_id
-        WHERE at.tag_id = ?
-          AND a.status IN ('in_progress', 'pending')
-        ORDER BY CASE a.status WHEN 'in_progress' THEN 0 ELSE 1 END,
-                 a.updated_at DESC
-        """,
-        (HEARTBEAT_TIMEOUT_MINUTES, tag_id),
-    ).fetchall()
-    result = []
-    for r in rows:
-        d = row_to_dict(r)
-        d["is_heartbeat_active"] = bool(d["is_heartbeat_active"])
-        result.append(d)
-    return result
-
-
-def _get_active_activities_by_tag(tag_id: int) -> list[dict]:
-    """domain:タグに紐づくホットアクティビティを取得する（テスト用公開API）。
-
-    hook本体は_get_active_activities_by_tag_with_conn()を使用する。
-    """
-    conn = get_connection()
-    try:
-        return _get_active_activities_by_tag_with_conn(conn, tag_id)
-    finally:
-        conn.close()
-
-
 def _build_activities_section(conn) -> str:
     """アクティビティ一覧をdomain:タグごとに組み立てる。"""
-    domains = _get_active_domains_with_conn(conn)
+    domains = get_active_domains_with_conn(conn)
 
     if not domains:
         return ""
@@ -117,7 +51,7 @@ def _build_activities_section(conn) -> str:
         tag_id = domain["tag_id"]
         name = domain["name"]
 
-        activities = _get_active_activities_by_tag_with_conn(conn, tag_id)
+        activities = get_active_activities_by_tag_with_conn(conn, tag_id)
         if not activities:
             continue
 
@@ -164,44 +98,35 @@ def _build_activities_section(conn) -> str:
 
 
 def _build_topics_section(conn) -> str:
-    """トピック一覧を組み立てる（最近作成された順、上位10件）。"""
-    rows = conn.execute(
-        """
-        SELECT id, title
-        FROM discussion_topics
-        ORDER BY created_at DESC
-        LIMIT 10
-        """,
-    ).fetchall()
+    """トピック一覧を組み立てる（最近作成された順）。"""
+    topics = get_recent_topics_with_conn(conn, limit=TOPICS_LIMIT)
 
-    if not rows:
+    if not topics:
         return ""
 
-    lines = ["# トピック一覧（最新10件）"]
-    for r in rows:
-        lines.append(f"- [{r['id']}] {r['title']}")
+    lines = [f"# トピック一覧（最新{TOPICS_LIMIT}件）"]
+    for t in topics:
+        lines.append(f"- [{t['id']}] {t['title']}")
 
     return "\n".join(lines) + "\n"
 
 
 def _build_reminders_section(conn) -> str:
     """リマインダー一覧を組み立てる。"""
-    rows = conn.execute(
-        "SELECT content FROM reminders WHERE active = 1"
-    ).fetchall()
+    contents = get_active_reminder_contents_with_conn(conn)
 
-    if not rows:
+    if not contents:
         return ""
 
     lines = ["# リマインダー"]
-    for r in rows:
-        lines.append(f"- {r['content']}")
+    for content in contents:
+        lines.append(f"- {content}")
 
     return "\n".join(lines) + "\n"
 
 
 def _build_session_context() -> str:
-    """DBからセッション開始時のコンテキストを組み立てる。
+    """サービス層経由でセッション開始時のコンテキストを組み立てる。
 
     各セクションは独立してtry/exceptで保護し、
     一部のセクションが失敗しても残りは返す。
