@@ -11,9 +11,11 @@ import numpy as np
 
 from src.db import init_database, get_connection
 from src.services.search_service import (
-    _rrf_merge, _apply_recency_boost, find_similar_topics, _expand_query_with_tags,
+    _rrf_merge, _apply_recency_boost, _compute_adaptive_weights,
+    find_similar_topics, _expand_query_with_tags,
     RRF_K, RRF_W_FTS, RRF_W_VEC, RRF_W_TAG, RECENCY_DECAY_RATE,
     QE_DISTANCE_THRESHOLD, QE_MAX_EXPANSIONS, QE_EXCLUDE_NAMESPACES,
+    ADAPTIVE_RRF_ENABLED, ADAPTIVE_RRF_THRESHOLDS,
 )
 from src.services import search_service
 from src.services.topic_service import add_topic
@@ -111,7 +113,7 @@ def test_rrf_merge_fts_only():
 
 
 def test_rrf_merge_vec_only():
-    """RRF統合: ベクトルのみの結果"""
+    """RRF統合: ベクトルのみの結果（Adaptive RRFにより重みが変わる）"""
     vec = [
         {"type": "decision", "id": 10, "title": "X"},
         {"type": "activity", "id": 20, "title": "Y"},
@@ -121,7 +123,9 @@ def test_rrf_merge_vec_only():
 
     assert len(results) == 2
     assert results[0]["id"] == 10
-    assert results[0]["score"] == pytest.approx(RRF_W_VEC / (RRF_K + 1))
+    # FTS=0, vec=2 → ratio=0.0 → w_vec=1.5（Adaptive RRF有効時）
+    _, expected_w_vec = _compute_adaptive_weights(0, 2)
+    assert results[0]["score"] == pytest.approx(expected_w_vec / (RRF_K + 1))
 
 
 def test_rrf_merge_overlap_boosts_score():
@@ -1200,3 +1204,170 @@ def test_qe_vector_search_not_expanded(temp_db, mock_embedding_model):
         assert len(result["results"]) >= 1
     finally:
         emb.search_similar_tags = original
+
+
+# ========================================
+# Adaptive RRF Weight テスト
+# ========================================
+
+
+class TestComputeAdaptiveWeights:
+    """_compute_adaptive_weights 単体テスト"""
+
+    def test_ratio_below_02(self):
+        """ratio < 0.2: FTS重み0.5, ベクトル重み1.5"""
+        # fts=1, vec=10 → ratio=0.1
+        w_fts, w_vec = _compute_adaptive_weights(1, 10)
+        assert w_fts == 0.5
+        assert w_vec == 1.5
+
+    def test_ratio_below_05(self):
+        """ratio < 0.5 (>= 0.2): FTS重み0.8, ベクトル重み1.2"""
+        # fts=3, vec=10 → ratio=0.3
+        w_fts, w_vec = _compute_adaptive_weights(3, 10)
+        assert w_fts == 0.8
+        assert w_vec == 1.2
+
+    def test_ratio_above_05(self):
+        """ratio >= 0.5: デフォルト重み"""
+        # fts=5, vec=10 → ratio=0.5
+        w_fts, w_vec = _compute_adaptive_weights(5, 10)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+    def test_ratio_equal_1(self):
+        """ratio = 1.0（同数）: デフォルト重み"""
+        w_fts, w_vec = _compute_adaptive_weights(10, 10)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+    def test_ratio_above_1(self):
+        """ratio > 1.0（FTSのほうが多い）: デフォルト重み"""
+        w_fts, w_vec = _compute_adaptive_weights(20, 10)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+    def test_vec_count_zero(self):
+        """vec_count=0: ratio=1.0扱いでデフォルト重み"""
+        w_fts, w_vec = _compute_adaptive_weights(5, 0)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+    def test_both_zero(self):
+        """fts_count=0, vec_count=0: デフォルト重み"""
+        w_fts, w_vec = _compute_adaptive_weights(0, 0)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+    def test_fts_zero_vec_nonzero(self):
+        """fts_count=0, vec_count>0: ratio=0.0 → 最低帯（0.5, 1.5）"""
+        w_fts, w_vec = _compute_adaptive_weights(0, 10)
+        assert w_fts == 0.5
+        assert w_vec == 1.5
+
+    def test_boundary_02(self):
+        """ratio=0.2（ちょうど境界）: 0.2未満ではないのでnext帯"""
+        # fts=2, vec=10 → ratio=0.2（ちょうど）
+        w_fts, w_vec = _compute_adaptive_weights(2, 10)
+        assert w_fts == 0.8
+        assert w_vec == 1.2
+
+    def test_boundary_05(self):
+        """ratio=0.5（ちょうど境界）: 0.5未満ではないのでデフォルト"""
+        w_fts, w_vec = _compute_adaptive_weights(5, 10)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+    def test_disabled_flag(self, monkeypatch):
+        """ADAPTIVE_RRF_ENABLED=False: 常にデフォルト重み"""
+        monkeypatch.setattr(search_service, 'ADAPTIVE_RRF_ENABLED', False)
+        # ratio < 0.2 のケースでもデフォルト重みになること
+        w_fts, w_vec = _compute_adaptive_weights(1, 10)
+        assert w_fts == RRF_W_FTS
+        assert w_vec == RRF_W_VEC
+
+
+class TestRrfMergeAdaptive:
+    """_rrf_merge でAdaptive RRF重みが反映されることを検証"""
+
+    def test_adaptive_low_ratio_boosts_vector(self):
+        """ratio < 0.2: ベクトル結果の重みが1.5になる"""
+        # FTS: 1件, ベクトル: 10件 → ratio=0.1 → w_fts=0.5, w_vec=1.5
+        fts = [{"type": "topic", "id": 1, "title": "A"}]
+        vec = [{"type": "topic", "id": i, "title": f"V{i}"} for i in range(2, 12)]
+
+        results = _rrf_merge(fts, vec, limit=20)
+
+        # id=1 はFTSのランク1、ベクトルには未登場
+        score_fts_only = next(r["score"] for r in results if r["id"] == 1)
+        assert score_fts_only == pytest.approx(0.5 / (RRF_K + 1))
+
+        # id=2 はベクトルのランク1、FTSには未登場
+        score_vec_only = next(r["score"] for r in results if r["id"] == 2)
+        assert score_vec_only == pytest.approx(1.5 / (RRF_K + 1))
+
+    def test_adaptive_mid_ratio(self):
+        """ratio < 0.5: FTS重み0.8, ベクトル重み1.2"""
+        # FTS: 3件, ベクトル: 10件 → ratio=0.3
+        fts = [{"type": "topic", "id": i, "title": f"F{i}"} for i in range(1, 4)]
+        vec = [{"type": "topic", "id": i, "title": f"V{i}"} for i in range(11, 21)]
+
+        results = _rrf_merge(fts, vec, limit=20)
+
+        # FTSランク1の重み = 0.8
+        score_fts = next(r["score"] for r in results if r["id"] == 1)
+        assert score_fts == pytest.approx(0.8 / (RRF_K + 1))
+
+        # ベクトルランク1の重み = 1.2
+        score_vec = next(r["score"] for r in results if r["id"] == 11)
+        assert score_vec == pytest.approx(1.2 / (RRF_K + 1))
+
+    def test_adaptive_high_ratio_default(self):
+        """ratio >= 0.5: デフォルト重み（1.0, 1.0）"""
+        # FTS: 5件, ベクトル: 5件 → ratio=1.0
+        fts = [{"type": "topic", "id": i, "title": f"F{i}"} for i in range(1, 6)]
+        vec = [{"type": "topic", "id": i, "title": f"V{i}"} for i in range(11, 16)]
+
+        results = _rrf_merge(fts, vec, limit=20)
+
+        score_fts = next(r["score"] for r in results if r["id"] == 1)
+        assert score_fts == pytest.approx(RRF_W_FTS / (RRF_K + 1))
+
+        score_vec = next(r["score"] for r in results if r["id"] == 11)
+        assert score_vec == pytest.approx(RRF_W_VEC / (RRF_K + 1))
+
+    def test_adaptive_tag_weight_unchanged(self):
+        """Adaptive RRFでもタグLIKEの重みは固定（RRF_W_TAG=0.5）"""
+        # ratio < 0.2 → w_fts=0.5, w_vec=1.5 でもタグは0.5のまま
+        fts = [{"type": "topic", "id": 1, "title": "A"}]
+        vec = [{"type": "topic", "id": i, "title": f"V{i}"} for i in range(2, 12)]
+        tag = [{"type": "topic", "id": 100, "title": "Tag"}]
+
+        results = _rrf_merge(fts, vec, limit=20, tag_results=tag)
+
+        score_tag = next(r["score"] for r in results if r["id"] == 100)
+        assert score_tag == pytest.approx(RRF_W_TAG / (RRF_K + 1))
+
+    def test_adaptive_disabled_uses_default(self, monkeypatch):
+        """ADAPTIVE_RRF_ENABLED=False: 固定重みが使われる"""
+        monkeypatch.setattr(search_service, 'ADAPTIVE_RRF_ENABLED', False)
+
+        # ratio < 0.2 のケースでもデフォルト重みになること
+        fts = [{"type": "topic", "id": 1, "title": "A"}]
+        vec = [{"type": "topic", "id": i, "title": f"V{i}"} for i in range(2, 12)]
+
+        results = _rrf_merge(fts, vec, limit=20)
+
+        score_fts = next(r["score"] for r in results if r["id"] == 1)
+        assert score_fts == pytest.approx(RRF_W_FTS / (RRF_K + 1))
+
+        score_vec = next(r["score"] for r in results if r["id"] == 2)
+        assert score_vec == pytest.approx(RRF_W_VEC / (RRF_K + 1))
+
+    def test_adaptive_vec_empty_uses_default(self):
+        """ベクトル結果が空: デフォルト重みでFTSスコアを算出"""
+        fts = [{"type": "topic", "id": 1, "title": "A"}]
+
+        results = _rrf_merge(fts, [], limit=10)
+
+        assert results[0]["score"] == pytest.approx(RRF_W_FTS / (RRF_K + 1))
