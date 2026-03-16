@@ -573,6 +573,194 @@ def list_tags(namespace: Optional[str] = None) -> dict:
         }
 
 
+# search_tags RRFパラメータ
+_SEARCH_TAGS_RRF_K = 60
+_SEARCH_TAGS_W_LIKE = 1.0
+_SEARCH_TAGS_W_VEC = 1.0
+
+
+def search_tags(
+    query: str,
+    namespace: Optional[str] = None,
+    include_notes: bool = False,
+    limit: int = 20,
+) -> dict:
+    """タグをキーワード検索する（LIKE + ベクトル KNN のハイブリッド）。
+
+    チャネル1: タグ名LIKE部分一致（usage_count降順）
+    チャネル2: tag_vec KNN検索（embedding_service.search_similar_tags）
+    統合: シンプルRRF（2チャネル）
+
+    Args:
+        query: 検索キーワード（タグ名部分一致 + ベクトル検索）
+        namespace: namespaceフィルタ（"domain", "intent", ""、未指定で全タグ）
+        include_notes: Trueのときnotesを返す（デフォルトFalse）
+        limit: 取得件数上限（デフォルト20）
+
+    Returns:
+        検索結果（tags配列、各要素にscore付き）
+    """
+    from src.services.embedding_service import search_similar_tags
+
+    if not query or not query.strip():
+        return {"error": {"code": "INVALID_QUERY", "message": "query must not be empty"}}
+
+    query = query.strip()
+    limit = max(1, min(limit, 100))
+
+    try:
+        conn = get_connection()
+        try:
+            # --- チャネル1: LIKE部分一致 ---
+            like_pattern = f"%{query}%"
+            if namespace is not None:
+                like_rows = conn.execute(
+                    """
+                    SELECT t.id, t.namespace, t.name, t.notes, t.canonical_id,
+                      ct.namespace AS canonical_namespace, ct.name AS canonical_name,
+                      (SELECT COUNT(*) FROM topic_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM activity_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM decision_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM log_tags WHERE tag_id = t.id) AS usage_count
+                    FROM tags t
+                    LEFT JOIN tags AS ct ON t.canonical_id = ct.id
+                    WHERE t.name LIKE ? AND t.namespace = ?
+                    ORDER BY usage_count DESC, t.name ASC
+                    """,
+                    (like_pattern, namespace),
+                ).fetchall()
+            else:
+                like_rows = conn.execute(
+                    """
+                    SELECT t.id, t.namespace, t.name, t.notes, t.canonical_id,
+                      ct.namespace AS canonical_namespace, ct.name AS canonical_name,
+                      (SELECT COUNT(*) FROM topic_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM activity_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM decision_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM log_tags WHERE tag_id = t.id) AS usage_count
+                    FROM tags t
+                    LEFT JOIN tags AS ct ON t.canonical_id = ct.id
+                    WHERE t.name LIKE ?
+                    ORDER BY usage_count DESC, t.name ASC
+                    """,
+                    (like_pattern,),
+                ).fetchall()
+
+            # LIKE結果をdict化（id -> row_dict + rank）
+            like_tag_data: dict[int, dict] = {}
+            like_ranks: dict[int, int] = {}
+            for rank, row in enumerate(like_rows, start=1):
+                r = row_to_dict(row)
+                tag_id = r["id"]
+                like_tag_data[tag_id] = r
+                like_ranks[tag_id] = rank
+
+            # --- チャネル2: ベクトルKNN検索 ---
+            vec_results = search_similar_tags(query, k=limit)
+            # namespace後フィルタ
+            vec_ranks: dict[int, int] = {}
+            rank_counter = 1
+            for tag_id, _distance in vec_results:
+                if namespace is not None:
+                    # namespaceフィルタが必要な場合、DBで確認
+                    if tag_id in like_tag_data:
+                        # LIKE結果にある = namespaceフィルタ済み
+                        vec_ranks[tag_id] = rank_counter
+                        rank_counter += 1
+                    else:
+                        # LIKE結果にない = DBで確認
+                        ns_row = conn.execute(
+                            "SELECT namespace FROM tags WHERE id = ?",
+                            (tag_id,),
+                        ).fetchone()
+                        if ns_row and ns_row["namespace"] == namespace:
+                            vec_ranks[tag_id] = rank_counter
+                            rank_counter += 1
+                else:
+                    vec_ranks[tag_id] = rank_counter
+                    rank_counter += 1
+
+            # --- RRF統合 ---
+            all_tag_ids = set(like_ranks.keys()) | set(vec_ranks.keys())
+            scored: list[tuple[int, float]] = []
+            for tag_id in all_tag_ids:
+                score = 0.0
+                if tag_id in like_ranks:
+                    score += _SEARCH_TAGS_W_LIKE / (_SEARCH_TAGS_RRF_K + like_ranks[tag_id])
+                if tag_id in vec_ranks:
+                    score += _SEARCH_TAGS_W_VEC / (_SEARCH_TAGS_RRF_K + vec_ranks[tag_id])
+                scored.append((tag_id, score))
+
+            # スコア降順ソート → limit適用
+            scored.sort(key=lambda x: x[1], reverse=True)
+            scored = scored[:limit]
+
+            # --- 結果構築 ---
+            # LIKE結果にないタグのデータをDBから取得
+            missing_ids = [tid for tid, _ in scored if tid not in like_tag_data]
+            if missing_ids:
+                placeholders = ",".join("?" * len(missing_ids))
+                missing_rows = conn.execute(
+                    f"""
+                    SELECT t.id, t.namespace, t.name, t.notes, t.canonical_id,
+                      ct.namespace AS canonical_namespace, ct.name AS canonical_name,
+                      (SELECT COUNT(*) FROM topic_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM activity_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM decision_tags WHERE tag_id = t.id) +
+                      (SELECT COUNT(*) FROM log_tags WHERE tag_id = t.id) AS usage_count
+                    FROM tags t
+                    LEFT JOIN tags AS ct ON t.canonical_id = ct.id
+                    WHERE t.id IN ({placeholders})
+                    """,
+                    tuple(missing_ids),
+                ).fetchall()
+                for row in missing_rows:
+                    r = row_to_dict(row)
+                    like_tag_data[r["id"]] = r
+
+            tags = []
+            for tag_id, score in scored:
+                r = like_tag_data.get(tag_id)
+                if r is None:
+                    continue
+                ns = r["namespace"]
+                name = r["name"]
+                tag_str = f"{ns}:{name}" if ns else name
+
+                # canonical文字列の構築
+                canonical = None
+                if r["canonical_id"] is not None:
+                    c_ns = r["canonical_namespace"]
+                    c_name = r["canonical_name"]
+                    canonical = f"{c_ns}:{c_name}" if c_ns else c_name
+
+                entry: dict = {
+                    "tag": tag_str,
+                    "id": r["id"],
+                    "namespace": ns,
+                    "name": name,
+                    "usage_count": r["usage_count"],
+                    "score": round(score, 4),
+                    "canonical": canonical,
+                }
+                if include_notes:
+                    entry["notes"] = r["notes"]
+                tags.append(entry)
+
+            return {"tags": tags}
+
+        finally:
+            conn.close()
+
+    except Exception as e:
+        return {
+            "error": {
+                "code": "DATABASE_ERROR",
+                "message": str(e),
+            }
+        }
+
+
 JUNCTION_TABLES = [
     ("topic_tags", "topic_id"),
     ("activity_tags", "activity_id"),
