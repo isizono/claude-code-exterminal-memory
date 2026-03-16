@@ -300,6 +300,41 @@ def test_get_topics_since_without_tags(temp_db):
     assert result["topics"][0]["title"] == "New"
 
 
+def test_get_topics_until_includes_same_day(temp_db):
+    """until指定日と同日のレコードが含まれる（境界テスト）"""
+    t1 = add_topic(title="Same Day", description="Desc", tags=DEFAULT_TAGS)
+
+    conn = get_connection()
+    conn.execute(
+        "UPDATE discussion_topics SET created_at = '2026-03-15 12:30:00' WHERE id = ?",
+        (t1["topic_id"],),
+    )
+    conn.commit()
+    conn.close()
+
+    result = get_topics(tags=DEFAULT_TAGS, until="2026-03-15")
+
+    assert "error" not in result
+    assert result["total_count"] == 1
+    assert result["topics"][0]["title"] == "Same Day"
+
+
+def test_get_topics_invalid_since_format(temp_db):
+    """不正なsince形式でINVALID_PARAMETERエラー"""
+    result = get_topics(tags=DEFAULT_TAGS, since="not-a-date")
+
+    assert "error" in result
+    assert result["error"]["code"] == "INVALID_PARAMETER"
+
+
+def test_get_topics_invalid_until_format(temp_db):
+    """不正なuntil形式でINVALID_PARAMETERエラー"""
+    result = get_topics(tags=DEFAULT_TAGS, until="2026/03/15")
+
+    assert "error" in result
+    assert result["error"]["code"] == "INVALID_PARAMETER"
+
+
 def test_get_topics_has_tags_field(temp_db):
     """各topicにtags付き"""
     add_topic(title="Tagged Topic", description="Desc", tags=["domain:test", "intent:design"])

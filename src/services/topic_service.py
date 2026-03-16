@@ -1,4 +1,5 @@
 """議論トピック管理サービス"""
+import re
 import sqlite3
 from typing import Optional
 from src.db import get_connection, row_to_dict
@@ -158,6 +159,22 @@ def get_topics(
                 }
             }
 
+        date_pattern = re.compile(r"^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$")
+        if since is not None and not date_pattern.match(since):
+            return {
+                "error": {
+                    "code": "INVALID_PARAMETER",
+                    "message": f"since must be ISO date format (YYYY-MM-DD), got '{since}'",
+                }
+            }
+        if until is not None and not date_pattern.match(until):
+            return {
+                "error": {
+                    "code": "INVALID_PARAMETER",
+                    "message": f"until must be ISO date format (YYYY-MM-DD), got '{until}'",
+                }
+            }
+
         conn = get_connection()
         try:
             # タグフィルタでtopic_idsを絞り込む（tags指定時のみ）
@@ -197,8 +214,10 @@ def get_topics(
                 where_params.append(since)
 
             if until is not None:
+                # 日付のみ指定時は当日を含めるため末尾に時刻を付与
+                until_value = until if " " in until else until + " 23:59:59"
                 conditions.append("created_at <= ?")
-                where_params.append(until)
+                where_params.append(until_value)
 
             if conditions:
                 where_clause = "WHERE " + " AND ".join(conditions)

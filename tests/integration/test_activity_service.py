@@ -358,6 +358,8 @@ class TestGetActivities:
         a2 = add_activity(title="New Pending", description="Desc", tags=DEFAULT_TAGS, check_in=False)
         update_activity(a1["activity_id"], new_status="completed")
 
+        # update_activityが内部でupdated_at=CURRENT_TIMESTAMPを設定するため、
+        # テスト用に手動で上書きしてsince条件の検証を可能にする
         conn = get_connection()
         conn.execute(
             "UPDATE activities SET updated_at = '2026-01-01 00:00:00' WHERE id = ?",
@@ -375,6 +377,37 @@ class TestGetActivities:
         assert "error" not in result
         assert result["total_count"] == 0
         assert result["activities"] == []
+
+    def test_get_activities_until_includes_same_day(self, temp_db):
+        """until指定日と同日のレコードが含まれる（境界テスト）"""
+        add_activity(title="Same Day", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+
+        conn = get_connection()
+        conn.execute(
+            "UPDATE activities SET updated_at = '2026-03-15 18:00:00' WHERE title = 'Same Day'"
+        )
+        conn.commit()
+        conn.close()
+
+        result = get_activities(tags=DEFAULT_TAGS, until="2026-03-15")
+
+        assert "error" not in result
+        assert result["total_count"] == 1
+        assert result["activities"][0]["title"] == "Same Day"
+
+    def test_get_activities_invalid_since_format(self, temp_db):
+        """不正なsince形式でINVALID_PARAMETERエラー"""
+        result = get_activities(tags=DEFAULT_TAGS, since="not-a-date")
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_PARAMETER"
+
+    def test_get_activities_invalid_until_format(self, temp_db):
+        """不正なuntil形式でINVALID_PARAMETERエラー"""
+        result = get_activities(tags=DEFAULT_TAGS, until="2026/03/15")
+
+        assert "error" in result
+        assert result["error"]["code"] == "INVALID_PARAMETER"
 
     def test_get_activities_truncates_description_at_max_len(self, temp_db):
         """descriptionがACTIVITY_DESC_MAX_LEN文字に切り詰められること"""
