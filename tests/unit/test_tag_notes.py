@@ -3,6 +3,7 @@
 - update_tag の正常系・エラー系
 - 遭遇時注入の正常系・重複防止
 - get_by_ids での遭遇時注入
+- 4ツール（get_topics/get_activities/get_logs/get_decisions）の結果ベース注入
 """
 import os
 import tempfile
@@ -16,6 +17,8 @@ from src.services.tag_service import (
 )
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decision
+from src.services.discussion_log_service import add_log
+from src.services.activity_service import add_activity
 from src.services.search_service import get_by_ids
 import src.services.embedding_service as emb
 
@@ -389,3 +392,197 @@ class TestGetByIdsInjection:
             _maybe_inject_tag_notes(result, all_tags)
 
         assert "tag_notes" not in result
+
+
+# ========================================
+# 結果ベース tag_notes 注入テスト（4ツール）
+# ========================================
+
+
+def _apply_result_based_injection(result: dict, items_key: str) -> dict:
+    """テスト用ヘルパー: main.pyのハンドラと同じ結果ベース注入ロジックを適用する"""
+    from src.main import _collect_result_tags, _maybe_inject_tag_notes
+
+    if "error" not in result:
+        all_tags = _collect_result_tags(result.get(items_key, []))
+        if all_tags:
+            _maybe_inject_tag_notes(result, all_tags)
+    return result
+
+
+class TestGetTopicsResultBasedInjection:
+    """get_topics の結果ベース tag_notes 注入テスト"""
+
+    def test_injects_tag_notes_from_result_tags(self, temp_db):
+        """タグフィルタなしでも結果内のタグからtag_notesが注入される"""
+        from src.services.topic_service import get_topics
+
+        add_topic(title="Test Topic", description="Desc", tags=["domain:test"])
+        update_tag("domain:test", "テスト教訓")
+
+        result = get_topics()
+        assert "error" not in result
+        assert len(result["topics"]) >= 1
+
+        _apply_result_based_injection(result, "topics")
+
+        assert "tag_notes" in result
+        assert any(n["tag"] == "domain:test" for n in result["tag_notes"])
+
+    def test_no_notes_no_key(self, temp_db):
+        """notesがないタグのみの場合はtag_notesキーが含まれない"""
+        from src.services.topic_service import get_topics
+
+        add_topic(title="Test Topic", description="Desc", tags=["domain:empty"])
+
+        result = get_topics()
+        assert "error" not in result
+
+        _apply_result_based_injection(result, "topics")
+
+        assert "tag_notes" not in result
+
+
+class TestGetActivitiesResultBasedInjection:
+    """get_activities の結果ベース tag_notes 注入テスト"""
+
+    def test_injects_tag_notes_from_result_tags(self, temp_db):
+        """タグフィルタなしでも結果内のタグからtag_notesが注入される"""
+        from src.services.activity_service import get_activities
+
+        add_activity(
+            title="Test Activity", description="Desc",
+            tags=["domain:test", "intent:implement"], check_in=False,
+        )
+        update_tag("domain:test", "テスト教訓")
+
+        result = get_activities()
+        assert "error" not in result
+        assert len(result["activities"]) >= 1
+
+        _apply_result_based_injection(result, "activities")
+
+        assert "tag_notes" in result
+        assert any(n["tag"] == "domain:test" for n in result["tag_notes"])
+
+    def test_no_notes_no_key(self, temp_db):
+        """notesがないタグのみの場合はtag_notesキーが含まれない"""
+        from src.services.activity_service import get_activities
+
+        # intent:タグはマイグレーションでnotesが設定されるため、notesのないタグのみ使用
+        add_activity(
+            title="Test Activity", description="Desc",
+            tags=["domain:empty"], check_in=False,
+        )
+
+        result = get_activities()
+        assert "error" not in result
+
+        _apply_result_based_injection(result, "activities")
+
+        assert "tag_notes" not in result
+
+
+class TestGetLogsResultBasedInjection:
+    """get_logs の結果ベース tag_notes 注入テスト"""
+
+    def test_injects_tag_notes_from_result_tags(self, temp_db):
+        """結果内のタグからtag_notesが注入される"""
+        from src.services.discussion_log_service import get_logs
+
+        topic = add_topic(title="Test Topic", description="Desc", tags=["domain:test"])
+        topic_id = topic["topic_id"]
+        add_log(topic_id, title="Test Log", content="content", tags=["domain:test"])
+        update_tag("domain:test", "テスト教訓")
+
+        result = get_logs(topic_id)
+        assert "error" not in result
+        assert len(result["logs"]) >= 1
+
+        _apply_result_based_injection(result, "logs")
+
+        assert "tag_notes" in result
+        assert any(n["tag"] == "domain:test" for n in result["tag_notes"])
+
+    def test_no_notes_no_key(self, temp_db):
+        """notesがないタグのみの場合はtag_notesキーが含まれない"""
+        from src.services.discussion_log_service import get_logs
+
+        topic = add_topic(title="Test Topic", description="Desc", tags=["domain:empty"])
+        topic_id = topic["topic_id"]
+        add_log(topic_id, title="Test Log", content="content")
+
+        result = get_logs(topic_id)
+        assert "error" not in result
+
+        _apply_result_based_injection(result, "logs")
+
+        assert "tag_notes" not in result
+
+
+class TestGetDecisionsResultBasedInjection:
+    """get_decisions の結果ベース tag_notes 注入テスト"""
+
+    def test_injects_tag_notes_from_result_tags(self, temp_db):
+        """結果内のタグからtag_notesが注入される"""
+        from src.services.decision_service import get_decisions
+
+        topic = add_topic(title="Test Topic", description="Desc", tags=["domain:test"])
+        topic_id = topic["topic_id"]
+        add_decision("Test Decision", "reason", topic_id, tags=["domain:test"])
+        update_tag("domain:test", "テスト教訓")
+
+        result = get_decisions(topic_id)
+        assert "error" not in result
+        assert len(result["decisions"]) >= 1
+
+        _apply_result_based_injection(result, "decisions")
+
+        assert "tag_notes" in result
+        assert any(n["tag"] == "domain:test" for n in result["tag_notes"])
+
+    def test_no_notes_no_key(self, temp_db):
+        """notesがないタグのみの場合はtag_notesキーが含まれない"""
+        from src.services.decision_service import get_decisions
+
+        topic = add_topic(title="Test Topic", description="Desc", tags=["domain:empty"])
+        topic_id = topic["topic_id"]
+        add_decision("Test Decision", "reason", topic_id)
+
+        result = get_decisions(topic_id)
+        assert "error" not in result
+
+        _apply_result_based_injection(result, "decisions")
+
+        assert "tag_notes" not in result
+
+
+class TestCollectResultTags:
+    """_collect_result_tags ヘルパーのテスト"""
+
+    def test_collects_unique_tags(self):
+        """複数アイテムからユニークなタグを収集する"""
+        from src.main import _collect_result_tags
+
+        items = [
+            {"tags": ["domain:test", "intent:design"]},
+            {"tags": ["domain:test", "hooks"]},
+            {"tags": ["intent:design"]},
+        ]
+        result = _collect_result_tags(items)
+        assert set(result) == {"domain:test", "intent:design", "hooks"}
+
+    def test_empty_items(self):
+        """空リストの場合は空リストを返す"""
+        from src.main import _collect_result_tags
+
+        result = _collect_result_tags([])
+        assert result == []
+
+    def test_items_without_tags(self):
+        """tagsキーがないアイテムでもエラーにならない"""
+        from src.main import _collect_result_tags
+
+        items = [{"id": 1}, {"id": 2, "tags": ["domain:test"]}]
+        result = _collect_result_tags(items)
+        assert result == ["domain:test"]

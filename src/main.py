@@ -167,6 +167,14 @@ def _maybe_inject_tag_notes(result: dict, tag_strings: list[str]) -> dict:
     return result
 
 
+def _collect_result_tags(items: list[dict]) -> list[str]:
+    """結果アイテムからユニークなタグを収集する"""
+    tags: set[str] = set()
+    for item in items:
+        tags.update(item.get("tags", []))
+    return sorted(tags)
+
+
 # MCPサーバーを作成
 mcp = FastMCP("cc-memory", instructions=build_instructions())
 
@@ -247,8 +255,10 @@ def get_topics(
     until: ISO日付文字列。この日付以前に作成されたトピックのみ返す
     """
     result = topic_service.get_topics(tags, limit, offset, since, until)
-    if "error" not in result and tags:
-        _maybe_inject_tag_notes(result, tags)
+    if "error" not in result:
+        all_tags = _collect_result_tags(result.get("topics", []))
+        if all_tags:
+            _maybe_inject_tag_notes(result, all_tags)
     return result
 
 
@@ -259,7 +269,12 @@ def get_logs(
     limit: int = 30,
 ) -> dict:
     """指定トピックの議論ログを取得する。"""
-    return discussion_log_service.get_logs(topic_id, start_id, limit)
+    result = discussion_log_service.get_logs(topic_id, start_id, limit)
+    if "error" not in result:
+        all_tags = _collect_result_tags(result.get("logs", []))
+        if all_tags:
+            _maybe_inject_tag_notes(result, all_tags)
+    return result
 
 
 @mcp.tool()
@@ -269,7 +284,12 @@ def get_decisions(
     limit: int = 30,
 ) -> dict:
     """指定トピックに関連する決定事項を取得する。"""
-    return decision_service.get_decisions(topic_id, start_id, limit)
+    result = decision_service.get_decisions(topic_id, start_id, limit)
+    if "error" not in result:
+        all_tags = _collect_result_tags(result.get("decisions", []))
+        if all_tags:
+            _maybe_inject_tag_notes(result, all_tags)
+    return result
 
 
 @mcp.tool()
@@ -500,8 +520,10 @@ def get_activities(
         アクティビティ一覧（total_countで該当ステータスの全件数を確認可能）
     """
     result = activity_service.get_activities(tags, status, limit, since, until)
-    if "error" not in result and tags:
-        _maybe_inject_tag_notes(result, tags)
+    if "error" not in result:
+        all_tags = _collect_result_tags(result.get("activities", []))
+        if all_tags:
+            _maybe_inject_tag_notes(result, all_tags)
     return result
 
 
