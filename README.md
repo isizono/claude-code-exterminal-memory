@@ -56,7 +56,7 @@ claude plugin install claude-code-memory
 | 資材 | `add_material`, `get_material` | セッション中の成果物をタグ付き独立エンティティとして保存・取得 |
 | リレーション | `add_relation`, `remove_relation`, `get_map` | エンティティ間の関連の追加・削除・グラフ探索 |
 | リマインダー | `add_reminder`, `list_reminders`, `update_reminder` | check-in時に注入される運用ルールの管理 |
-| タグ | `list_tags`, `update_tag`, `analyze_tags` | タグ一覧の取得・タグ情報の更新・タグ共起分析 |
+| タグ | `search_tags`, `update_tag`, `analyze_tags` | タグの検索・タグ情報の更新・タグ共起分析 |
 | 検索 | `search`, `get_by_ids` | キーワード横断検索・詳細情報の取得 |
 
 ## スキル

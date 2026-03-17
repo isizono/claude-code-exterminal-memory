@@ -172,7 +172,7 @@ Step 2との違い: Step 2は「やると決まった議論・設計・実装ア
 - ステップ6の [未完] decision とは別に、アクティビティとしても登録する（役割が異なる: decisionは「何が未決定か」、activityは「次に何をすべきか」）
 - 未完の話がなければこのステップはスキップする
 
-=== Step 8: tag notesの更新 (list_tags / update_tag) ===
+=== Step 8: tag notesの更新 (search_tags / update_tag) ===
 
 セッション中に得られた教訓で、特定のタグに紐づけるべきものがあれば記録する。
 tag notesはそのタグの文脈で作業開始時にAIへ自動注入される「タグ版CLAUDE.md」である。
@@ -184,7 +184,7 @@ tag notesはそのタグの文脈で作業開始時にAIへ自動注入される
 
 手順:
 1. セッション中に関わったタグを特定する
-2. list_tags で対象タグの現在の notes を確認する
+2. search_tags で対象タグを検索し、現在の notes を確認する（対象タグ名をqueryに、include_notes=Trueで呼ぶ）
 3. 新規追記・修正すべき内容があれば update_tag で書き込む
    （既存notesがある場合は内容を保持しつつマージ。上書き方式なので全文を書く）
 
