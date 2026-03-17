@@ -150,16 +150,19 @@ def build_instructions() -> str:
     return RULES
 
 
-def _maybe_inject_tag_notes(result: dict, tag_strings: list[str]) -> dict:
+def _maybe_inject_tag_notes(result: dict, tag_strings: list[str], mark: bool = True) -> dict:
     """結果dictにtag_notesを注入する（notes があれば）
 
     Note: always_inject_namespacesは渡さない（意図的）。
     intent:タグがこの経路で_injected_tagsに登録されるが、
     check_in経路はalways_inject_namespacesで常時注入が保証されるため問題ない。
+
+    Args:
+        mark: False の場合、_injected_tags を参照も更新もしない（読み取り経路用）。
     """
     conn = get_connection()
     try:
-        notes = collect_tag_notes_for_injection(conn, tag_strings)
+        notes = collect_tag_notes_for_injection(conn, tag_strings, mark=mark)
     finally:
         conn.close()
     if notes:
@@ -258,7 +261,7 @@ def get_topics(
     if "error" not in result:
         all_tags = _collect_result_tags(result.get("topics", []))
         if all_tags:
-            _maybe_inject_tag_notes(result, all_tags)
+            _maybe_inject_tag_notes(result, all_tags, mark=False)
     return result
 
 
@@ -273,7 +276,7 @@ def get_logs(
     if "error" not in result:
         all_tags = _collect_result_tags(result.get("logs", []))
         if all_tags:
-            _maybe_inject_tag_notes(result, all_tags)
+            _maybe_inject_tag_notes(result, all_tags, mark=False)
     return result
 
 
@@ -288,7 +291,7 @@ def get_decisions(
     if "error" not in result:
         all_tags = _collect_result_tags(result.get("decisions", []))
         if all_tags:
-            _maybe_inject_tag_notes(result, all_tags)
+            _maybe_inject_tag_notes(result, all_tags, mark=False)
     return result
 
 
@@ -523,7 +526,7 @@ def get_activities(
     if "error" not in result:
         all_tags = _collect_result_tags(result.get("activities", []))
         if all_tags:
-            _maybe_inject_tag_notes(result, all_tags)
+            _maybe_inject_tag_notes(result, all_tags, mark=False)
     return result
 
 
