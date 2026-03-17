@@ -149,9 +149,6 @@ def _build_session_context() -> str:
         # 静的セクション（DB不要）
         sections.append(_SEARCH_FLOW_GUIDE)
 
-        if not sections:
-            return ""
-
         context = "\n".join(sections)
         context += "\n詳細はsearch / get_decisions / get_logs / check_in等で取得してください。"
         return context

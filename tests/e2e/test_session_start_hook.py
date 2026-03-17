@@ -130,6 +130,7 @@ class TestSessionStartHookBasic:
         try:
             conn.execute("DELETE FROM reminders")
             conn.execute("DELETE FROM discussion_topics")
+            conn.execute("DELETE FROM activities")
             conn.commit()
         finally:
             conn.close()
