@@ -9,7 +9,7 @@ from src.services.tag_service import (
 
 logger = logging.getLogger(__name__)
 
-VALID_ENTITY_TYPES = {"topic", "activity"}
+VALID_ENTITY_TYPES = {"topic", "activity", "material"}
 
 
 def _validate_entity_type(entity_type: str) -> dict | None:
@@ -24,7 +24,7 @@ def _validate_entity_type(entity_type: str) -> dict | None:
     return None
 
 
-def _validate_targets(targets: list[dict]) -> dict | None:
+def _validate_targets(source_type: str, targets: list[dict]) -> dict | None:
     """targetsのバリデーション。不正な場合はエラーdictを返す。"""
     if not targets:
         return {
@@ -49,6 +49,14 @@ def _validate_targets(targets: list[dict]) -> dict | None:
                 "error": {
                     "code": "VALIDATION_ERROR",
                     "message": f"'ids' for type '{target['type']}' must be a non-empty list",
+                }
+            }
+        # material同士のリレーションは非サポート
+        if source_type == "material" and target["type"] == "material":
+            return {
+                "error": {
+                    "code": "UNSUPPORTED_RELATION",
+                    "message": "material-to-material relations are not supported",
                 }
             }
     return None
@@ -76,6 +84,14 @@ def _get_insert_params(source_type: str, source_id: int, target_type: str, targe
         # 正規化: id_1 < id_2
         id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
         return ("activity_relations", "(activity_id_1, activity_id_2)", (id_1, id_2))
+    elif source_type == "topic" and target_type == "material":
+        return ("topic_material_relations", "(topic_id, material_id)", (source_id, target_id))
+    elif source_type == "material" and target_type == "topic":
+        return ("topic_material_relations", "(topic_id, material_id)", (target_id, source_id))
+    elif source_type == "activity" and target_type == "material":
+        return ("activity_material_relations", "(activity_id, material_id)", (source_id, target_id))
+    elif source_type == "material" and target_type == "activity":
+        return ("activity_material_relations", "(activity_id, material_id)", (target_id, source_id))
     else:
         raise ValueError(f"Unexpected type combination: {source_type}/{target_type}")
 
@@ -103,6 +119,14 @@ def _get_delete_params(source_type: str, source_id: int, target_type: str, targe
     elif source_type == "activity" and target_type == "activity":
         id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
         return ("activity_relations", "activity_id_1 = ? AND activity_id_2 = ?", (id_1, id_2))
+    elif source_type == "topic" and target_type == "material":
+        return ("topic_material_relations", "topic_id = ? AND material_id = ?", (source_id, target_id))
+    elif source_type == "material" and target_type == "topic":
+        return ("topic_material_relations", "topic_id = ? AND material_id = ?", (target_id, source_id))
+    elif source_type == "activity" and target_type == "material":
+        return ("activity_material_relations", "activity_id = ? AND material_id = ?", (source_id, target_id))
+    elif source_type == "material" and target_type == "activity":
+        return ("activity_material_relations", "activity_id = ? AND material_id = ?", (target_id, source_id))
     else:
         raise ValueError(f"Unexpected type combination: {source_type}/{target_type}")
 
@@ -162,7 +186,7 @@ def add_relation(source_type: str, source_id: int, targets: list[dict]) -> dict:
     err = _validate_entity_type(source_type)
     if err:
         return err
-    err = _validate_targets(targets)
+    err = _validate_targets(source_type, targets)
     if err:
         return err
 
@@ -198,7 +222,7 @@ def remove_relation(source_type: str, source_id: int, targets: list[dict]) -> di
     err = _validate_entity_type(source_type)
     if err:
         return err
-    err = _validate_targets(targets)
+    err = _validate_targets(source_type, targets)
     if err:
         return err
 
@@ -245,6 +269,7 @@ def _get_map_with_conn(
     # エンティティのタイプ別にIDを収集
     topic_ids = [row["entity_id"] for row in rows if row["entity_type"] == "topic"]
     activity_ids = [row["entity_id"] for row in rows if row["entity_type"] == "activity"]
+    material_ids = [row["entity_id"] for row in rows if row["entity_type"] == "material"]
 
     # タイトルをバッチ取得
     topic_titles = {}
@@ -265,14 +290,25 @@ def _get_map_with_conn(
         ).fetchall()
         activity_titles = {r["id"]: r["title"] for r in title_rows}
 
+    material_titles = {}
+    if material_ids:
+        placeholders = ",".join("?" * len(material_ids))
+        title_rows = conn.execute(
+            f"SELECT id, title FROM materials WHERE id IN ({placeholders})",
+            tuple(material_ids),
+        ).fetchall()
+        material_titles = {r["id"]: r["title"] for r in title_rows}
+
     # タグをバッチ取得
     topic_tags_map = get_entity_tags_batch(conn, "topic_tags", "topic_id", topic_ids) if topic_ids else {}
     activity_tags_map = get_entity_tags_batch(conn, "activity_tags", "activity_id", activity_ids) if activity_ids else {}
+    material_tags_map = get_entity_tags_batch(conn, "material_tags", "material_id", material_ids) if material_ids else {}
 
     # 存在するIDのセットを構築（存在しないIDを除外するため）
     existing_ids = set()
     existing_ids.update(("topic", tid) for tid in topic_titles)
     existing_ids.update(("activity", aid) for aid in activity_titles)
+    existing_ids.update(("material", mid) for mid in material_titles)
 
     # カタログ構築（存在しないエンティティは除外）
     entities = []
@@ -287,9 +323,14 @@ def _get_map_with_conn(
         if etype == "topic":
             title = topic_titles[eid]
             tags = topic_tags_map.get(eid, [])
-        else:
+        elif etype == "activity":
             title = activity_titles[eid]
             tags = activity_tags_map.get(eid, [])
+        elif etype == "material":
+            title = material_titles[eid]
+            tags = material_tags_map.get(eid, [])
+        else:
+            continue
 
         entities.append({
             "type": etype,
