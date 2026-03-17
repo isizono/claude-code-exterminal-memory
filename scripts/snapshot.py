@@ -154,7 +154,7 @@ def take_snapshot(db_path: str, snapshot_dir: Path | None = None, max_snapshots:
     if max_snapshots is None:
         max_snapshots = SNAPSHOT_MAX_COUNT
 
-    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
 
     now = datetime.now(timezone.utc)
     timestamp = now.strftime("%Y%m%d_%H%M")
