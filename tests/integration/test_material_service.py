@@ -270,6 +270,7 @@ class TestUpdateMaterial:
         assert result["material_id"] == material_id
         assert result["content"] == "Updated content"
         assert result["title"] == "Original Title"  # unchanged
+        assert "hint" in result
 
     def test_update_title(self, temp_db):
         """Updating title only succeeds"""
@@ -282,6 +283,7 @@ class TestUpdateMaterial:
         assert result["material_id"] == material_id
         assert result["title"] == "Updated Title"
         assert result["content"] == "Original content"  # unchanged
+        assert "hint" in result
 
     def test_update_both(self, temp_db):
         """Updating both content and title succeeds"""
@@ -294,6 +296,7 @@ class TestUpdateMaterial:
         assert result["material_id"] == material_id
         assert result["title"] == "New Title"
         assert result["content"] == "New content"
+        assert "hint" in result
 
     def test_update_neither_returns_validation_error(self, temp_db):
         """Providing neither content nor title returns VALIDATION_ERROR"""

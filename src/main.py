@@ -588,7 +588,7 @@ def update_material(
 
     Args:
         material_id: 資材のID
-        content: 新しい本文（全体置換。optional）
+        content: 新しい本文（全体置換。optional）。先頭1-2文は内容の説明・要約を書くこと（check-inやsearchのsnippetに使われるため）
         title: 新しいタイトル（optional）
 
     Returns:
