@@ -54,6 +54,9 @@ class TestAddMaterial:
         assert "domain:test" in result["tags"]
         assert "design" in result["tags"]
         assert "created_at" in result
+        # hintフィールドが含まれること
+        assert "hint" in result
+        assert "snippet" in result["hint"]
         # activity_idが含まれないこと
         assert "activity_id" not in result
 
@@ -168,6 +171,20 @@ class TestGetMaterial:
         assert "created_at" in result
         # activity_idが含まれないこと
         assert "activity_id" not in result
+
+    def test_get_material_has_hint(self, temp_db):
+        """get_materialのレスポンスにhintフィールドが含まれる"""
+        created = add_material(
+            title="Hint Test",
+            content="Content for hint test",
+            tags=["domain:test"],
+        )
+
+        result = get_material(created["material_id"])
+
+        assert "error" not in result
+        assert "hint" in result
+        assert "snippet" in result["hint"]
 
     def test_get_material_not_found(self, temp_db):
         """存在しないmaterial_idでNOT_FOUNDエラーになる"""
