@@ -53,12 +53,10 @@ def acquire(port: int) -> bool:
             )
             return False
         logger.info(
-            f"PID {existing['pid']} is alive but port {existing['port']} is not listening, treating as stale"
+            f"Removing stale lock file: pid={existing['pid']} alive but port {existing['port']} not listening"
         )
-
-    # stale lock — 削除して再試行
-    if existing is not None:
-        logger.info(f"Removing stale lock file: pid={existing['pid']}")
+    elif existing is not None:
+        logger.info(f"Removing stale lock file: pid={existing['pid']} (process dead)")
     try:
         LOCK_FILE.unlink(missing_ok=True)
     except OSError:

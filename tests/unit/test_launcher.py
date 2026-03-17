@@ -145,6 +145,68 @@ class TestEnsureServerRunning:
         assert launcher._ensure_server_running() is False
 
 
+class TestEnsureServerRunningStaleLock:
+    """_ensure_server_running のstale lock処理のテスト"""
+
+    def test_stale_lock_pid_dead(self, monkeypatch, tmp_path):
+        """PIDが死んでいるロックファイルはstaleとして削除し、サーバーを起動する"""
+        from src.services import lock_file
+
+        lock_dir = tmp_path / ".cc-memory"
+        lock_dir.mkdir()
+        lock_path = lock_dir / "server.lock"
+        lock_path.write_text('{"pid": 99999999, "port": 52837}', encoding="utf-8")
+        monkeypatch.setattr(lock_file, "LOCK_FILE", lock_path)
+        monkeypatch.setattr(lock_file, "is_process_alive", lambda pid: False)
+
+        call_count = {"check": 0}
+
+        def fake_is_running():
+            call_count["check"] += 1
+            return call_count["check"] >= 3
+
+        monkeypatch.setattr(launcher, "_is_server_running", fake_is_running)
+        monkeypatch.setattr(launcher, "_start_http_server", lambda: True)
+        monkeypatch.setattr(launcher.time, "sleep", lambda _: None)
+
+        assert launcher._ensure_server_running() is True
+        # ロックファイルが削除されている
+        assert not lock_path.exists()
+
+    def test_lock_pid_alive_waits_for_server(self, monkeypatch, tmp_path):
+        """PIDが生きているロックファイルがあれば、サーバーの準備完了を待つ"""
+        from src.services import lock_file
+
+        lock_dir = tmp_path / ".cc-memory"
+        lock_dir.mkdir()
+        lock_path = lock_dir / "server.lock"
+        lock_path.write_text('{"pid": 99999999, "port": 52837}', encoding="utf-8")
+        monkeypatch.setattr(lock_file, "LOCK_FILE", lock_path)
+        monkeypatch.setattr(lock_file, "is_process_alive", lambda pid: True)
+
+        started = {"called": False}
+
+        def fake_start():
+            started["called"] = True
+            return True
+
+        call_count = {"check": 0}
+
+        def fake_is_running():
+            call_count["check"] += 1
+            return call_count["check"] >= 3
+
+        monkeypatch.setattr(launcher, "_is_server_running", fake_is_running)
+        monkeypatch.setattr(launcher, "_start_http_server", fake_start)
+        monkeypatch.setattr(launcher.time, "sleep", lambda _: None)
+
+        assert launcher._ensure_server_running() is True
+        # PIDが生きているので_start_http_serverは呼ばれない
+        assert started["called"] is False
+        # ロックファイルはそのまま
+        assert lock_path.exists()
+
+
 class TestSessionRegistration:
     def test_register_success(self, monkeypatch):
         """セッション登録が成功する"""
