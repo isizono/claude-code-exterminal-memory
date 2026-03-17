@@ -15,6 +15,8 @@ from src.services.tag_service import (
 
 logger = logging.getLogger(__name__)
 
+SNIPPET_MAX_LEN = 200
+
 
 def _material_to_response(material: dict, tags: list[str]) -> dict:
     """資材データをAPIレスポンス形式に変換（全文含む）"""
@@ -24,6 +26,7 @@ def _material_to_response(material: dict, tags: list[str]) -> dict:
         "content": material["content"],
         "tags": tags,
         "created_at": material["created_at"],
+        "hint": "contentの先頭1-2文は内容の説明・要約にしてください（check-in時にsnippetとして表示されます）",
     }
 
 
@@ -32,6 +35,7 @@ def _material_to_catalog(material: dict, tags: list[str]) -> dict:
     return {
         "material_id": material["id"],
         "title": material["title"],
+        "snippet": (material.get("content") or "")[:SNIPPET_MAX_LEN],
         "tags": tags,
         "created_at": material["created_at"],
     }
@@ -127,10 +131,10 @@ def get_materials_by_relation_with_conn(conn, activity_id: int) -> list[dict]:
         activity_id: アクティビティのID
 
     Returns:
-        資材カタログのリスト [{"id": int, "title": str, "tags": list[str], "created_at": str}, ...]
+        資材カタログのリスト [{"id": int, "title": str, "snippet": str, "tags": list[str], "created_at": str}, ...]
     """
     rows = conn.execute(
-        """SELECT m.id, m.title, m.created_at
+        """SELECT m.id, m.title, m.content, m.created_at
            FROM materials m
            JOIN activity_material_relations amr ON amr.material_id = m.id
            WHERE amr.activity_id = ?
@@ -143,6 +147,7 @@ def get_materials_by_relation_with_conn(conn, activity_id: int) -> list[dict]:
         {
             "id": row["id"],
             "title": row["title"],
+            "snippet": (row["content"] or "")[:SNIPPET_MAX_LEN],
             "tags": tags_map.get(row["id"], []),
             "created_at": row["created_at"],
         }
