@@ -21,13 +21,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 @pytest.fixture
 def temp_db():
     """テスト用の一時的なデータベースを作成する"""
+    import src.config
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test.db")
         os.environ["DISCUSSION_DB_PATH"] = db_path
+        src.config.DB_PATH = db_path
         init_database()
         yield db_path
         if "DISCUSSION_DB_PATH" in os.environ:
             del os.environ["DISCUSSION_DB_PATH"]
+        src.config.DB_PATH = None
 
 
 def _run_session_start_hook(db_path: str) -> dict:

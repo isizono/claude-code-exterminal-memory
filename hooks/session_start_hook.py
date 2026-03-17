@@ -16,12 +16,13 @@ if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
 from src.config import IN_PROGRESS_LIMIT, PENDING_LIMIT
-from src.db import get_connection
+from src.db import get_connection, get_db_path
 from src.services.activity_service import (
     get_active_domains_with_conn,
     get_active_activities_by_tag_with_conn,
 )
 from src.services.reminder_service import get_active_reminder_contents_with_conn
+from scripts.snapshot import health_check, should_take_snapshot, take_snapshot
 
 
 
@@ -112,6 +113,44 @@ def _build_reminders_section(conn) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _build_snapshot_section(conn) -> str:
+    """スナップショット取得＋ヘルスチェック。異常検知時のみ警告を返す。
+
+    connは引数として受け取るが、snapshot.pyはdb_pathベースで動作するため
+    内部でget_db_path()を使用する。
+    """
+    db_path = get_db_path()
+    snapshot_dir = Path(db_path).parent / "snapshots"
+
+    # ヘルスチェック
+    result = health_check(db_path, snapshot_dir)
+
+    if not result.is_healthy:
+        lines = [
+            "\U0001f6a8\U0001f6a8\U0001f6a8 【緊急】DBデータ異常減少を検知 \U0001f6a8\U0001f6a8\U0001f6a8",
+            "",
+            "前回スナップショットと比較して以下のテーブルで大幅なデータ減少を確認:",
+        ]
+        lines.extend(result.warnings)
+        lines.extend([
+            "",
+            "\u26a1 データ消失インシデントの可能性があります。",
+            "\u26a1 スナップショットからの復元が可能です。",
+            "\u26a1 ユーザーに即座に状況を報告し、復元するか確認してください。",
+            "\u26a1 復元手順は cc-memory:guide を参照してください。",
+        ])
+        return "\n".join(lines) + "\n"
+
+    # ヘルスチェックOKの場合のみスナップショット取得判定
+    if should_take_snapshot(snapshot_dir, db_path=db_path):
+        try:
+            take_snapshot(db_path, snapshot_dir)
+        except Exception as e:
+            print(f"snapshot error: {e}", file=sys.stderr)
+
+    return ""
+
+
 _SEARCH_FLOW_GUIDE = """\
 # 検索フロー
 
@@ -134,6 +173,7 @@ def _build_session_context() -> str:
     try:
         sections = []
         builders = [
+            _build_snapshot_section,
             _build_activities_section,
             _build_reminders_section,
         ]
