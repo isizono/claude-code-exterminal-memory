@@ -353,7 +353,7 @@ def get_active_activities_by_tag(tag_id: int) -> list[dict]:
 
 def update_activity(
     activity_id: int,
-    new_status: Optional[str] = None,
+    status: Optional[str] = None,
     title: Optional[str] = None,
     description: Optional[str] = None,
     tags: Optional[list[str]] = None,
@@ -363,7 +363,7 @@ def update_activity(
 
     Args:
         activity_id: アクティビティID
-        new_status: 新しいステータス（optional）
+        status: 新しいステータス（optional）
         title: 新しいタイトル（optional）
         description: 新しい説明（optional）
         tags: 新しいタグ配列（optional、指定時は全置換。1個以上必須）
@@ -372,11 +372,11 @@ def update_activity(
         更新されたアクティビティ情報
     """
     # 最低1つのオプショナルパラメータが必要
-    if new_status is None and title is None and description is None and tags is None:
+    if status is None and title is None and description is None and tags is None:
         return {
             "error": {
                 "code": "VALIDATION_ERROR",
-                "message": "At least one of new_status, title, description, or tags must be provided",
+                "message": "At least one of status, title, description, or tags must be provided",
             }
         }
 
@@ -388,11 +388,11 @@ def update_activity(
             return parsed_tags
 
     # ステータスバリデーション
-    if new_status is not None and new_status not in REAL_STATUSES:
+    if status is not None and status not in REAL_STATUSES:
         return {
             "error": {
                 "code": "INVALID_STATUS",
-                "message": f"Invalid status: {new_status}. Must be one of {sorted(REAL_STATUSES)}",
+                "message": f"Invalid status: {status}. Must be one of {sorted(REAL_STATUSES)}",
             }
         }
 
@@ -430,9 +430,9 @@ def update_activity(
         set_parts = []
         values = []
 
-        if new_status is not None:
+        if status is not None:
             set_parts.append("status = ?")
-            values.append(new_status)
+            values.append(status)
 
         if title is not None:
             set_parts.append("title = ?")
