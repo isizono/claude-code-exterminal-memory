@@ -79,8 +79,9 @@ class TestSessionLifecycle:
         # キャンセル後、少し待ってもshutdownは呼ばれない
         assert shutdown_called.wait(timeout=3) is False
 
-    def test_lock_prevents_double_start(self):
+    def test_lock_prevents_double_start(self, monkeypatch):
         """ロック取得済みの場合、2つ目のacquireは失敗する"""
+        monkeypatch.setattr(lock_file, "is_port_listening", lambda port, **kw: True)
         assert lock_file.acquire(52837) is True
         assert lock_file.acquire(52837) is False
 
