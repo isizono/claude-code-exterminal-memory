@@ -4,7 +4,7 @@ import sqlite3
 from typing import Optional
 from src.db import get_connection, row_to_dict
 from src.services.embedding_service import build_embedding_text, generate_and_store_embedding
-from src.services.relation_service import _add_relation_with_conn
+from src.services.relation_service import _add_relation_with_conn, _validate_targets
 from src.services.search_service import find_similar_topics
 from src.services.tag_service import (
     validate_and_parse_tags,
@@ -51,6 +51,12 @@ def add_topic(
     parsed_tags = validate_and_parse_tags(tags, required=True)
     if isinstance(parsed_tags, dict):
         return parsed_tags
+
+    # relatedのバリデーション
+    if related:
+        err = _validate_targets("topic", related)
+        if err:
+            return err
 
     conn = get_connection()
     try:

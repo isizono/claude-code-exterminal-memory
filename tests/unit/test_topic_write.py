@@ -585,6 +585,66 @@ def test_add_topic_with_related_activity(temp_db):
         conn.close()
 
 
+def test_add_topic_related_missing_ids_key(temp_db):
+    """related内にidsキーが欠落している場合にVALIDATION_ERRORが返る"""
+    result = add_topic(
+        title="idsキー欠落",
+        description="テスト",
+        tags=DEFAULT_TAGS,
+        related=[{"type": "topic"}],
+    )
+    assert "error" in result
+    assert result["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_add_topic_related_missing_type_key(temp_db):
+    """related内にtypeキーが欠落している場合にVALIDATION_ERRORが返る"""
+    result = add_topic(
+        title="typeキー欠落",
+        description="テスト",
+        tags=DEFAULT_TAGS,
+        related=[{"ids": [1]}],
+    )
+    assert "error" in result
+    assert result["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_add_topic_related_invalid_type(temp_db):
+    """related内のtypeが不正な場合にINVALID_ENTITY_TYPEが返る"""
+    result = add_topic(
+        title="不正type",
+        description="テスト",
+        tags=DEFAULT_TAGS,
+        related=[{"type": "invalid", "ids": [1]}],
+    )
+    assert "error" in result
+    assert result["error"]["code"] == "INVALID_ENTITY_TYPE"
+
+
+def test_add_topic_related_empty_ids(temp_db):
+    """related内のidsが空リストの場合にVALIDATION_ERRORが返る"""
+    result = add_topic(
+        title="空ids",
+        description="テスト",
+        tags=DEFAULT_TAGS,
+        related=[{"type": "topic", "ids": []}],
+    )
+    assert "error" in result
+    assert result["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_add_topic_related_empty_list(temp_db):
+    """related=[]の場合はリレーションなしでトピックが正常に作成される"""
+    result = add_topic(
+        title="空リスト",
+        description="related空リスト",
+        tags=DEFAULT_TAGS,
+        related=[],
+    )
+    assert "error" not in result
+    assert result["topic_id"] > 0
+
+
 def test_add_topic_without_related(temp_db):
     """related未指定でリレーションなしのトピックが作成される"""
     t = add_topic(
