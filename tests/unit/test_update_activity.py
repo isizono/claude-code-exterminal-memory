@@ -3,7 +3,7 @@ import os
 import tempfile
 import pytest
 from src.db import init_database
-from src.services.activity_service import add_activity, update_activity
+from src.services.activity_service import add_activity, update_activity, get_activities
 
 
 DEFAULT_TAGS = ["domain:test"]
@@ -77,6 +77,19 @@ class TestUpdateActivitySuccess:
         assert "error" not in result
         assert result["activity_id"] == test_activity["activity_id"]
         assert result["status"] == "in_progress"
+
+    def test_update_persists_via_get_activities(self, test_activity):
+        """更新がDBに永続化されていることをget_activitiesで確認する"""
+        activity_id = test_activity["activity_id"]
+        update_activity(activity_id, title="Persisted Title", description="Persisted Desc", new_status="in_progress")
+
+        result = get_activities(status="in_progress")
+        activities = result["activities"]
+        match = [a for a in activities if a["id"] == activity_id]
+        assert len(match) == 1
+        assert match[0]["title"] == "Persisted Title"
+        assert match[0]["description"] == "Persisted Desc"
+        assert match[0]["status"] == "in_progress"
 
     def test_update_preserves_tags(self, test_activity):
         """update_activityでタグが保持される（レスポンスはactivity_id+statusのみ）"""

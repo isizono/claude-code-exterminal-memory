@@ -464,16 +464,17 @@ def update_activity(
         # タグを取得
         tag_strings = get_entity_tags(conn, "activity_tags", "activity_id", activity_id)
 
+        updated = row_to_dict(row)
+
         # title/description/tagsが変更された場合、embeddingを再生成
         if title is not None or description is not None or parsed_tags is not None:
-            updated = row_to_dict(row)
             tag_text = " ".join(tag_strings) if tag_strings else ""
             generate_and_store_embedding(
                 "activity", activity_id,
                 build_embedding_text(updated["title"], updated["description"], tag_text),
             )
 
-        return {"activity_id": activity_id, "status": row["status"]}
+        return {"activity_id": activity_id, "status": updated["status"]}
 
     except sqlite3.IntegrityError as e:
         conn.rollback()
