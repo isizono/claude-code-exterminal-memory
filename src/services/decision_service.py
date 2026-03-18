@@ -121,6 +121,14 @@ def add_decisions(items: list[dict]) -> dict:
                     build_embedding_text(c["decision"], c["reason"], tag_text),
                 )
 
+            # レスポンス軽量化: embedding生成後にdecision_id以外を除去
+            for c in created:
+                c.pop("decision", None)
+                c.pop("reason", None)
+                c.pop("topic_id", None)
+                c.pop("tags", None)
+                c.pop("created_at", None)
+
         return {"created": created, "errors": errors}
 
     except Exception as e:

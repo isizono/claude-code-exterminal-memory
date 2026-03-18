@@ -29,15 +29,7 @@ def add_log(
         err = result["errors"][0]["error"]
         return {"error": err}
     # 成功
-    c = result["created"][0]
-    return {
-        "log_id": c["log_id"],
-        "topic_id": c["topic_id"],
-        "title": c["title"],
-        "content": c["content"],
-        "tags": c.get("tags", []),
-        "created_at": c.get("created_at"),
-    }
+    return result["created"][0]
 
 
 def add_decision(
@@ -59,12 +51,4 @@ def add_decision(
         err = result["errors"][0]["error"]
         return {"error": err}
     # 成功
-    c = result["created"][0]
-    return {
-        "decision_id": c["decision_id"],
-        "topic_id": c["topic_id"],
-        "decision": c["decision"],
-        "reason": c["reason"],
-        "tags": c.get("tags", []),
-        "created_at": c.get("created_at"),
-    }
+    return result["created"][0]

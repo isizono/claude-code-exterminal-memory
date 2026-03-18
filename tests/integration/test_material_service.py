@@ -274,10 +274,10 @@ class TestUpdateMaterial:
 
         assert "error" not in result
         assert result["material_id"] == material_id
-        assert result["content"] == "Updated content"
-        assert result["title"] == "Original Title"  # unchanged
-        assert "hint" in result
-        assert sorted(result["tags"]) == sorted(["design", "domain:test"])
+        # レスポンス軽量化: material_idのみ
+        assert "content" not in result
+        assert "title" not in result
+        assert "tags" not in result
 
     def test_update_title(self, temp_db):
         """Updating title only succeeds"""
@@ -288,10 +288,10 @@ class TestUpdateMaterial:
 
         assert "error" not in result
         assert result["material_id"] == material_id
-        assert result["title"] == "Updated Title"
-        assert result["content"] == "Original content"  # unchanged
-        assert "hint" in result
-        assert sorted(result["tags"]) == sorted(["design", "domain:test"])
+        # レスポンス軽量化: material_idのみ
+        assert "title" not in result
+        assert "content" not in result
+        assert "tags" not in result
 
     def test_update_both(self, temp_db):
         """Updating both content and title succeeds"""
@@ -302,9 +302,9 @@ class TestUpdateMaterial:
 
         assert "error" not in result
         assert result["material_id"] == material_id
-        assert result["title"] == "New Title"
-        assert result["content"] == "New content"
-        assert "hint" in result
+        # レスポンス軽量化: material_idのみ
+        assert "content" not in result
+        assert "title" not in result
 
     def test_update_neither_returns_validation_error(self, temp_db):
         """Providing neither content nor title returns VALIDATION_ERROR"""

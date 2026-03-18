@@ -237,10 +237,7 @@ def update_material(
             build_embedding_text(updated["title"], updated["content"], tag_text),
         )
 
-        result = _material_to_response(updated, tag_strings)
-        if content is not None:
-            result["hint"] = "contentの先頭1-2文は内容の説明・要約を書いてください。check-inやsearchのsnippetに使われます。"
-        return result
+        return {"material_id": material_id}
 
     except sqlite3.IntegrityError as e:
         conn.rollback()

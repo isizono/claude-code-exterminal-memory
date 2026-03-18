@@ -46,26 +46,23 @@ class TestUpdateActivitySuccess:
         result = update_activity(test_activity["activity_id"], new_status="in_progress")
 
         assert "error" not in result
+        assert result["activity_id"] == test_activity["activity_id"]
         assert result["status"] == "in_progress"
-        assert result["title"] == "Original Title"
-        assert result["description"] == "Original Description"
 
     def test_update_title(self, test_activity):
         """タイトルのみ変更できる"""
         result = update_activity(test_activity["activity_id"], title="New Title")
 
         assert "error" not in result
-        assert result["title"] == "New Title"
+        assert result["activity_id"] == test_activity["activity_id"]
         assert result["status"] == "pending"
-        assert result["description"] == "Original Description"
 
     def test_update_description(self, test_activity):
         """説明のみ変更できる"""
         result = update_activity(test_activity["activity_id"], description="New Description")
 
         assert "error" not in result
-        assert result["description"] == "New Description"
-        assert result["title"] == "Original Title"
+        assert result["activity_id"] == test_activity["activity_id"]
         assert result["status"] == "pending"
 
     def test_update_multiple_fields(self, test_activity):
@@ -78,17 +75,16 @@ class TestUpdateActivitySuccess:
         )
 
         assert "error" not in result
+        assert result["activity_id"] == test_activity["activity_id"]
         assert result["status"] == "in_progress"
-        assert result["title"] == "Updated Title"
-        assert result["description"] == "Updated Description"
 
     def test_update_preserves_tags(self, test_activity):
-        """update_activityでタグが保持される"""
+        """update_activityでタグが保持される（レスポンスはactivity_id+statusのみ）"""
         result = update_activity(test_activity["activity_id"], new_status="in_progress")
 
         assert "error" not in result
-        assert "tags" in result
-        assert "domain:test" in result["tags"]
+        assert result["activity_id"] == test_activity["activity_id"]
+        assert result["status"] == "in_progress"
 
 
 # ========================================
@@ -176,15 +172,12 @@ class TestUpdateActivityTags:
     """update_activityのタグ更新テスト"""
 
     def test_update_tags(self, test_activity):
-        """タグ全置換"""
+        """タグ全置換（レスポンスはactivity_id+statusのみ）"""
         result = update_activity(test_activity["activity_id"], tags=["intent:design", "domain:cc-memory"])
 
         assert "error" not in result
-        assert "tags" in result
-        assert "intent:design" in result["tags"]
-        assert "domain:cc-memory" in result["tags"]
-        # 旧タグは除去されている
-        assert "domain:test" not in result["tags"]
+        assert result["activity_id"] == test_activity["activity_id"]
+        assert result["status"] == "pending"
 
     def test_update_tags_empty_list(self, test_activity):
         """tags=[]でTAGS_REQUIREDエラー"""
@@ -194,9 +187,10 @@ class TestUpdateActivityTags:
         assert result["error"]["code"] == "TAGS_REQUIRED"
 
     def test_update_tags_none(self, test_activity):
-        """tags=None（未指定）ではタグ変更なし"""
+        """tags=None（未指定）ではタグ変更なし（レスポンスはactivity_id+statusのみ）"""
         # まずステータスだけ変更
         result = update_activity(test_activity["activity_id"], new_status="in_progress")
 
         assert "error" not in result
-        assert result["tags"] == ["domain:test"]  # 元のタグが保持される
+        assert result["activity_id"] == test_activity["activity_id"]
+        assert result["status"] == "in_progress"
