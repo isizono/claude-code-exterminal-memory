@@ -25,8 +25,9 @@ class TestAcquire:
         assert info["pid"] == os.getpid()
         assert info["port"] == 52837
 
-    def test_acquire_fails_when_process_alive(self):
-        """自プロセスでロック取得後、再取得は失敗する"""
+    def test_acquire_fails_when_process_alive(self, monkeypatch):
+        """自プロセスでロック取得後、ポートもリスニング中なら再取得は失敗する"""
+        monkeypatch.setattr(lock_file, "is_port_listening", lambda port, **kw: True)
         assert lock_file.acquire(52837) is True
         assert lock_file.acquire(52837) is False
 
@@ -97,6 +98,30 @@ class TestRelease:
         assert lock_file.read() is not None  # 削除されていない
 
 
+class TestAcquirePortCheck:
+    def test_acquire_reclaims_when_pid_alive_but_port_not_listening(self, monkeypatch):
+        """PIDが生きていてもポートに応答がなければstaleと判定してロックを取得する"""
+        monkeypatch.setattr(lock_file, "is_process_alive", lambda pid: True)
+        monkeypatch.setattr(lock_file, "is_port_listening", lambda port, **kw: False)
+        lock_file.LOCK_FILE.write_text(
+            json.dumps({"pid": 99999999, "port": 52837}), encoding="utf-8"
+        )
+
+        assert lock_file.acquire(52837) is True
+        info = lock_file.read()
+        assert info["pid"] == os.getpid()
+
+    def test_acquire_fails_when_pid_alive_and_port_listening(self, monkeypatch):
+        """PIDが生きていてポートにも応答がある場合はロック取得に失敗する"""
+        monkeypatch.setattr(lock_file, "is_process_alive", lambda pid: True)
+        monkeypatch.setattr(lock_file, "is_port_listening", lambda port, **kw: True)
+        lock_file.LOCK_FILE.write_text(
+            json.dumps({"pid": 99999999, "port": 52837}), encoding="utf-8"
+        )
+
+        assert lock_file.acquire(52837) is False
+
+
 class TestIsProcessAlive:
     def test_current_process_is_alive(self):
         """自プロセスは生存している"""
@@ -105,3 +130,24 @@ class TestIsProcessAlive:
     def test_nonexistent_process(self):
         """存在しないPIDはFalse"""
         assert lock_file.is_process_alive(99999999) is False
+
+
+class TestIsPortListening:
+    def test_listening_port(self):
+        """リスニング中のポートにはTrueを返す"""
+        import socket as _socket
+        with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+            s.bind(("localhost", 0))
+            s.listen(1)
+            port = s.getsockname()[1]
+            assert lock_file.is_port_listening(port) is True
+
+    def test_closed_port(self):
+        """閉じたポートにはFalseを返す"""
+        import socket as _socket
+        with _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM) as s:
+            s.bind(("localhost", 0))
+            s.listen(1)
+            port = s.getsockname()[1]
+        # ソケットを閉じた後
+        assert lock_file.is_port_listening(port) is False
