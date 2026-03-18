@@ -29,19 +29,6 @@ ACTIVE_STATUSES = ("in_progress", "pending")
 VALID_STATUSES = REAL_STATUSES | {"active"}
 
 
-def _activity_to_response(activity: dict, tags: list[str]) -> dict:
-    """アクティビティデータをAPIレスポンス形式に変換"""
-    return {
-        "activity_id": activity["id"],
-        "title": activity["title"],
-        "description": activity["description"],
-        "status": activity["status"],
-        "tags": tags,
-        "created_at": activity["created_at"],
-        "updated_at": activity["updated_at"],
-    }
-
-
 def add_activity(
     title: str,
     description: str,
@@ -477,16 +464,17 @@ def update_activity(
         # タグを取得
         tag_strings = get_entity_tags(conn, "activity_tags", "activity_id", activity_id)
 
+        updated = row_to_dict(row)
+
         # title/description/tagsが変更された場合、embeddingを再生成
         if title is not None or description is not None or parsed_tags is not None:
-            updated = row_to_dict(row)
             tag_text = " ".join(tag_strings) if tag_strings else ""
             generate_and_store_embedding(
                 "activity", activity_id,
                 build_embedding_text(updated["title"], updated["description"], tag_text),
             )
 
-        return _activity_to_response(row_to_dict(row), tag_strings)
+        return {"activity_id": activity_id, "status": updated["status"]}
 
     except sqlite3.IntegrityError as e:
         conn.rollback()

@@ -175,7 +175,7 @@ def test_add_log_success(temp_db):
     assert result["log_id"] > 0
     assert result["topic_id"] == topic["topic_id"]
     assert result["title"] == "プランモードの議論"
-    assert "AI: プランモードは設計議論フェーズでは不要だと考えます" in result["content"]
+    assert "content" not in result
     assert "tags" in result
     # tagsはtopicから継承
     assert "domain:test" in result["tags"]
@@ -351,13 +351,10 @@ def test_add_decision_success(temp_db):
 
     assert "error" not in result
     assert result["decision_id"] > 0
-    assert result["topic_id"] == topic["topic_id"]
-    assert result["decision"] == "設計議論フェーズではプランモード不要。"
-    assert result["reason"] == "設計議論では自由に発散→収束させたい。"
-    assert "tags" in result
-    # tagsはtopicから継承
-    assert "domain:test" in result["tags"]
-    assert "created_at" in result
+    assert "decision" not in result
+    assert "reason" not in result
+    assert "topic_id" not in result
+    assert "tags" not in result
 
 
 def test_add_decision_with_tags(temp_db):
@@ -372,9 +369,8 @@ def test_add_decision_with_tags(temp_db):
     )
 
     assert "error" not in result
-    # topic_tags UNION decision_tags
-    assert "domain:test" in result["tags"]
-    assert "extra" in result["tags"]
+    assert result["decision_id"] > 0
+    assert "tags" not in result
 
 
 def test_add_decision_without_tags(temp_db):
@@ -388,9 +384,8 @@ def test_add_decision_without_tags(temp_db):
     )
 
     assert "error" not in result
-    # topicの継承タグが効いている
-    assert "domain:test" in result["tags"]
-    assert "intent:design" in result["tags"]
+    assert result["decision_id"] > 0
+    assert "tags" not in result
 
 
 def test_add_decision_without_topic(temp_db):

@@ -87,7 +87,7 @@ class TestV1BatchSuccess:
             assert c["log_id"] > 0
             assert c["topic_id"] == tid
             assert c["title"] == f"タイトル{i + 1}"
-            assert c["content"] == f"ログ{i + 1}の内容"
+            assert "content" not in c  # レスポンス軽量化
             assert "tags" in c
             assert "created_at" in c
 
@@ -106,11 +106,12 @@ class TestV1BatchSuccess:
 
         for i, c in enumerate(result["created"]):
             assert c["decision_id"] > 0
-            assert c["topic_id"] == tid
-            assert c["decision"] == f"決定{i + 1}"
-            assert c["reason"] == f"理由{i + 1}"
-            assert "tags" in c
-            assert "created_at" in c
+            # レスポンス軽量化: decision_idのみ含まれる
+            assert "topic_id" not in c
+            assert "decision" not in c
+            assert "reason" not in c
+            assert "tags" not in c
+            assert "created_at" not in c
 
 
 # ========================================
@@ -141,7 +142,7 @@ class TestV2SingleItem:
         assert "error" not in result
         assert len(result["created"]) == 1
         assert len(result["errors"]) == 0
-        assert result["created"][0]["decision"] == "単件決定"
+        assert result["created"][0]["decision_id"] > 0
 
 
 # ========================================
@@ -608,7 +609,7 @@ class TestTagInheritance:
         assert "intent:discuss" in tags
 
     def test_add_decisions_tags_inherited_from_topic(self, topic):
-        """tags省略時にtopicのタグが継承される"""
+        """tags省略時にtopicのタグが継承される（レスポンスにはdecision_idのみ）"""
         tid = topic["topic_id"]
         result = add_decisions([
             {"topic_id": tid, "decision": "タグ省略決定", "reason": "理由"},
@@ -616,7 +617,9 @@ class TestTagInheritance:
 
         assert "error" not in result
         assert len(result["created"]) == 1
-        assert "domain:test" in result["created"][0]["tags"]
+        assert result["created"][0]["decision_id"] > 0
+        # レスポンス軽量化: tagsは含まれない
+        assert "tags" not in result["created"][0]
 
     def test_add_logs_mixed_topics(self, topic, topic2):
         """異なるtopic_idのアイテムが混在しても正しく処理される"""

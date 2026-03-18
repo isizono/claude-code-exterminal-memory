@@ -135,6 +135,10 @@ def add_logs(items: list[dict]) -> dict:
                     build_embedding_text(c["title"], c["content"], tag_text),
                 )
 
+            # レスポンス軽量化: embedding生成後にcontentを除去
+            for c in created:
+                c.pop("content", None)
+
         return {"created": created, "errors": errors}
 
     except Exception as e:
