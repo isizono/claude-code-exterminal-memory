@@ -133,8 +133,8 @@ def get_activities(
 
     Args:
         tags: タグ配列（optional。指定時はAND条件でフィルタ、未指定時は全件）
-        status: フィルタするステータス（active/pending/in_progress/completed、デフォルト: active）
-                "active"はpending+in_progressの両方を返すエイリアス
+        status: フィルタするステータス（active/pending/in_progress/completed/snoozed、デフォルト: active）
+                "active"はpending+in_progressの両方を返すエイリアス（snoozedは含まない）
         limit: 取得件数上限（デフォルト: 5）
         since: ISO日付文字列（例: "2026-03-10"）。この日付以降に更新されたアクティビティのみ返す
         until: ISO日付文字列。この日付以前に更新されたアクティビティのみ返す
@@ -440,6 +440,10 @@ def update_activity(
                     "message": f"Activity with id {activity_id} not found",
                 }
             }
+
+        # snoozed中にstatus指定なしでフィールド更新 → 自動復活
+        if status is None and row["status"] == "snoozed":
+            status = "pending"
 
         # 動的SQL構築: 指定されたフィールドのみUPDATEする
         set_parts = []
