@@ -531,3 +531,91 @@ class TestUpdateActivity:
 
         assert "error" in result
         assert result["error"]["code"] == "NOT_FOUND"
+
+
+class TestSnoozedStatus:
+    """snoozedステータスの統合テスト"""
+
+    def test_set_status_to_snoozed(self, activity_with_db):
+        """アクティビティをsnoozedに変更できる"""
+        activity = activity_with_db["activity"]
+        result = update_activity(activity["activity_id"], status="snoozed")
+
+        assert "error" not in result
+        assert result["status"] == "snoozed"
+
+    def test_snoozed_excluded_from_active(self, temp_db):
+        """snoozedアクティビティはstatus='active'に含まれない"""
+        a = add_activity(title="Snoozed", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        update_activity(a["activity_id"], status="snoozed")
+
+        result = get_activities(status="active")
+
+        assert "error" not in result
+        assert result["total_count"] == 0
+
+    def test_snoozed_returned_with_status_filter(self, temp_db):
+        """get_activities(status='snoozed')でsnoozedアクティビティが返る"""
+        a = add_activity(title="Snoozed", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        update_activity(a["activity_id"], status="snoozed")
+
+        result = get_activities(status="snoozed")
+
+        assert "error" not in result
+        assert result["total_count"] == 1
+        assert result["activities"][0]["title"] == "Snoozed"
+
+    def test_lazy_evaluation_restores_expired_snoozed(self, temp_db):
+        """期限切れsnoozedがget_activities呼び出し時にpendingに復活する"""
+        a = add_activity(title="Expired Snooze", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        update_activity(a["activity_id"], status="snoozed")
+
+        # updated_atを4日前に書き換えて期限切れにする
+        conn = get_connection()
+        conn.execute(
+            "UPDATE activities SET updated_at = datetime('now', '-4 days') WHERE id = ?",
+            (a["activity_id"],),
+        )
+        conn.commit()
+        conn.close()
+
+        # get_activitiesのlazy evaluationで復活するはず
+        result = get_activities(status="pending")
+
+        assert "error" not in result
+        assert result["total_count"] == 1
+        assert result["activities"][0]["title"] == "Expired Snooze"
+        assert result["activities"][0]["status"] == "pending"
+
+    def test_lazy_evaluation_keeps_unexpired_snoozed(self, temp_db):
+        """期限内のsnoozedはget_activities呼び出し後もsnoozedのまま"""
+        a = add_activity(title="Fresh Snooze", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        update_activity(a["activity_id"], status="snoozed")
+
+        # get_activitiesを呼んでもsnoozedのまま
+        get_activities(status="active")
+        result = get_activities(status="snoozed")
+
+        assert "error" not in result
+        assert result["total_count"] == 1
+        assert result["activities"][0]["status"] == "snoozed"
+
+    def test_field_update_wakes_snoozed(self, temp_db):
+        """snoozed中にtitle更新すると自動的にpendingに復活する"""
+        a = add_activity(title="Sleeping", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        update_activity(a["activity_id"], status="snoozed")
+
+        result = update_activity(a["activity_id"], title="Awake")
+
+        assert "error" not in result
+        assert result["status"] == "pending"
+
+    def test_explicit_status_change_on_snoozed(self, temp_db):
+        """snoozed→completedの明示的なステータス変更は尊重される"""
+        a = add_activity(title="Done", description="Desc", tags=DEFAULT_TAGS, check_in=False)
+        update_activity(a["activity_id"], status="snoozed")
+
+        result = update_activity(a["activity_id"], status="completed")
+
+        assert "error" not in result
+        assert result["status"] == "completed"
