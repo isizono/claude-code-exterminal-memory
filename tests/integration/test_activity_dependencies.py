@@ -317,3 +317,81 @@ class TestRelationsViewRelationType:
             assert a3 in target_ids
         finally:
             conn.close()
+
+
+class TestGetMapWithDependencies:
+    """get_mapがdepends_on関係を含むシナリオのテスト"""
+
+    def test_get_map_includes_depends_on_target(self, temp_db):
+        """get_mapがdepends_on先のアクティビティを返す"""
+        from src.services.relation_service import get_map
+
+        conn = get_connection()
+        try:
+            a1 = _create_activity(conn, "Dependent")
+            a2 = _create_activity(conn, "Dependency")
+            conn.execute(
+                "INSERT INTO activity_dependencies (dependent_id, dependency_id) VALUES (?, ?)",
+                (a1, a2),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = get_map("activity", a1, min_depth=1, max_depth=1)
+        assert "entities" in result
+        entity_ids = {(e["type"], e["id"]) for e in result["entities"]}
+        assert ("activity", a2) in entity_ids
+
+    def test_get_map_depends_on_not_reverse(self, temp_db):
+        """get_mapでdependency側から起点にした場合、dependent側は返らない（非対称）"""
+        from src.services.relation_service import get_map
+
+        conn = get_connection()
+        try:
+            a1 = _create_activity(conn, "Dependent")
+            a2 = _create_activity(conn, "Dependency")
+            conn.execute(
+                "INSERT INTO activity_dependencies (dependent_id, dependency_id) VALUES (?, ?)",
+                (a1, a2),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = get_map("activity", a2, min_depth=1, max_depth=1)
+        entity_ids = {(e["type"], e["id"]) for e in result["entities"]}
+        # a2→a1 方向のdepends_onはviewに存在しないため、a1は返らない
+        assert ("activity", a1) not in entity_ids
+
+    def test_get_map_mixed_related_and_depends_on(self, temp_db):
+        """get_mapがrelated関係とdepends_on関係の両方を含む場合に正しく返す"""
+        from src.services.relation_service import add_relation, get_map
+
+        conn = get_connection()
+        try:
+            a1 = _create_activity(conn, "Main")
+            a2 = _create_activity(conn, "Related Peer")
+            a3 = _create_activity(conn, "Dependency")
+            conn.commit()
+        finally:
+            conn.close()
+
+        # a1 ←related→ a2
+        add_relation("activity", a1, [{"type": "activity", "ids": [a2]}])
+
+        # a1 →depends_on→ a3
+        conn = get_connection()
+        try:
+            conn.execute(
+                "INSERT INTO activity_dependencies (dependent_id, dependency_id) VALUES (?, ?)",
+                (a1, a3),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+        result = get_map("activity", a1, min_depth=1, max_depth=1)
+        entity_ids = {(e["type"], e["id"]) for e in result["entities"]}
+        assert ("activity", a2) in entity_ids
+        assert ("activity", a3) in entity_ids

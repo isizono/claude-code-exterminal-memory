@@ -1,6 +1,5 @@
--- depends: 0026_add_snoozed_status
+-- depends: 0027_add_shelved_status
 
--- TODO 1: activity_dependencies テーブル作成
 CREATE TABLE activity_dependencies (
     dependent_id  INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
     dependency_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
@@ -9,10 +8,8 @@ CREATE TABLE activity_dependencies (
     CHECK (dependent_id != dependency_id)
 );
 
--- TODO 2: 逆方向参照用インデックス作成
 CREATE INDEX idx_activity_dependencies_dependency ON activity_dependencies(dependency_id);
 
--- TODO 3: relations_view 再作成（DROP VIEW + CREATE VIEW with relation_type列追加）
 DROP VIEW relations_view;
 CREATE VIEW relations_view AS
   SELECT topic_id_1 AS source_id, 'topic' AS source_type,
