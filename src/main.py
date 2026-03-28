@@ -550,8 +550,8 @@ def get_activities(
 
     Args:
         tags: タグ配列（optional）。指定時はAND条件でフィルタ。未指定時は全件返す。例: ["domain:cc-memory"]
-        status: フィルタするステータス（active/pending/in_progress/completed/snoozed、デフォルト: active）
-                "active"はpending+in_progressの両方を返すエイリアス（snoozedは含まない）
+        status: フィルタするステータス（active/pending/in_progress/completed/snoozed/shelved、デフォルト: active）
+                "active"はpending+in_progressの両方を返すエイリアス（snoozed/shelvedは含まない）
         limit: 取得件数上限（デフォルト: 5）
         since: ISO日付文字列（例: "2026-03-10"）。この日付以降に更新されたアクティビティのみ返す
         until: ISO日付文字列。この日付以前に更新されたアクティビティのみ返す
@@ -582,6 +582,7 @@ def update_activity(
     - アクティビティ開始: update_activity(activity_id, status="in_progress")
     - アクティビティ完了: update_activity(activity_id, status="completed")
     - アクティビティを寝かせる: update_activity(activity_id, status="snoozed")
+    - アクティビティを棚上げする: update_activity(activity_id, status="shelved")
     - タイトル変更: update_activity(activity_id, title="新しいタイトル")
     - 説明更新: update_activity(activity_id, description="新しい説明")
     - タグ変更: update_activity(activity_id, tags=["domain:cc-memory", "intent:implement"])
@@ -590,7 +591,7 @@ def update_activity(
 
     Args:
         activity_id: アクティビティID
-        status: 新しいステータス（pending/in_progress/completed/snoozed）
+        status: 新しいステータス（pending/in_progress/completed/snoozed/shelved）
         title: 新しいタイトル
         description: 新しい説明
         tags: 新しいタグ配列（指定時は全置換。1個以上必須）
