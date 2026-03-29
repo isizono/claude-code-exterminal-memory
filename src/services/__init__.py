@@ -6,6 +6,7 @@ from . import (
     search_service,
     activity_service,
     tag_service,
+    pin_service,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "search_service",
     "activity_service",
     "tag_service",
+    "pin_service",
 ]
