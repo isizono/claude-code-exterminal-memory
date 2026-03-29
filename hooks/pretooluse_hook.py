@@ -41,17 +41,8 @@ _ACTIVITY_NUDGE_MESSAGE = (
 
 _RECORD_NUDGE_MESSAGE = (
     "<system-reminder>"
-    "Self-check before continuing: "
-    "(1) Does your current topic still match the conversation? "
-    "If the discussion has shifted, create a new topic with add_topic. "
-    "(2) Have you and the user reached any agreements that should be recorded? "
-    "Examples: design choices, naming conventions, scope boundaries, "
-    "implementation approaches, or trade-off resolutions. "
-    "If yes, record them now with add_decisions before proceeding. "
-    "(3) Has there been substantive discussion worth preserving? "
-    "Use add_logs to capture the flow of conversation — "
-    "arguments considered, options explored, and reasoning behind choices. "
-    "Decisions record conclusions; logs preserve the path that led there."
+    "記録が遅れています。議論の途中でもいいので add_logs / add_decisions で記録してください。"
+    "次も記録がなければblockが走ります。"
     "</system-reminder>"
 )
 

@@ -81,7 +81,7 @@ class TestRecordNudge:
 
         ctx = output["hookSpecificOutput"]["additionalContext"]
         assert "<system-reminder>" in ctx
-        assert "Self-check before continuing" in ctx
+        assert "記録が遅れています" in ctx
         assert "add_decisions" in ctx
 
     def test_nudge_consumed_after_injection(self, state_dir):
@@ -136,7 +136,7 @@ class TestActivityNudge:
         result2 = _run_hook({"session_id": _SESSION_ID}, state_dir)
         output2 = json.loads(result2.stdout)
         ctx2 = output2["hookSpecificOutput"]["additionalContext"]
-        assert "Self-check before continuing" in ctx2
+        assert "記録が遅れています" in ctx2
 
 
 class TestEmptySessionId:
