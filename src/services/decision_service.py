@@ -87,8 +87,6 @@ def add_decisions(items: list[dict]) -> dict:
                     try:
                         p_type = propagate_to.get("type")
                         p_content = propagate_to.get("content", "")
-                        if not p_content or not p_content.strip():
-                            raise ValueError("propagate_to.content must not be empty")
                         if p_type == "habit":
                             p_id = _add_habit_with_conn(conn, p_content)
                             propagation_result = {"status": "ok", "type": "habit", "id": p_id}

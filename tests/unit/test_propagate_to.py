@@ -9,9 +9,18 @@ from src.db import init_database, get_connection
 from src.services.topic_service import add_topic
 from src.services.decision_service import add_decisions
 from src.services.tag_service import _injected_tags
+import src.services.embedding_service as emb
 
 
 DEFAULT_TAGS = ["domain:test"]
+
+
+@pytest.fixture(autouse=True)
+def disable_embedding(monkeypatch):
+    """embeddingサービスを無効化"""
+    monkeypatch.setattr(emb, '_server_initialized', False)
+    monkeypatch.setattr(emb, '_backfill_done', True)
+    monkeypatch.setattr(emb, '_ensure_server_running', lambda: False)
 
 
 @pytest.fixture
@@ -271,6 +280,39 @@ class TestPropagateToErrors:
         assert created["propagation"]["status"] == "error"
         assert created["propagation"]["type"] == "invalid_type"
         assert "invalid" in created["propagation"]["message"].lower()
+
+        # decisionがDBに残っていることを確認
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT * FROM decisions WHERE id = ?",
+                (created["decision_id"],),
+            ).fetchone()
+            assert row is not None
+        finally:
+            conn.close()
+
+    def test_missing_type_key_error_decision_remains(self, topic):
+        """typeキー省略 → type=Noneでpropagation.status=="error", decisionは残る"""
+        tid = topic["topic_id"]
+        result = add_decisions([
+            {
+                "topic_id": tid,
+                "decision": "typeキー省略での伝搬テスト",
+                "reason": "バリデーションテスト",
+                "propagate_to": {
+                    "content": "何かしらのコンテンツ",
+                },
+            },
+        ])
+
+        assert "error" not in result
+        assert len(result["created"]) == 1
+
+        created = result["created"][0]
+        assert created["decision_id"] > 0
+        assert created["propagation"]["status"] == "error"
+        assert "Invalid propagate_to.type: None" in created["propagation"]["message"]
 
         # decisionがDBに残っていることを確認
         conn = get_connection()
