@@ -40,7 +40,7 @@ _ACTIVITY_NUDGE_MESSAGE = (
 
 _RECORD_NUDGE_MESSAGE = (
     "<system-reminder>"
-    "記録が遅れています。議論の途中でもいいので add_logs / add_decisions で記録してください。"
+    "記録が遅れています。議論の途中でもいいので add_logs / add_decisions / add_topic で記録してください。"
     "2ターン以内に記録がなければblockが走ります。"
     "</system-reminder>"
 )

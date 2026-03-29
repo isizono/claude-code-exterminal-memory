@@ -125,7 +125,7 @@ def main() -> None:
                 _output(
                     "block",
                     "記録が漏れています。このターンのレスポンス内で、直近の議論を "
-                    "add_logs / add_decisions で記録してください。",
+                    "add_logs / add_decisions / add_topic で記録してください。",
                 )
                 return
 
@@ -197,16 +197,25 @@ def _safe_post_approve(
     *,
     run_nudges: bool = False,
 ) -> None:
-    """approve出力後の状態更新。例外はstderrログのみ（double-output防止）。"""
+    """approve出力後の状態更新。例外はstderrログのみ（double-output防止）。
+
+    各処理は独立したtryブロックで囲み、一方の失敗が他方を阻害しないようにする。
+    """
     try:
         _update_state_on_approve(state, events, transcript_path)
-        if run_nudges:
-            _handle_nudges(state, events, current_turn)
     except Exception as e:
         print(
-            f"stop_hook.py post-approve error: {e}\n{traceback.format_exc()}",
+            f"stop_hook.py post-approve error (state): {e}\n{traceback.format_exc()}",
             file=sys.stderr,
         )
+    if run_nudges:
+        try:
+            _handle_nudges(state, events, current_turn)
+        except Exception as e:
+            print(
+                f"stop_hook.py post-approve error (nudge): {e}\n{traceback.format_exc()}",
+                file=sys.stderr,
+            )
 
 
 def _update_state_on_approve(
