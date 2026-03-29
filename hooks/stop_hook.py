@@ -167,6 +167,7 @@ def _is_in_skill_span(events: list[dict], current_turn: int) -> bool:
 
 def _turns_since_last_recording(events: list[dict], current_turn: int) -> int:
     """最後に記録ツールが呼ばれたturnからの経過ターン数を返す。"""
+    # 記録ゼロの場合はセッション開始(turn 0)から経過したとみなす
     last_recording_turn = 0
     for e in events:
         if e["e"] == "tool" and e.get("name") in _RECORDING_TOOLS and e.get("turn", 0) > last_recording_turn:

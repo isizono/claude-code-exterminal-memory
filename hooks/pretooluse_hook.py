@@ -32,17 +32,16 @@ def _make_hook_output(message: str) -> dict:
 
 _ACTIVITY_NUDGE_MESSAGE = (
     "<system-reminder>"
-    "You just recorded a decision. Consider whether it implies follow-up work "
-    "(design discussion, implementation, investigation) that should be tracked "
-    "as a new activity. If so, create one with add_activity. "
-    "Ignore if not applicable."
+    "決定事項を記録しましたが、アクティビティにcheck-inしていません。"
+    "フォローアップ作業（議論・設計・実装・調査）が必要なら add_activity で作成してください。"
+    "該当しなければ無視してください。"
     "</system-reminder>"
 )
 
 _RECORD_NUDGE_MESSAGE = (
     "<system-reminder>"
     "記録が遅れています。議論の途中でもいいので add_logs / add_decisions で記録してください。"
-    "次も記録がなければblockが走ります。"
+    "2ターン以内に記録がなければblockが走ります。"
     "</system-reminder>"
 )
 

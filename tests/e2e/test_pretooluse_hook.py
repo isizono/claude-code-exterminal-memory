@@ -113,8 +113,8 @@ class TestActivityNudge:
         output = json.loads(result.stdout)
         assert "hookSpecificOutput" in output
         ctx = output["hookSpecificOutput"]["additionalContext"]
-        assert "decision" in ctx
-        assert "activity" in ctx.lower()
+        assert "決定事項" in ctx
+        assert "add_activity" in ctx
 
     def test_activity_nudge_takes_priority(self, state_dir):
         """activity nudgeが最新なら、record nudgeより優先"""
@@ -130,7 +130,7 @@ class TestActivityNudge:
         output = json.loads(result.stdout)
         ctx = output["hookSpecificOutput"]["additionalContext"]
         # activity nudgeが注入される（最新のnudgeが先に消費される）
-        assert "activity" in ctx.lower()
+        assert "add_activity" in ctx
 
         # record nudgeはまだ残っている
         result2 = _run_hook({"session_id": _SESSION_ID}, state_dir)
