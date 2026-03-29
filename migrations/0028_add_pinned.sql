@@ -1,9 +1,9 @@
--- Migration 027: discussion_logs, decisions, materialsにpinnedカラムを追加
+-- Migration 028: discussion_logs, decisions, materialsにpinnedカラムを追加
 --
--- depends: 0026_add_snoozed_status
+-- depends: 0027_add_shelved_status
 --
 -- 背景:
---   重要なエンティティをpinしてcheck-in時にcontentごと返すための準備。
+--   重要なエンティティをpinして重要度を明示するための準備。
 --   pin基準: 「これを知らずに着手したら間違った方向に進む」レベルの情報。
 --
 -- 変更内容:
