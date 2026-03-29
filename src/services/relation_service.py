@@ -230,6 +230,9 @@ def _remove_depends_on_with_conn(conn: sqlite3.Connection, source_id: int, targe
     """
     removed = 0
     for target_id in target_ids:
+        # 自己参照はCHECK制約で存在し得ないが、明示的にスキップ
+        if source_id == target_id:
+            continue
         conn.execute(
             "DELETE FROM activity_dependencies WHERE dependent_id = ? AND dependency_id = ?",
             (source_id, target_id),
@@ -254,6 +257,26 @@ def _remove_relation_with_conn(conn: sqlite3.Connection, source_type: str, sourc
             )
             removed += conn.execute("SELECT changes()").fetchone()[0]
     return removed
+
+
+def _validate_depends_on_constraints(source_type: str, targets: list[dict]) -> dict | None:
+    """depends_onリレーションの制約をバリデーションする。activity→activityのみ有効。"""
+    if source_type != "activity":
+        return {
+            "error": {
+                "code": "INVALID_RELATION_TYPE",
+                "message": "depends_on relation is only valid for activity→activity",
+            }
+        }
+    for target in targets:
+        if target["type"] != "activity":
+            return {
+                "error": {
+                    "code": "INVALID_RELATION_TYPE",
+                    "message": "depends_on relation is only valid for activity→activity",
+                }
+            }
+    return None
 
 
 def add_relation(source_type: str, source_id: int, targets: list[dict], relation_type: str = "related") -> dict:
@@ -285,23 +308,10 @@ def add_relation(source_type: str, source_id: int, targets: list[dict], relation
     if err:
         return err
 
-    # depends_onはactivity→activityのみ
     if relation_type == "depends_on":
-        if source_type != "activity":
-            return {
-                "error": {
-                    "code": "INVALID_RELATION_TYPE",
-                    "message": "depends_on relation is only valid for activity→activity",
-                }
-            }
-        for target in targets:
-            if target["type"] != "activity":
-                return {
-                    "error": {
-                        "code": "INVALID_RELATION_TYPE",
-                        "message": "depends_on relation is only valid for activity→activity",
-                    }
-                }
+        err = _validate_depends_on_constraints(source_type, targets)
+        if err:
+            return err
 
     conn = get_connection()
     try:
@@ -358,23 +368,10 @@ def remove_relation(source_type: str, source_id: int, targets: list[dict], relat
     if err:
         return err
 
-    # depends_onはactivity→activityのみ
     if relation_type == "depends_on":
-        if source_type != "activity":
-            return {
-                "error": {
-                    "code": "INVALID_RELATION_TYPE",
-                    "message": "depends_on relation is only valid for activity→activity",
-                }
-            }
-        for target in targets:
-            if target["type"] != "activity":
-                return {
-                    "error": {
-                        "code": "INVALID_RELATION_TYPE",
-                        "message": "depends_on relation is only valid for activity→activity",
-                    }
-                }
+        err = _validate_depends_on_constraints(source_type, targets)
+        if err:
+            return err
 
     conn = get_connection()
     try:
