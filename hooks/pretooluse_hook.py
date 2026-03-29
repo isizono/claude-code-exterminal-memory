@@ -30,11 +30,10 @@ def _make_hook_output(message: str) -> dict:
     }
 
 
-_ACTIVITY_NUDGE_MESSAGE = (
+_FOLLOW_UP_NUDGE_MESSAGE = (
     "<system-reminder>"
-    "決定事項を記録しましたが、アクティビティにcheck-inしていません。"
-    "フォローアップ作業（議論・設計・実装・調査）が必要なら add_activity で作成してください。"
-    "該当しなければ無視してください。"
+    "決定事項を記録しました。関連するエンティティ（topic・logs・activity）の"
+    "作成や更新も忘れずに行ってください。該当しなければ無視してください。"
     "</system-reminder>"
 )
 
@@ -82,8 +81,8 @@ def main() -> None:
             e["consumed"] = True
             _rewrite_events(state, events)
 
-            if e.get("type") == "activity":
-                print(json.dumps(_make_hook_output(_ACTIVITY_NUDGE_MESSAGE), ensure_ascii=False))
+            if e.get("type") == "follow_up":
+                print(json.dumps(_make_hook_output(_FOLLOW_UP_NUDGE_MESSAGE), ensure_ascii=False))
                 return
             elif e.get("type") == "record":
                 print(json.dumps(_make_hook_output(_RECORD_NUDGE_MESSAGE), ensure_ascii=False))

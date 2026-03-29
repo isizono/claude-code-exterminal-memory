@@ -412,8 +412,8 @@ class TestSkillSpan:
 class TestNudge:
     """nudgeイベントの生成"""
 
-    def test_activity_nudge_on_decision_without_activity(self, env_setup):
-        """add_decisions呼出あり + add_activity/check_inなし → activity nudgeイベント生成"""
+    def test_follow_up_nudge_on_decision_only(self, env_setup):
+        """add_decisions呼出あり + 他の記録系/check-in系ツールなし → follow_up nudgeイベント生成"""
         state_dir = env_setup["state_dir"]
 
         transcript = env_setup["tmp_path"] / "transcript.jsonl"
@@ -433,11 +433,11 @@ class TestNudge:
 
         events = _read_events(state_dir, "test-session")
         nudge_events = [e for e in events if e.get("e") == "nudge"]
-        activity_nudges = [e for e in nudge_events if e.get("type") == "activity"]
-        assert len(activity_nudges) >= 1
+        follow_up_nudges = [e for e in nudge_events if e.get("type") == "follow_up"]
+        assert len(follow_up_nudges) >= 1
 
-    def test_no_activity_nudge_when_checkin_present(self, env_setup):
-        """add_decisions + check_in両方呼出 → activity nudge不発"""
+    def test_no_follow_up_nudge_when_companion_present(self, env_setup):
+        """add_decisions + check_in両方呼出 → follow_up nudge不発"""
         state_dir = env_setup["state_dir"]
 
         transcript = env_setup["tmp_path"] / "transcript.jsonl"
@@ -460,8 +460,8 @@ class TestNudge:
         assert result["decision"] == "approve"
 
         events = _read_events(state_dir, "test-session")
-        activity_nudges = [e for e in events if e.get("e") == "nudge" and e.get("type") == "activity"]
-        assert len(activity_nudges) == 0
+        follow_up_nudges = [e for e in events if e.get("e") == "nudge" and e.get("type") == "follow_up"]
+        assert len(follow_up_nudges) == 0
 
 
 class TestStateUpdatedOnApprove:

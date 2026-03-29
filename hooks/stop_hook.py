@@ -252,19 +252,20 @@ def _handle_nudges(state: HookState, events: list[dict], current_turn: int) -> N
                 "turn": current_turn,
             })
 
-    # activity nudge: 直近turnにadd_decisionあり & add_activity/check_inなし
+    # follow_up nudge: 直近turnにadd_decisionsあり & 他の記録系/check-in系ツールなし
     recent_events = [e for e in events if e.get("turn", 0) == current_turn]
     has_decision = any(
         e["e"] == "tool" and e.get("name") == "add_decisions" for e in recent_events
     )
     if has_decision:
-        has_activity = any(
-            e["e"] == "tool" and e.get("name") in _CHECKIN_TOOLS for e in recent_events
+        companion_tools = (_RECORDING_TOOLS | _CHECKIN_TOOLS) - {"add_decisions"}
+        has_companion = any(
+            e["e"] == "tool" and e.get("name") in companion_tools for e in recent_events
         )
-        if not has_activity:
+        if not has_companion:
             nudge_events.append({
                 "e": "nudge",
-                "type": "activity",
+                "type": "follow_up",
                 "turn": current_turn,
             })
 
