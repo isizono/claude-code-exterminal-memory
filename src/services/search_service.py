@@ -72,6 +72,9 @@ QE_DISTANCE_THRESHOLD = 0.3   # コサイン距離。これ未満のタグを拡
 QE_MAX_EXPANSIONS = 5          # 全キーワード合計での最大拡張タグ数
 QE_EXCLUDE_NAMESPACES = True   # namespace付きタグを除外するか
 
+# nearby_tags パラメータ
+NEARBY_TAGS_LIMIT = 5          # 返却するnearby_tagsの最大件数
+
 
 def _escape_fts5_query(keyword: str) -> str:
     """FTS5クエリ用のエスケープ処理。ダブルクォートで囲む。"""
@@ -349,6 +352,97 @@ def _attach_tags(results: list[dict]) -> None:
             else:
                 for item in items:
                     item["tags"] = []
+    finally:
+        conn.close()
+
+
+# 共起テーブル定義: (テーブル名, エンティティIDカラム名)
+_CO_OCCURRENCE_TABLES = [
+    ("topic_tags", "topic_id"),
+    ("decision_tags", "decision_id"),
+    ("log_tags", "log_id"),
+    ("activity_tags", "activity_id"),
+    ("material_tags", "material_id"),
+]
+
+
+def _compute_nearby_tags(
+    results: list[dict],
+    query_tag_ids: list[int] | None,
+    offset: int,
+) -> list[dict]:
+    """検索結果のタグ共起から関連タグを計算する。
+
+    5タグテーブルのself-joinで共起関係を集計し、結果に含まれないタグを
+    co_count降順で返す。namespace付きタグ(domain:/intent:)は除外。
+
+    Args:
+        results: _attach_tags済みの検索結果
+        query_tag_ids: 検索フィルタに使用されたtag_id（除外用）
+        offset: ページネーションオフセット
+
+    Returns:
+        [{"tag": "tag_name", "co_count": N}, ...]
+    """
+    if offset > 0 or not results:
+        return []
+
+    # resultsからタグ文字列を収集
+    all_tag_strings: set[str] = set()
+    for item in results:
+        all_tag_strings.update(item.get("tags", []))
+
+    if not all_tag_strings:
+        return []
+
+    conn = get_connection()
+    try:
+        # タグ文字列→tag_id解決（エイリアスも考慮）
+        result_tag_ids = set(_resolve_tag_ids_readonly(conn, list(all_tag_strings)))
+
+        if not result_tag_ids:
+            return []
+
+        # 除外セット: 結果タグ + クエリフィルタタグ
+        exclude_ids = set(result_tag_ids)
+        if query_tag_ids:
+            exclude_ids.update(query_tag_ids)
+
+        result_ids_list = list(result_tag_ids)
+        exclude_ids_list = list(exclude_ids)
+
+        ph_in = ",".join("?" * len(result_ids_list))
+        ph_not = ",".join("?" * len(exclude_ids_list))
+
+        # 各テーブルでself-join → テーブル単位でGROUP BY → UNION ALL
+        unions = []
+        params: list = []
+        for table, id_col in _CO_OCCURRENCE_TABLES:
+            unions.append(f"""
+                SELECT t2.tag_id, COUNT(DISTINCT t1.{id_col}) AS co_count
+                FROM {table} t1
+                JOIN {table} t2 ON t1.{id_col} = t2.{id_col}
+                WHERE t1.tag_id IN ({ph_in})
+                  AND t2.tag_id NOT IN ({ph_not})
+                GROUP BY t2.tag_id
+            """)
+            params.extend(result_ids_list)
+            params.extend(exclude_ids_list)
+
+        union_sql = " UNION ALL ".join(unions)
+        query = f"""
+            SELECT t.name, SUM(sub.co_count) AS total_co_count
+            FROM ({union_sql}) sub
+            JOIN tags t ON t.id = sub.tag_id
+            WHERE t.namespace = ''
+            GROUP BY sub.tag_id, t.name
+            ORDER BY total_co_count DESC
+            LIMIT ?
+        """
+        params.append(NEARBY_TAGS_LIMIT)
+
+        rows = conn.execute(query, tuple(params)).fetchall()
+        return [{"tag": row["name"], "co_count": row["total_co_count"]} for row in rows]
     finally:
         conn.close()
 
@@ -1167,10 +1261,13 @@ def search(
             details_targets = results[:DETAILS_MAX_RESULTS]
             _attach_details(details_targets)
 
+        nearby_tags = _compute_nearby_tags(results, tag_ids, offset)
+
         return {
             "results": results,
             "total_count": total_count,
             "search_methods_used": methods_used,
+            "nearby_tags": nearby_tags,
         }
 
     except Exception as e:
