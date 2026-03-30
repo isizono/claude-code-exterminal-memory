@@ -129,7 +129,6 @@ def _build_activities_section(conn) -> str:
 
     # メタデータ一括取得
     all_ids = [a["id"] for a in normal_activities]
-    hb_ids = [a["id"] for a in heartbeat_activities]
     tags_map = get_entity_tags_batch(conn, "activity_tags", "activity_id", all_ids)
     unresolved_deps = _get_unresolved_deps(conn, all_ids)
     descriptions = _get_descriptions(conn, all_ids)
