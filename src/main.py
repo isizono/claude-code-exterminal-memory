@@ -816,7 +816,6 @@ def update_pin(entity_type: str, entity_id: int, pinned: bool) -> dict:
 
     pin基準: 「これを知らずに着手したら間違った方向に進む」レベルの情報。
     unpin基準: 「もう知らなくてもいい状態になったか」。
-    ※check-in時のpinnedエンティティ自動返却は将来実装予定。
 
     pinすべき例:
     - 方向転換を記録したログ（以前の方針と異なる判断をした経緯）
