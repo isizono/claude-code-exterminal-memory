@@ -61,9 +61,9 @@ def _get_activities_overview(conn: sqlite3.Connection, activity_ids: list[int]) 
 
 
 def _get_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -> list[dict]:
-    """複数トピックのdecisionsを横断取得し、新しい順にフラット化する。
+    """複数トピックの非pinnedのdecisionsを横断取得し、新しい順にフラット化する。
 
-    上位DECISIONS_FULL_LIMIT件はid+title、超過分はid+titleのみ。
+    上位DECISIONS_FULL_LIMIT件はid+title。pinnedは除外される（別途取得）。
     """
     if not topic_ids:
         return []
@@ -72,7 +72,7 @@ def _get_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -
         f"""
         SELECT id, decision
         FROM decisions
-        WHERE topic_id IN ({placeholders})
+        WHERE topic_id IN ({placeholders}) AND pinned = 0
         ORDER BY id DESC
         LIMIT {DECISIONS_FULL_LIMIT}
         """,
@@ -86,7 +86,7 @@ def _get_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -
 
 
 def _count_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -> int:
-    """複数トピックのdecisionsの総件数を取得する。"""
+    """複数トピックのdecisionsの総件数を取得する（pinned含む、coverage分母用）。"""
     if not topic_ids:
         return 0
     placeholders = ",".join("?" * len(topic_ids))
@@ -98,7 +98,7 @@ def _count_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int])
 
 
 def _get_logs_catalog_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -> list[dict]:
-    """複数トピックのlogsカタログ（id + titleのみ）を横断取得し、新しい順にフラット化する。"""
+    """複数トピックの非pinnedのlogsカタログ（id + titleのみ）を横断取得し、新しい順にフラット化する。"""
     if not topic_ids:
         return []
     placeholders = ",".join("?" * len(topic_ids))
@@ -106,13 +106,62 @@ def _get_logs_catalog_from_topics(conn: sqlite3.Connection, topic_ids: list[int]
         f"""
         SELECT id, title
         FROM discussion_logs
-        WHERE topic_id IN ({placeholders})
+        WHERE topic_id IN ({placeholders}) AND pinned = 0
         ORDER BY id DESC
         """,
         tuple(topic_ids),
     ).fetchall()
 
     return [{"id": row["id"], "title": row["title"]} for row in rows]
+
+
+def _get_pinned_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -> list[dict]:
+    """関連トピックのpinned decisionsをcontent付きで取得する。"""
+    if not topic_ids:
+        return []
+    placeholders = ",".join("?" * len(topic_ids))
+    rows = conn.execute(
+        f"""
+        SELECT id, decision, reason
+        FROM decisions
+        WHERE topic_id IN ({placeholders}) AND pinned = 1
+        ORDER BY id DESC
+        """,
+        tuple(topic_ids),
+    ).fetchall()
+    return [{"id": row["id"], "title": row["decision"], "reason": row["reason"]} for row in rows]
+
+
+def _get_pinned_logs_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -> list[dict]:
+    """関連トピックのpinned logsをcontent付きで取得する。"""
+    if not topic_ids:
+        return []
+    placeholders = ",".join("?" * len(topic_ids))
+    rows = conn.execute(
+        f"""
+        SELECT id, title, content
+        FROM discussion_logs
+        WHERE topic_id IN ({placeholders}) AND pinned = 1
+        ORDER BY id DESC
+        """,
+        tuple(topic_ids),
+    ).fetchall()
+    return [{"id": row["id"], "title": row["title"], "content": row["content"]} for row in rows]
+
+
+def _get_pinned_materials_for_activity(conn: sqlite3.Connection, activity_id: int) -> list[dict]:
+    """アクティビティに紐づくpinned materialsをcontent付きで取得する。"""
+    rows = conn.execute(
+        """
+        SELECT m.id, m.title, m.content
+        FROM materials m
+        JOIN activity_material_relations amr ON amr.material_id = m.id
+        WHERE amr.activity_id = ? AND m.pinned = 1
+        ORDER BY m.created_at ASC
+        """,
+        (activity_id,),
+    ).fetchall()
+    return [{"id": row["id"], "title": row["title"], "content": row["content"]} for row in rows]
 
 
 def _extract_intent_tag(tags: list[str]) -> str:
@@ -165,8 +214,8 @@ def check_in(activity_id: int) -> dict:
         activity_id: アクティビティID
 
     Returns:
-        check-in結果（coverage, activity, related_topics, related_activities, tag_notes,
-        materials, recent_decisions, logs, catalog, summary）
+        check-in結果（coverage, activity, related_topics, related_activities, pinned,
+        tag_notes, materials, recent_decisions, logs, catalog, summary）
     """
     conn = get_connection()
     try:
@@ -208,34 +257,41 @@ def check_in(activity_id: int) -> dict:
         # 3. tag_notes収集
         tag_notes = collect_tag_notes_for_injection(conn, tags, always_inject_namespaces=["intent"]) or []
 
-        # 4. materials取得（リレーション経由、カタログ形式、共有コネクション使用）
-        materials = get_materials_by_relation_with_conn(conn, activity_id)
+        # 4. pinnedエンティティ取得（content付き）
+        pinned_decisions = _get_pinned_decisions_from_topics(conn, direct["topic"])
+        pinned_logs = _get_pinned_logs_from_topics(conn, direct["topic"])
+        pinned_materials = _get_pinned_materials_for_activity(conn, activity_id)
+        pinned_material_ids = {m["id"] for m in pinned_materials}
 
-        # 5. recent_decisions取得（関連topic横断、フラット15件）
+        # 5. materials取得（リレーション経由、カタログ形式、pinnedを除外）
+        all_materials = get_materials_by_relation_with_conn(conn, activity_id)
+        materials = [m for m in all_materials if m["id"] not in pinned_material_ids]
+
+        # 6. recent_decisions取得（関連topic横断、フラット15件、pinnedを除外）
         recent_decisions = _get_decisions_from_topics(conn, direct["topic"])
 
-        # 6. logsカタログ取得（id + titleのみ、関連topic横断）
+        # 7. logsカタログ取得（id + titleのみ、関連topic横断、pinnedを除外）
         logs_catalog = _get_logs_catalog_from_topics(conn, direct["topic"])
 
-        # 7. coverage算出
+        # 8. coverage算出（pinned件数を分子に加算）
         total_decisions = _count_decisions_from_topics(conn, direct["topic"])
         total_materials_row = conn.execute(
             "SELECT COUNT(*) FROM activity_material_relations WHERE activity_id = ?",
             (activity_id,),
         ).fetchone()
         total_materials = total_materials_row[0] if total_materials_row else 0
-        total_logs = len(logs_catalog)
+        total_logs = len(logs_catalog) + len(pinned_logs)
 
         coverage = {
-            "decisions": f"{len(recent_decisions)}/{total_decisions}",
-            "materials": f"{len(materials)}/{total_materials}",
-            "logs": f"0/{total_logs}",  # logsはタイトルのみ返却のため常に0
+            "decisions": f"{len(pinned_decisions) + len(recent_decisions)}/{total_decisions}",
+            "materials": f"{len(pinned_materials) + len(materials)}/{total_materials}",
+            "logs": f"{len(pinned_logs)}/{total_logs}",
         }
 
-        # 8. 2次カタログ取得（depth 1-2）
+        # 9. 2次カタログ取得（depth 1-2）
         catalog = _get_map_with_conn(conn, "activity", activity_id, min_depth=1, max_depth=2)
 
-        # 9. status自動更新（in_progress以外ならin_progressに変更）
+        # 10. status自動更新（in_progress以外ならin_progressに変更）
         # NOTE: update_activityは内部で別コネクションを使用する（既存APIの制約）。
         # check_inのトランザクションとは独立してコミットされる。
         if activity["status"] != "in_progress":
@@ -249,7 +305,7 @@ def check_in(activity_id: int) -> dict:
             else:
                 activity["status"] = "in_progress"
 
-        # 10. summary生成
+        # 11. summary生成
         summary = _build_summary(activity, tags)
 
         # 戻り値組み立て（coverageをトップレベルの最初のキーに）
@@ -274,6 +330,13 @@ def check_in(activity_id: int) -> dict:
 
         if dependencies:
             result["dependencies"] = dependencies
+
+        if pinned_decisions or pinned_logs or pinned_materials:
+            result["pinned"] = {
+                "decisions": pinned_decisions,
+                "logs": pinned_logs,
+                "materials": pinned_materials,
+            }
 
         result["tag_notes"] = tag_notes
         result["materials"] = materials
