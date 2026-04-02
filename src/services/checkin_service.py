@@ -86,7 +86,7 @@ def _get_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -
 
 
 def _count_decisions_from_topics(conn: sqlite3.Connection, topic_ids: list[int]) -> int:
-    """複数トピックのdecisionsの総件数を取得する。"""
+    """複数トピックのdecisionsの総件数を取得する（pinned含む、coverage分母用）。"""
     if not topic_ids:
         return 0
     placeholders = ",".join("?" * len(topic_ids))
