@@ -679,7 +679,7 @@ class TestResultBasedInjectionDoesNotMark:
 
 
 # ========================================
-# MCP ハンドラ経由テスト（FunctionTool.fn）
+# MCP ハンドラ経由テスト
 # ========================================
 
 
@@ -693,7 +693,7 @@ class TestHandlerGetTopicsInjection:
         add_topic(title="Handler Test", description="Desc", tags=["domain:handler"])
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        result = get_topics.fn()
+        result = get_topics()
         assert "error" not in result
         assert "tag_notes" in result
         assert any(n["tag"] == "domain:handler" for n in result["tag_notes"])
@@ -705,7 +705,7 @@ class TestHandlerGetTopicsInjection:
         add_topic(title="Handler Test", description="Desc", tags=["domain:handler"])
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        get_topics.fn()
+        get_topics()
         assert "domain:handler" not in _injected_tags
 
 
@@ -722,7 +722,7 @@ class TestHandlerGetActivitiesInjection:
         )
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        result = get_activities.fn()
+        result = get_activities()
         assert "error" not in result
         assert "tag_notes" in result
         assert any(n["tag"] == "domain:handler" for n in result["tag_notes"])
@@ -737,7 +737,7 @@ class TestHandlerGetActivitiesInjection:
         )
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        get_activities.fn()
+        get_activities()
         assert "domain:handler" not in _injected_tags
 
 
@@ -757,7 +757,7 @@ class TestHandlerGetLogsInjection:
         assert add_result["errors"] == []
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        result = get_logs.fn("topic", topic_id)
+        result = get_logs("topic", topic_id)
         assert "error" not in result
         assert "tag_notes" in result
         assert any(n["tag"] == "domain:handler" for n in result["tag_notes"])
@@ -775,7 +775,7 @@ class TestHandlerGetLogsInjection:
         assert add_result["errors"] == []
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        get_logs.fn("topic", topic_id)
+        get_logs("topic", topic_id)
         assert "domain:handler" not in _injected_tags
 
 
@@ -795,7 +795,7 @@ class TestHandlerGetDecisionsInjection:
         assert add_result["errors"] == []
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        result = get_decisions.fn("topic", topic_id)
+        result = get_decisions("topic", topic_id)
         assert "error" not in result
         assert "tag_notes" in result
         assert any(n["tag"] == "domain:handler" for n in result["tag_notes"])
@@ -813,5 +813,5 @@ class TestHandlerGetDecisionsInjection:
         assert add_result["errors"] == []
         update_tag("domain:handler", "ハンドラ経由テスト")
 
-        get_decisions.fn("topic", topic_id)
+        get_decisions("topic", topic_id)
         assert "domain:handler" not in _injected_tags

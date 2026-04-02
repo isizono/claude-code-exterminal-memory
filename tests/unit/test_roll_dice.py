@@ -2,8 +2,8 @@
 from src.main import roll_dice
 
 
-# @mcp.tool()デコレータがFunctionToolオブジェクトを返すため、.fnで元の関数を取得
-_roll = roll_dice.fn
+# FastMCP 3.xでは@mcp.tool()が元の関数をそのまま返す
+_roll = roll_dice
 
 
 class TestRollDice:

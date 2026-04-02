@@ -87,6 +87,65 @@ claude plugin install claude-code-memory
 | `CCM_RECENCY_DECAY_RATE` | `0.0014` | 検索の時間減衰率 |
 | `CCM_SYNC_DISABLE_RETROSPECTIVE` | `false` | `/sync-memory`のふりかえりセクションを非表示にする |
 
+<details>
+<summary>リモートサーバー（claude.aiから接続）</summary>
+
+claude.ai（Web版）からcc-memoryに接続するためのリモートサーバー構成。Cloudflare TunnelでHTTPS公開し、GitHub OAuthで認証する。
+
+### 前提条件
+
+- GitHub OAuth Appが登録済みであること
+- [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (`cloudflared`) がインストール済みであること
+
+### 1. GitHub OAuth App作成
+
+1. GitHub → Settings → Developer settings → OAuth Apps → New OAuth App
+2. 以下を設定:
+   - **Application name**: `cc-memory`（任意）
+   - **Homepage URL**: CF Tunnelの公開URL（例: `https://cc-memory.example.com`）
+   - **Authorization callback URL**: `<公開URL>/github/callback`
+3. Client IDとClient Secretを控える
+
+### 2. 環境変数の設定
+
+```bash
+export GITHUB_CLIENT_ID="your-client-id"
+export GITHUB_CLIENT_SECRET="your-client-secret"
+export CC_MEMORY_BASE_URL="https://cc-memory.example.com"
+```
+
+### 3. Cloudflare Tunnelのセットアップ
+
+```bash
+# 初回のみ: トンネル作成
+cloudflared tunnel create cc-memory
+cloudflared tunnel route dns cc-memory cc-memory.example.com
+
+# config.ymlに以下を追加
+# tunnel: <tunnel-id>
+# credentials-file: ~/.cloudflared/<tunnel-id>.json
+# ingress:
+#   - hostname: cc-memory.example.com
+#     service: http://localhost:8001
+#   - service: http_status:404
+```
+
+### 4. 起動
+
+```bash
+# リモートサーバー起動
+uv run python -m src.remote
+
+# 別ターミナルでCF Tunnel起動
+cloudflared tunnel run cc-memory
+```
+
+### 5. claude.aiから接続
+
+claude.ai → Settings → Integrations → Add Integration からリモートサーバーのURLを追加する。
+
+</details>
+
 ## ライセンス
 
 MIT
