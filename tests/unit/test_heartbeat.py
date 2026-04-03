@@ -92,6 +92,8 @@ def _make_tool_result_entry(tool_use_id: str, result_data: dict):
 
 _CHECKIN_TOOL = "mcp__plugin_claude-code-memory_cc-memory__check_in"
 _ADD_ACTIVITY_TOOL = "mcp__plugin_claude-code-memory_cc-memory__add_activity"
+_REMOTE_CHECKIN_TOOL = "mcp__claude_ai_cc-memory__check_in"
+_REMOTE_ADD_ACTIVITY_TOOL = "mcp__claude_ai_cc-memory__add_activity"
 
 
 class TestExtractCheckinActivityId:
@@ -172,6 +174,16 @@ class TestExtractCheckinActivityId:
             ),
         ]
         assert extract_checkin_activity_id(entries) == 55
+
+    def test_remote_prefix_checkin(self):
+        """リモートMCPプレフィックスのcheck_inも検出できる"""
+        entries = [
+            _make_assistant_entry(
+                tool_calls=[_REMOTE_CHECKIN_TOOL],
+                tool_inputs=[{"activity_id": 609}],
+            ),
+        ]
+        assert extract_checkin_activity_id(entries) == 609
 
 
 # ========================================
@@ -276,6 +288,31 @@ class TestExtractLastActivityId:
         ]
         path = _write_transcript(tmp_path, entries)
         assert extract_last_activity_id(path) == 77
+
+    def test_remote_prefix_check_in(self, tmp_path):
+        """リモートMCPプレフィックスのcheck_inも検出できる"""
+        entries = [
+            _make_assistant_entry(
+                tool_calls=[_REMOTE_CHECKIN_TOOL],
+                tool_inputs=[{"activity_id": 609}],
+                tool_ids=["toolu_remote_1"],
+            ),
+        ]
+        path = _write_transcript(tmp_path, entries)
+        assert extract_last_activity_id(path) == 609
+
+    def test_remote_prefix_add_activity(self, tmp_path):
+        """リモートMCPプレフィックスのadd_activityも検出できる"""
+        entries = [
+            _make_assistant_entry(
+                tool_calls=[_REMOTE_ADD_ACTIVITY_TOOL],
+                tool_inputs=[{"title": "a", "description": "d", "tags": ["domain:t"]}],
+                tool_ids=["toolu_remote_2"],
+            ),
+            _make_tool_result_entry("toolu_remote_2", {"activity_id": 123}),
+        ]
+        path = _write_transcript(tmp_path, entries)
+        assert extract_last_activity_id(path) == 123
 
 
 # ========================================
