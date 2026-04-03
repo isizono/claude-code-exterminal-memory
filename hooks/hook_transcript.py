@@ -198,12 +198,6 @@ def _extract_user_content_text(entry: dict) -> str:
 # ===================================================================
 
 
-_RECORDING_SHORT_NAMES = {"add_decisions", "add_topic", "add_logs"}
-
-_ADD_DECISION_SHORT = "add_decisions"
-
-_CHECKIN_SHORT_NAMES = {"check_in", "add_activity"}
-
 _CONTEXT_RETRIEVAL_SHORT_NAMES = {
     "search", "get_topics", "get_decisions",
     "get_logs", "get_activities", "get_by_ids",
@@ -233,12 +227,12 @@ def _has_tool_calls(entries: list[dict], short_names: set[str]) -> bool:
 
 def has_recent_recording(entries: list[dict]) -> bool:
     """entriesにadd_decisions/add_topic/add_logsのツール呼び出しがあるかチェック。"""
-    return _has_tool_calls(entries, _RECORDING_SHORT_NAMES)
+    return _has_tool_calls(entries, _RECORDING_TOOLS)
 
 
 def has_activity_checkin_calls(entries: list[dict]) -> bool:
     """entriesにcheck_in/add_activityのツール呼び出しがあるかチェック。"""
-    return _has_tool_calls(entries, _CHECKIN_SHORT_NAMES)
+    return _has_tool_calls(entries, _CHECKIN_TOOLS)
 
 
 def extract_checkin_activity_id(entries: list[dict]) -> int | None:
@@ -364,10 +358,10 @@ def has_context_retrieval_calls(entries: list[dict]) -> bool:
 
 def has_decision_without_activity(entries: list[dict]) -> bool:
     """entriesにadd_decisionがあり、かつcheck_in/add_activityがない場合True。"""
-    has_decision = _has_tool_calls(entries, {_ADD_DECISION_SHORT})
+    has_decision = _has_tool_calls(entries, {"add_decisions"})
     if not has_decision:
         return False
-    has_activity = _has_tool_calls(entries, _CHECKIN_SHORT_NAMES)
+    has_activity = _has_tool_calls(entries, _CHECKIN_TOOLS)
     return not has_activity
 
 
