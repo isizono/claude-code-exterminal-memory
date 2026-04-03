@@ -35,6 +35,10 @@ class ServerDisconnected(Exception):
 _REMOTE_URL = os.environ.get("CC_MEMORY_URL")
 
 if _REMOTE_URL:
+    if not _REMOTE_URL.startswith(("http://", "https://")):
+        raise ValueError(
+            f"CC_MEMORY_URL must start with http:// or https://, got: {_REMOTE_URL!r}"
+        )
     _base = _REMOTE_URL.rstrip("/")
     MCP_ENDPOINT = f"{_base}/mcp"
     _IS_LOCAL = False
@@ -298,12 +302,12 @@ def main() -> None:
         logger.info("Remote mode: connecting to %s", MCP_ENDPOINT)
 
     for attempt in range(MAX_RETRIES + 1):
-        # 1. HTTPサーバーの起動確認（ローカルのみ）
+        # 1. HTTPサーバーの起動確認（ローカルのみ。リモートはOAuth等の制約があるためスキップ）
         if _IS_LOCAL and not _ensure_server_running():
             logger.error("Failed to ensure HTTP server is running")
             sys.exit(1)
 
-        # 2. セッション登録（ローカルのみ）
+        # 2. セッション登録（ローカルのみ。リモートサーバーにはセッションAPIがない）
         if _IS_LOCAL and not _register_session():
             logger.error("Failed to register session")
             sys.exit(1)

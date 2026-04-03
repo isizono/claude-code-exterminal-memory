@@ -336,6 +336,7 @@ class TestMainRetryLoop:
 
         bridge_side_effectsにはasyncio.run(_bridge())の戻り値/例外のリストを渡す。
         """
+        monkeypatch.setattr(launcher, "_IS_LOCAL", True)
         monkeypatch.setattr(launcher, "_cleanup_done", False)
         monkeypatch.setattr(launcher, "_ensure_server_running", lambda: True)
         monkeypatch.setattr(launcher, "_register_session", lambda: True)
@@ -434,6 +435,7 @@ class TestMainRetryLoop:
         def counting_cleanup():
             cleanup_count["calls"] += 1
 
+        monkeypatch.setattr(launcher, "_IS_LOCAL", True)
         monkeypatch.setattr(launcher, "_cleanup_done", False)
         monkeypatch.setattr(launcher, "_cleanup", counting_cleanup)
         monkeypatch.setattr(launcher, "_ensure_server_running", lambda: True)
