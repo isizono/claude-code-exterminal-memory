@@ -133,13 +133,15 @@ class TestCheckIn:
 
         assert "error" not in result
         assert len(result["materials"]) == 2
-        # カタログ形式: id, title, snippet, created_at（contentなし）
+        # カタログ形式: id, title, snippet, source, created_at（contentなし）
         for m in result["materials"]:
             assert "id" in m
             assert "title" in m
             assert "snippet" in m
+            assert "source" in m
             assert "created_at" in m
             assert "content" not in m
+            assert m["source"] == "テスト用データ"
         # snippetの値が正しい
         assert result["materials"][0]["snippet"] == "# 設計\n詳細内容"
         assert result["materials"][1]["snippet"] == "# 調査\n結果内容"
@@ -724,6 +726,7 @@ class TestCheckInPinned:
         assert len(result["pinned"]["materials"]) == 1
         assert result["pinned"]["materials"][0]["title"] == "設計書"
         assert result["pinned"]["materials"][0]["content"] == "# 設計\n詳細な内容"
+        assert result["pinned"]["materials"][0]["source"] == "テスト用データ"
 
     def test_pinned_material_excluded_from_materials(self, temp_db):
         """pinされたmaterialは通常のmaterialsフィールドから除外される"""
