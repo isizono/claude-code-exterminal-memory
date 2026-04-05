@@ -33,9 +33,18 @@ def temp_db():
         src.config.DB_PATH = None
 
 
-def _run_session_start_hook(db_path: str) -> dict:
+def _run_session_start_hook(
+    db_path: str,
+    extra_env: dict | None = None,
+    env_remove: list[str] | None = None,
+) -> dict:
     """session_start_hook.pyを実行してJSON出力を返す"""
     env = {**os.environ, "DISCUSSION_DB_PATH": db_path}
+    if extra_env:
+        env.update(extra_env)
+    if env_remove:
+        for key in env_remove:
+            env.pop(key, None)
 
     result = subprocess.run(
         [sys.executable, "hooks/session_start_hook.py"],
@@ -314,3 +323,32 @@ class TestSessionStartHookErrorHandling:
         parsed = json.loads(stdout)
         # エラー時は空JSON
         assert parsed == {}
+
+
+class TestSessionStartHookSyncPolicy:
+    """sync_policyの注入テスト"""
+
+    def test_sync_policy_shown_when_set(self, temp_db):
+        """CCM_SYNC_POLICY設定時にsync_policyセクションが出力される"""
+        result = _run_session_start_hook(
+            temp_db, extra_env={"CCM_SYNC_POLICY": "PRマージ済みは自動で閉じて"}
+        )
+        context = result["hookSpecificOutput"]["additionalContext"]
+        assert "# sync_policy" in context
+        assert "PRマージ済みは自動で閉じて" in context
+
+    def test_sync_policy_hidden_when_unset(self, temp_db):
+        """CCM_SYNC_POLICY未設定時にsync_policyセクションが出力されない"""
+        result = _run_session_start_hook(
+            temp_db, env_remove=["CCM_SYNC_POLICY"]
+        )
+        context = result["hookSpecificOutput"]["additionalContext"]
+        assert "# sync_policy" not in context
+
+    def test_sync_policy_hidden_when_empty(self, temp_db):
+        """CCM_SYNC_POLICY空文字時にsync_policyセクションが出力されない"""
+        result = _run_session_start_hook(
+            temp_db, extra_env={"CCM_SYNC_POLICY": ""}
+        )
+        context = result["hookSpecificOutput"]["additionalContext"]
+        assert "# sync_policy" not in context
