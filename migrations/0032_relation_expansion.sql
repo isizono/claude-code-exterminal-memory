@@ -24,6 +24,7 @@ CREATE TABLE relations (
     source_id INTEGER NOT NULL,
     target_type TEXT NOT NULL CHECK(target_type IN ('topic', 'activity', 'material', 'decision', 'log')),
     target_id INTEGER NOT NULL,
+    -- 現在はrelated専用。depends_onはactivity_dependencies、supersedesはdecision_supersedesで管理
     relation_type TEXT NOT NULL DEFAULT 'related' CHECK(relation_type = 'related'),
     created_at TEXT DEFAULT (datetime('now')),
     PRIMARY KEY (source_type, source_id, target_type, target_id),
