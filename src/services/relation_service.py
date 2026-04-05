@@ -386,7 +386,8 @@ def add_relation(source_type: str, source_id: int, targets: list[dict], relation
     except ValueError as e:
         conn.rollback()
         logger.warning(f"add_relation rejected: {e}")
-        return {"error": {"code": "CIRCULAR_DEPENDENCY", "message": str(e)}}
+        code = "CIRCULAR_SUPERSEDES" if relation_type == "supersedes" else "CIRCULAR_DEPENDENCY"
+        return {"error": {"code": code, "message": str(e)}}
     except sqlite3.IntegrityError as e:
         conn.rollback()
         logger.error(f"add_relation failed: {e}")

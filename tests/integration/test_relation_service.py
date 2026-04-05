@@ -806,7 +806,7 @@ class TestSupersedes:
         assert result["removed"] == 1
 
     def test_supersedes_direct_cycle_rejected(self, entities_with_decision_log):
-        """supersedes直接循環（A→B, B→A）がCIRCULAR_DEPENDENCYエラーで拒否される"""
+        """supersedes直接循環（A→B, B→A）がCIRCULAR_SUPERSEDESエラーで拒否される"""
         e = entities_with_decision_log
         result = add_relation(
             "decision", e["d1"], [{"type": "decision", "ids": [e["d2"]]}],
@@ -820,10 +820,10 @@ class TestSupersedes:
             relation_type="supersedes",
         )
         assert "error" in result
-        assert result["error"]["code"] == "CIRCULAR_DEPENDENCY"
+        assert result["error"]["code"] == "CIRCULAR_SUPERSEDES"
 
     def test_supersedes_transitive_cycle_rejected(self, entities_with_decision_log):
-        """supersedes推移的循環（A→B, B→C, C→A）がCIRCULAR_DEPENDENCYエラーで拒否される"""
+        """supersedes推移的循環（A→B, B→C, C→A）がCIRCULAR_SUPERSEDESエラーで拒否される"""
         e = entities_with_decision_log
         result = add_relation(
             "decision", e["d1"], [{"type": "decision", "ids": [e["d2"]]}],
@@ -842,7 +842,7 @@ class TestSupersedes:
             relation_type="supersedes",
         )
         assert "error" in result
-        assert result["error"]["code"] == "CIRCULAR_DEPENDENCY"
+        assert result["error"]["code"] == "CIRCULAR_SUPERSEDES"
 
     def test_supersedes_non_decision_source_rejected(self, entities_with_decision_log):
         """supersedesのsource_typeがdecision以外の場合INVALID_RELATION_TYPEエラーになる"""
@@ -896,7 +896,7 @@ class TestSupersedes:
             relation_type="supersedes",
         )
         assert "error" in result
-        assert result["error"]["code"] == "CIRCULAR_DEPENDENCY"
+        assert result["error"]["code"] == "CIRCULAR_SUPERSEDES"
 
         # d2→d3も追加されていないことを確認（ロールバック）
         conn = get_connection()
@@ -1004,6 +1004,26 @@ class TestGetMapDecisionLogFilter:
         # depth=1のtopicだけ返る
         ids_in_result = {(ent["type"], ent["id"]) for ent in result["entities"]}
         assert ("topic", e["t1"]) in ids_in_result
+
+    def test_get_map_traverses_supersedes_edge(self, entities_with_decision_log):
+        """supersedes経由でdecisionに紐づくtopicに到達できる"""
+        e = entities_with_decision_log
+        # d2 supersedes d1、d1 related t1 のチェーン
+        add_relation(
+            "decision", e["d2"], [{"type": "decision", "ids": [e["d1"]]}],
+            relation_type="supersedes",
+        )
+        add_relation("decision", e["d1"], [{"type": "topic", "ids": [e["t1"]]}])
+
+        result = get_map("decision", e["d2"], min_depth=0, max_depth=2)
+
+        assert "error" not in result
+        # supersedes経由でd1に到達し、d1→t1のrelatedでt1に到達する
+        ids_in_result = {(ent["type"], ent["id"]) for ent in result["entities"]}
+        assert ("topic", e["t1"]) in ids_in_result
+        # decision自体は出力に含まれない
+        types_in_result = {ent["type"] for ent in result["entities"]}
+        assert "decision" not in types_in_result
 
 
 class TestFKLossImpact:
