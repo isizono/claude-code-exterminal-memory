@@ -191,7 +191,7 @@ def _build_habits_section(conn) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _build_sync_policy_section(conn) -> str:
+def _build_sync_policy_section(conn) -> str:  # conn: buildersループの統一シグネチャ
     """sync_policyが設定されていれば注入する。未設定時はコンテキスト消費ゼロ。"""
     if not config.SYNC_POLICY:
         return ""

@@ -33,11 +33,18 @@ def temp_db():
         src.config.DB_PATH = None
 
 
-def _run_session_start_hook(db_path: str, extra_env: dict | None = None) -> dict:
+def _run_session_start_hook(
+    db_path: str,
+    extra_env: dict | None = None,
+    env_remove: list[str] | None = None,
+) -> dict:
     """session_start_hook.pyを実行してJSON出力を返す"""
     env = {**os.environ, "DISCUSSION_DB_PATH": db_path}
     if extra_env:
         env.update(extra_env)
+    if env_remove:
+        for key in env_remove:
+            env.pop(key, None)
 
     result = subprocess.run(
         [sys.executable, "hooks/session_start_hook.py"],
@@ -332,22 +339,10 @@ class TestSessionStartHookSyncPolicy:
 
     def test_sync_policy_hidden_when_unset(self, temp_db):
         """CCM_SYNC_POLICY未設定時にsync_policyセクションが出力されない"""
-        env_without_policy = {
-            k: v for k, v in os.environ.items() if k != "CCM_SYNC_POLICY"
-        }
-        env_without_policy["DISCUSSION_DB_PATH"] = temp_db
-
-        result = subprocess.run(
-            [sys.executable, "hooks/session_start_hook.py"],
-            input="{}",
-            capture_output=True,
-            text=True,
-            cwd=str(PROJECT_ROOT),
-            env=env_without_policy,
+        result = _run_session_start_hook(
+            temp_db, env_remove=["CCM_SYNC_POLICY"]
         )
-        stdout = result.stdout.strip()
-        parsed = json.loads(stdout)
-        context = parsed["hookSpecificOutput"]["additionalContext"]
+        context = result["hookSpecificOutput"]["additionalContext"]
         assert "# sync_policy" not in context
 
     def test_sync_policy_hidden_when_empty(self, temp_db):
