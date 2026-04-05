@@ -3,6 +3,7 @@
 トピックまたはアクティビティに紐づくdecision・log・materialを時系列で返す。
 """
 import logging
+from datetime import datetime
 
 from src.db import get_connection
 
@@ -30,12 +31,17 @@ def get_timeline(
         topic_id: トピックID（activity_idと排他）
         activity_id: アクティビティID（topic_idと排他）
         entity_types: 取得するエンティティ型のリスト（"decision","log","material"のサブセット、未指定で全型）
-        before: ページネーション用カーソル（ISO 8601形式のcreated_at）
+        before: ページネーション用カーソル（ISO 8601形式のcreated_at、descでの前方ページネーション用）
         limit: 取得件数上限（デフォルト50、最大100）
         order: ソート方向（"desc"または"asc"、デフォルト"desc"）
 
+    Note:
+        beforeはdesc順での前方ページネーション用。asc順で次ページを取得するには
+        未対応（afterパラメータが必要だが現時点では未実装）。
+
     Returns:
         {items: [{id, type, title, created_at, replaces, replaced_by}], total}
+        totalはbefore条件に関係なく、entity_types・topic_id条件に合致する全件数を返す。
     """
     # --- バリデーション ---
 
@@ -70,6 +76,18 @@ def get_timeline(
                 "error": {
                     "code": "VALIDATION_ERROR",
                     "message": f"Invalid entity_types: {sorted(invalid)}. Valid types: {sorted(VALID_ENTITY_TYPES)}",
+                }
+            }
+
+    # before バリデーション
+    if before is not None:
+        try:
+            datetime.fromisoformat(before)
+        except (ValueError, TypeError):
+            return {
+                "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": f"Invalid before value: '{before}'. Must be ISO 8601 format (e.g. '2025-01-01 00:00:00')",
                 }
             }
 
@@ -143,24 +161,19 @@ def get_timeline(
             )
             count_params.extend(topic_ids)
 
-        if not union_parts:
-            return {"items": [], "total": 0}
-
         # before カーソル条件を外側のWHEREで適用
         base_query = " UNION ALL ".join(union_parts)
+
+        # totalは常にbefore条件なしの全件数を返す
+        count_query = f"SELECT COUNT(*) FROM ({' UNION ALL '.join(count_parts)}) AS c"
 
         if before:
             query = f"SELECT id, type, title, created_at FROM ({base_query}) AS t WHERE t.created_at < ? ORDER BY t.created_at {order} LIMIT ?"
             params.append(before)
             params.append(limit)
-
-            count_query = f"SELECT COUNT(*) FROM ({' UNION ALL '.join(count_parts)}) AS c WHERE c.created_at < ?"
-            count_params.append(before)
         else:
             query = f"SELECT id, type, title, created_at FROM ({base_query}) AS t ORDER BY t.created_at {order} LIMIT ?"
             params.append(limit)
-
-            count_query = f"SELECT COUNT(*) FROM ({' UNION ALL '.join(count_parts)}) AS c"
 
         # --- クエリ実行 ---
         rows = conn.execute(query, params).fetchall()

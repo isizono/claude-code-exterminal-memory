@@ -116,6 +116,23 @@ class TestGetTimelineValidation:
         assert "error" in result
         assert result["error"]["code"] == "VALIDATION_ERROR"
 
+    def test_invalid_before_format(self, temp_db):
+        """不正なbefore文字列を指定するとバリデーションエラーになる"""
+        result = get_timeline(topic_id=1, before="not-a-date")
+        assert "error" in result
+        assert result["error"]["code"] == "VALIDATION_ERROR"
+        assert "Invalid before" in result["error"]["message"]
+
+    def test_valid_before_format_accepted(self, topic):
+        """正しいISO 8601形式のbeforeは受け付けられる"""
+        result = get_timeline(topic_id=topic["topic_id"], before="2025-01-01 00:00:00")
+        assert "error" not in result
+
+    def test_valid_before_date_only_accepted(self, topic):
+        """日付のみのISO 8601形式も受け付けられる"""
+        result = get_timeline(topic_id=topic["topic_id"], before="2025-01-01")
+        assert "error" not in result
+
 
 class TestGetTimelineByTopicId:
     """topic_id指定でのタイムライン取得"""
@@ -292,8 +309,8 @@ class TestPagination:
         assert len(result["items"]) == 1
         assert result["items"][0]["title"] == "古いログ"
 
-    def test_before_cursor_total_reflects_filtered_count(self, topic):
-        """beforeカーソル使用時のtotalはフィルタ後の件数を返す"""
+    def test_before_cursor_total_reflects_all_count(self, topic):
+        """beforeカーソル使用時もtotalはbefore条件なしの全件数を返す"""
         tid = topic["topic_id"]
 
         conn = get_connection()
@@ -315,7 +332,8 @@ class TestPagination:
             conn.close()
 
         result = get_timeline(topic_id=tid, before="2025-06-01 00:00:00")
-        assert result["total"] == 2
+        assert len(result["items"]) == 2  # ログ1 + ログ2
+        assert result["total"] == 3  # 全3件
 
     def test_limit_restricts_results(self, topic):
         """limitで取得件数を制限できる"""
@@ -444,7 +462,7 @@ class TestTotalCount:
         assert result["total"] == 1
 
     def test_total_with_before_cursor(self, topic):
-        """beforeカーソルとtotalが整合する"""
+        """before指定時もtotalは全件数を返す"""
         tid = topic["topic_id"]
 
         conn = get_connection()
@@ -465,9 +483,10 @@ class TestTotalCount:
         finally:
             conn.close()
 
-        # before指定でフィルタ
+        # before指定でフィルタ → itemsは2件だがtotalは全3件
         result = get_timeline(topic_id=tid, before="2025-04-01 00:00:00")
-        assert result["total"] == 2  # ログ1 + 決定1
+        assert len(result["items"]) == 2  # ログ1 + 決定1
+        assert result["total"] == 3  # 全3件
 
 
 class TestRetractedExclusion:
