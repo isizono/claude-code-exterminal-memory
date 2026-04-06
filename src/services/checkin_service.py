@@ -183,7 +183,7 @@ def _get_pinned_materials_for_activity(conn: sqlite3.Connection, activity_id: in
     """アクティビティに紐づくpinned materialsをcontent付きで取得する。"""
     rows = conn.execute(
         """
-        SELECT m.id, m.title, m.content
+        SELECT m.id, m.title, m.content, m.source
         FROM materials m
         JOIN activity_material_relations amr ON amr.material_id = m.id
         WHERE amr.activity_id = ? AND m.pinned = 1
@@ -191,7 +191,7 @@ def _get_pinned_materials_for_activity(conn: sqlite3.Connection, activity_id: in
         """,
         (activity_id,),
     ).fetchall()
-    return [{"id": row["id"], "title": row["title"], "content": row["content"]} for row in rows]
+    return [{"id": row["id"], "title": row["title"], "content": row["content"], "source": row["source"]} for row in rows]
 
 
 def _extract_intent_tag(tags: list[str]) -> str:
