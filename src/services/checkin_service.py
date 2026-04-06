@@ -183,15 +183,16 @@ def _get_pinned_materials_for_activity(conn: sqlite3.Connection, activity_id: in
     """アクティビティに紐づくpinned materialsをcontent付きで取得する。"""
     rows = conn.execute(
         """
-        SELECT m.id, m.title, m.content
+        SELECT m.id, m.title, m.content, m.source
         FROM materials m
-        JOIN activity_material_relations amr ON amr.material_id = m.id
-        WHERE amr.activity_id = ? AND m.pinned = 1
+        JOIN relations r ON r.source_type = 'activity' AND r.source_id = ?
+                        AND r.target_type = 'material' AND r.target_id = m.id
+        WHERE m.pinned = 1
         ORDER BY m.created_at ASC
         """,
         (activity_id,),
     ).fetchall()
-    return [{"id": row["id"], "title": row["title"], "content": row["content"]} for row in rows]
+    return [{"id": row["id"], "title": row["title"], "content": row["content"], "source": row["source"]} for row in rows]
 
 
 def _extract_intent_tag(tags: list[str]) -> str:
@@ -306,7 +307,7 @@ def check_in(activity_id: int) -> dict:
         # 8. coverage算出（pinned件数・最新ログを分子に加算）
         total_decisions = _count_decisions_from_topics(conn, direct["topic"])
         total_materials_row = conn.execute(
-            "SELECT COUNT(*) FROM activity_material_relations WHERE activity_id = ?",
+            "SELECT COUNT(*) FROM relations WHERE source_type = 'activity' AND source_id = ? AND target_type = 'material'",
             (activity_id,),
         ).fetchone()
         total_materials = total_materials_row[0] if total_materials_row else 0
