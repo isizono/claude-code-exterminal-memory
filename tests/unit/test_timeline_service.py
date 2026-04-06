@@ -660,9 +660,28 @@ class TestSupersedes:
         assert items_by_id[2001]["replaced_by"] == {"type": "decision", "id": 2002}
         assert items_by_id[2001]["replaces"] is None
 
-    def test_log_and_material_replaces_always_null(self, topic):
-        """log/materialのreplaces/replaced_byはsupersedes関係があってもnull"""
+    def test_log_and_material_replaces_null_even_with_supersedes(self, topic):
+        """supersedes関係を持つdecisionが存在してもlog/materialのreplaces/replaced_byはnull"""
         tid = topic["topic_id"]
+
+        # supersedes関係のあるdecisionを作成
+        conn = get_connection()
+        try:
+            conn.execute(
+                "INSERT INTO decisions (id, topic_id, decision, reason) VALUES (?, ?, ?, ?)",
+                (3001, tid, "旧決定", "理由"),
+            )
+            conn.execute(
+                "INSERT INTO decisions (id, topic_id, decision, reason) VALUES (?, ?, ?, ?)",
+                (3002, tid, "新決定", "理由"),
+            )
+            conn.execute(
+                "INSERT INTO decision_supersedes (source_id, target_id) VALUES (?, ?)",
+                (3002, 3001),
+            )
+            conn.commit()
+        finally:
+            conn.close()
 
         add_logs([{"topic_id": tid, "content": "テストログ", "title": "ログ"}])
         add_material(
