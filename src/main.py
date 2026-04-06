@@ -14,6 +14,7 @@ from src.services import (
     relation_service,
     pin_service,
     retract_service,
+    timeline_service,
 )
 from src.services.checkin_service import check_in as _check_in
 from src.services.tag_service import search_tags as _search_tags, update_tag as _update_tag, collect_tag_notes_for_injection
@@ -859,6 +860,32 @@ def retract(entity_type: str, ids: list[int], undo: bool = False) -> dict:
         undo: True=取り消しを元に戻す（un-retract）、False=取り消す（retract）
     """
     return retract_service.retract(entity_type, ids, undo)
+
+
+@mcp.tool()
+def get_timeline(
+    topic_id: int | None = None,
+    activity_id: int | None = None,
+    entity_types: list[str] | None = None,
+    before: str | None = None,
+    limit: int = 50,
+    order: str = "desc",
+) -> dict:
+    """トピックまたはアクティビティに紐づくdecision・log・materialを時系列で返す。
+
+    Args:
+        topic_id: トピックID（activity_idと排他）
+        activity_id: アクティビティID（topic_idと排他）
+        entity_types: 取得するエンティティ型のリスト（"decision","log","material"のサブセット、未指定で全型）
+        before: ページネーション用カーソル（ISO 8601形式のcreated_at）
+        limit: 取得件数上限（デフォルト50、最大100）
+        order: ソート方向（"desc"または"asc"、デフォルト"desc"）
+    """
+    return timeline_service.get_timeline(
+        topic_id=topic_id, activity_id=activity_id,
+        entity_types=entity_types, before=before,
+        limit=limit, order=order,
+    )
 
 
 @mcp.tool()
