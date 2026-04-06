@@ -7,6 +7,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: unit
+            path: tests/unit
+          - name: integration-e2e
+            path: tests/integration tests/e2e
+
+    name: test (${{ matrix.name }})
 
     steps:
       - name: Checkout code
@@ -22,4 +31,4 @@ jobs:
         run: uv sync --frozen
 
       - name: Run tests with pytest
-        run: uv run pytest -v --tb=short
+        run: uv run pytest -v --tb=short -n auto ${{ matrix.path }}
