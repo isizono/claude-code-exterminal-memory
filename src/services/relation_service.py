@@ -9,8 +9,8 @@ from src.services.tag_service import (
 
 logger = logging.getLogger(__name__)
 
-VALID_ENTITY_TYPES = {"topic", "activity", "material"}
-VALID_RELATION_TYPES = {"related", "depends_on"}
+VALID_ENTITY_TYPES = {"topic", "activity", "material", "decision", "log"}
+VALID_RELATION_TYPES = {"related", "depends_on", "supersedes"}
 
 
 def _validate_entity_type(entity_type: str) -> dict | None:
@@ -52,84 +52,28 @@ def _validate_targets(source_type: str, targets: list[dict]) -> dict | None:
                     "message": f"'ids' for type '{target['type']}' must be a non-empty list",
                 }
             }
-        # material同士のリレーションは非サポート
-        if source_type == "material" and target["type"] == "material":
-            return {
-                "error": {
-                    "code": "UNSUPPORTED_RELATION",
-                    "message": "material-to-material relations are not supported",
-                }
-            }
     return None
 
 
-def _get_insert_params(source_type: str, source_id: int, target_type: str, target_id: int):
-    """source/targetの組み合わせから、適切なテーブルとINSERTパラメータを返す。
+def _normalize_pair(source_type: str, source_id: int, target_type: str, target_id: int):
+    """source/targetペアを正規化する（source_type < target_type、同一typeならsource_id < target_id）。
 
     Returns:
-        (table_name, columns, values) or None（自己参照の場合）
+        (source_type, source_id, target_type, target_id) or None（自己参照の場合）
     """
-    # 自己参照チェック
     if source_type == target_type and source_id == target_id:
         return None
 
-    if source_type == "topic" and target_type == "topic":
-        # 正規化: id_1 < id_2
-        id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
-        return ("topic_relations", "(topic_id_1, topic_id_2)", (id_1, id_2))
-    elif source_type == "topic" and target_type == "activity":
-        return ("topic_activity_relations", "(topic_id, activity_id)", (source_id, target_id))
-    elif source_type == "activity" and target_type == "topic":
-        return ("topic_activity_relations", "(topic_id, activity_id)", (target_id, source_id))
-    elif source_type == "activity" and target_type == "activity":
-        # 正規化: id_1 < id_2
-        id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
-        return ("activity_relations", "(activity_id_1, activity_id_2)", (id_1, id_2))
-    elif source_type == "topic" and target_type == "material":
-        return ("topic_material_relations", "(topic_id, material_id)", (source_id, target_id))
-    elif source_type == "material" and target_type == "topic":
-        return ("topic_material_relations", "(topic_id, material_id)", (target_id, source_id))
-    elif source_type == "activity" and target_type == "material":
-        return ("activity_material_relations", "(activity_id, material_id)", (source_id, target_id))
-    elif source_type == "material" and target_type == "activity":
-        return ("activity_material_relations", "(activity_id, material_id)", (target_id, source_id))
+    if source_type < target_type:
+        return (source_type, source_id, target_type, target_id)
+    elif source_type > target_type:
+        return (target_type, target_id, source_type, source_id)
     else:
-        raise ValueError(f"Unexpected type combination: {source_type}/{target_type}")
-
-
-def _get_delete_params(source_type: str, source_id: int, target_type: str, target_id: int):
-    """source/targetの組み合わせから、適切なテーブルとDELETE条件を返す。
-
-    Returns:
-        (table_name, where_clause, values) or None（自己参照の場合）
-
-    Raises:
-        ValueError: 不正なtype組み合わせ（バリデーション済みなら到達しない）
-    """
-    # 自己参照チェック（_get_insert_paramsと対称）
-    if source_type == target_type and source_id == target_id:
-        return None
-
-    if source_type == "topic" and target_type == "topic":
-        id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
-        return ("topic_relations", "topic_id_1 = ? AND topic_id_2 = ?", (id_1, id_2))
-    elif source_type == "topic" and target_type == "activity":
-        return ("topic_activity_relations", "topic_id = ? AND activity_id = ?", (source_id, target_id))
-    elif source_type == "activity" and target_type == "topic":
-        return ("topic_activity_relations", "topic_id = ? AND activity_id = ?", (target_id, source_id))
-    elif source_type == "activity" and target_type == "activity":
-        id_1, id_2 = min(source_id, target_id), max(source_id, target_id)
-        return ("activity_relations", "activity_id_1 = ? AND activity_id_2 = ?", (id_1, id_2))
-    elif source_type == "topic" and target_type == "material":
-        return ("topic_material_relations", "topic_id = ? AND material_id = ?", (source_id, target_id))
-    elif source_type == "material" and target_type == "topic":
-        return ("topic_material_relations", "topic_id = ? AND material_id = ?", (target_id, source_id))
-    elif source_type == "activity" and target_type == "material":
-        return ("activity_material_relations", "activity_id = ? AND material_id = ?", (source_id, target_id))
-    elif source_type == "material" and target_type == "activity":
-        return ("activity_material_relations", "activity_id = ? AND material_id = ?", (target_id, source_id))
-    else:
-        raise ValueError(f"Unexpected type combination: {source_type}/{target_type}")
+        # 同一type: id順で正規化
+        if source_id < target_id:
+            return (source_type, source_id, target_type, target_id)
+        else:
+            return (source_type, target_id, target_type, source_id)
 
 
 def _has_dependency_path(conn: sqlite3.Connection, from_id: int, to_id: int) -> bool:
@@ -201,15 +145,14 @@ def _add_relation_with_conn(conn: sqlite3.Connection, source_type: str, source_i
     for target in targets:
         target_type = target["type"]
         for target_id in target["ids"]:
-            params = _get_insert_params(source_type, source_id, target_type, target_id)
-            if params is None:
+            normalized = _normalize_pair(source_type, source_id, target_type, target_id)
+            if normalized is None:
                 # 自己参照はスキップ
                 continue
-            table, columns, values = params
-            placeholders = ", ".join("?" for _ in values)
+            n_stype, n_sid, n_ttype, n_tid = normalized
             conn.execute(
-                f"INSERT OR IGNORE INTO {table} {columns} VALUES ({placeholders})",
-                values,
+                "INSERT OR IGNORE INTO relations (source_type, source_id, target_type, target_id) VALUES (?, ?, ?, ?)",
+                (n_stype, n_sid, n_ttype, n_tid),
             )
             # INSERT OR IGNOREの場合、重複時はchanges()=0
             if conn.execute("SELECT changes()").fetchone()[0] > 0:
@@ -247,13 +190,13 @@ def _remove_relation_with_conn(conn: sqlite3.Connection, source_type: str, sourc
     for target in targets:
         target_type = target["type"]
         for target_id in target["ids"]:
-            params = _get_delete_params(source_type, source_id, target_type, target_id)
-            if params is None:
+            normalized = _normalize_pair(source_type, source_id, target_type, target_id)
+            if normalized is None:
                 continue
-            table, where_clause, values = params
+            n_stype, n_sid, n_ttype, n_tid = normalized
             conn.execute(
-                f"DELETE FROM {table} WHERE {where_clause}",
-                values,
+                "DELETE FROM relations WHERE source_type = ? AND source_id = ? AND target_type = ? AND target_id = ?",
+                (n_stype, n_sid, n_ttype, n_tid),
             )
             removed += conn.execute("SELECT changes()").fetchone()[0]
     return removed
@@ -279,15 +222,123 @@ def _validate_depends_on_constraints(source_type: str, targets: list[dict]) -> d
     return None
 
 
+def _validate_supersedes_constraints(source_type: str, targets: list[dict]) -> dict | None:
+    """supersedesリレーションの制約をバリデーションする。decision→decisionのみ有効。"""
+    if source_type != "decision":
+        return {
+            "error": {
+                "code": "INVALID_RELATION_TYPE",
+                "message": "supersedes relation is only valid for decision→decision",
+            }
+        }
+    for target in targets:
+        if target["type"] != "decision":
+            return {
+                "error": {
+                    "code": "INVALID_RELATION_TYPE",
+                    "message": "supersedes relation is only valid for decision→decision",
+                }
+            }
+    return None
+
+
+def _has_supersedes_path(conn: sqlite3.Connection, from_id: int, to_id: int) -> bool:
+    """DFSでfrom_idからto_idへのsupersedes経路が存在するか判定する。
+
+    decision_supersedesテーブルを辿り、from_id → ... → to_id の到達可能性をチェックする。
+    循環検出に使用: 新たに source→target を追加する前に、
+    target→source への既存経路があればサイクルになる。
+    """
+    visited: set[int] = set()
+    stack = [from_id]
+    while stack:
+        current = stack.pop()
+        if current == to_id:
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+        rows = conn.execute(
+            "SELECT target_id FROM decision_supersedes WHERE source_id = ?",
+            (current,),
+        ).fetchall()
+        for row in rows:
+            stack.append(row["target_id"])
+    return False
+
+
+def _add_supersedes_with_conn(conn: sqlite3.Connection, source_id: int, target_ids: list[int]) -> int:
+    """supersedesリレーションをdecision_supersedesテーブルに追加する。
+
+    循環を検出した場合はValueErrorを送出する。
+
+    Args:
+        conn: DB接続
+        source_id: 上書き元のdecision ID
+        target_ids: 上書き先のdecision IDリスト
+
+    Returns:
+        追加件数
+
+    Raises:
+        ValueError: 循環が検出された場合
+    """
+    added = 0
+    for target_id in target_ids:
+        # 自己参照はCHECK制約で弾かれるが、明示的にスキップ
+        if source_id == target_id:
+            continue
+
+        # 循環チェック: target_id → source_id への経路が既に存在すればサイクル
+        if _has_supersedes_path(conn, target_id, source_id):
+            raise ValueError(
+                f"Circular supersedes detected: adding {source_id}→{target_id} "
+                f"would create a cycle"
+            )
+
+        conn.execute(
+            "INSERT OR IGNORE INTO decision_supersedes (source_id, target_id) VALUES (?, ?)",
+            (source_id, target_id),
+        )
+        if conn.execute("SELECT changes()").fetchone()[0] > 0:
+            added += 1
+    return added
+
+
+def _remove_supersedes_with_conn(conn: sqlite3.Connection, source_id: int, target_ids: list[int]) -> int:
+    """supersedesリレーションをdecision_supersedesテーブルから削除する。
+
+    Args:
+        conn: DB接続
+        source_id: 上書き元のdecision ID
+        target_ids: 上書き先のdecision IDリスト
+
+    Returns:
+        削除件数
+    """
+    removed = 0
+    for target_id in target_ids:
+        # 自己参照はCHECK制約で存在し得ないが、明示的にスキップ
+        if source_id == target_id:
+            continue
+        conn.execute(
+            "DELETE FROM decision_supersedes WHERE source_id = ? AND target_id = ?",
+            (source_id, target_id),
+        )
+        removed += conn.execute("SELECT changes()").fetchone()[0]
+    return removed
+
+
 def add_relation(source_type: str, source_id: int, targets: list[dict], relation_type: str = "related") -> dict:
     """リレーションを追加する。
 
     Args:
-        source_type: 起点エンティティのタイプ（"topic", "activity", or "material"）
+        source_type: 起点エンティティのタイプ（"topic", "activity", "material", "decision", or "log"）
         source_id: 起点エンティティのID
         targets: ターゲットリスト [{"type": "topic", "ids": [1, 2]}, ...]
-        relation_type: リレーションタイプ（"related" or "depends_on"）。
+        relation_type: リレーションタイプ（"related", "depends_on", or "supersedes"）。
             "depends_on" はactivity同士のみ有効で、循環依存を検出した場合はエラーを返す。
+            "supersedes" はdecision同士のみ有効で、循環を検出した場合はエラーを返す。
 
     Returns:
         成功時: {"added": int}
@@ -313,12 +364,21 @@ def add_relation(source_type: str, source_id: int, targets: list[dict], relation
         if err:
             return err
 
+    if relation_type == "supersedes":
+        err = _validate_supersedes_constraints(source_type, targets)
+        if err:
+            return err
+
     conn = get_connection()
     try:
         if relation_type == "depends_on":
             added = 0
             for target in targets:
                 added += _add_depends_on_with_conn(conn, source_id, target["ids"])
+        elif relation_type == "supersedes":
+            added = 0
+            for target in targets:
+                added += _add_supersedes_with_conn(conn, source_id, target["ids"])
         else:
             added = _add_relation_with_conn(conn, source_type, source_id, targets)
         conn.commit()
@@ -326,7 +386,8 @@ def add_relation(source_type: str, source_id: int, targets: list[dict], relation
     except ValueError as e:
         conn.rollback()
         logger.warning(f"add_relation rejected: {e}")
-        return {"error": {"code": "CIRCULAR_DEPENDENCY", "message": str(e)}}
+        code = "CIRCULAR_SUPERSEDES" if relation_type == "supersedes" else "CIRCULAR_DEPENDENCY"
+        return {"error": {"code": code, "message": str(e)}}
     except sqlite3.IntegrityError as e:
         conn.rollback()
         logger.error(f"add_relation failed: {e}")
@@ -343,11 +404,12 @@ def remove_relation(source_type: str, source_id: int, targets: list[dict], relat
     """リレーションを削除する。
 
     Args:
-        source_type: 起点エンティティのタイプ（"topic", "activity", or "material"）
+        source_type: 起点エンティティのタイプ（"topic", "activity", "material", "decision", or "log"）
         source_id: 起点エンティティのID
         targets: ターゲットリスト [{"type": "topic", "ids": [1, 2]}, ...]
-        relation_type: リレーションタイプ（"related" or "depends_on"）。
+        relation_type: リレーションタイプ（"related", "depends_on", or "supersedes"）。
             "depends_on" はactivity同士のみ有効。
+            "supersedes" はdecision同士のみ有効。
 
     Returns:
         成功時: {"removed": int}
@@ -373,12 +435,21 @@ def remove_relation(source_type: str, source_id: int, targets: list[dict], relat
         if err:
             return err
 
+    if relation_type == "supersedes":
+        err = _validate_supersedes_constraints(source_type, targets)
+        if err:
+            return err
+
     conn = get_connection()
     try:
         if relation_type == "depends_on":
             removed = 0
             for target in targets:
                 removed += _remove_depends_on_with_conn(conn, source_id, target["ids"])
+        elif relation_type == "supersedes":
+            removed = 0
+            for target in targets:
+                removed += _remove_supersedes_with_conn(conn, source_id, target["ids"])
         else:
             removed = _remove_relation_with_conn(conn, source_type, source_id, targets)
         conn.commit()
@@ -412,7 +483,7 @@ def _get_map_with_conn(
         )
         SELECT DISTINCT entity_type, entity_id, MIN(depth) AS depth
         FROM reachable
-        WHERE depth >= ?
+        WHERE depth >= ? AND entity_type IN ('topic', 'activity', 'material')
         GROUP BY entity_type, entity_id
         """,
         (entity_type, entity_id, max_depth, min_depth),
@@ -501,8 +572,11 @@ def _get_map_with_conn(
 def get_map(entity_type: str, entity_id: int, min_depth: int = 0, max_depth: int = 2) -> dict:
     """リレーショングラフを走査し、到達可能エンティティのカタログを返す。
 
+    decision/logノードはグラフ走査の経由ノードとして使用するが、
+    返却するカタログにはtopic/activity/materialのみ含める。
+
     Args:
-        entity_type: 起点エンティティのタイプ（"topic" or "activity"）
+        entity_type: 起点エンティティのタイプ（"topic", "activity", "material", "decision", or "log"）
         entity_id: 起点エンティティのID
         min_depth: 最小深度（デフォルト: 0）
         max_depth: 最大深度（デフォルト: 2）
