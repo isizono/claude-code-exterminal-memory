@@ -257,7 +257,7 @@ _CONTEXT_FLOW_GUIDE = """\
   - 例: ユビキタス言語を定義したmaterial、方針を決定づけるdecision
 - `get_map`: トピックやアクティビティの関連構造を俯瞰できる。全体像の把握や探索に有用
 - `get_timeline`: エンティティの時系列変遷を追える。経緯を辿りたいときに有用
-- `supersedes`・`depends_on`: エンティティ間のリレーション。差し替えられたdecisionやブロッカーのあるアクティビティの管理に使う
+- リレーションタイプ `supersedes`・`depends_on`（`add_relation`で設定）: 差し替えられたdecisionやブロッカーのあるアクティビティの管理に使う
 """
 
 

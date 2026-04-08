@@ -151,6 +151,7 @@ class TestSessionStartHookBasic:
 
         context = result["hookSpecificOutput"]["additionalContext"]
         assert "コンテキスト取得フロー" in context
+        assert "補助ツール・概念" in context
         assert "# アクティビティ一覧" not in context
         assert "振る舞い" not in context
 
