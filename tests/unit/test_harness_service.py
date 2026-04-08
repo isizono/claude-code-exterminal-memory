@@ -134,14 +134,14 @@ class TestCondition3LogsSparse:
         assert HINT_LOGS_SPARSE not in hints
 
     def test_retracted_logs_excluded(self, topic, mock_embedding_server):
-        """retractされたlogsはカウントに含めない"""
+        """retractされたlogsはカウントに含めない: retractで発火/非発火が切り替わる"""
         tid = topic["topic_id"]
-        _add_n_decisions(tid, 7)
+        _add_n_decisions(tid, 6)
         _add_n_logs(tid, 2)
-        # d/l = 7/2 = 3.5 → 発火
-        assert HINT_LOGS_SPARSE in get_recommendations(tid)
+        # d/l = 6/2 = 3.0（閾値ちょうど） → 発火しない
+        assert HINT_LOGS_SPARSE not in get_recommendations(tid)
 
-        # 1件retractしてlogs=1 → d/l = 7/1 = 7.0 → まだ発火
+        # 1件retractして有効logs=1 → d/l = 6/1 = 6.0 > 3.0 → 発火する
         conn = get_connection()
         try:
             conn.execute(
